@@ -19,7 +19,7 @@ memory_t *memory_new(char *file) {
   // TODO: change these into actual mappings.
   M->PPU = xcalloc(PPU_SIZE, sizeof(uint8_t));
   M->IO = xcalloc(IO_SIZE, sizeof(uint8_t));
-  M->bat = xcalloc(BAT_SIZE, sizeof(uint8_t));
+  M->bat = xcalloc(MAP2_BAT_SIZE, sizeof(uint8_t));
 
   // Read in INES/NES2.0 header.
   FILE *rom = fopen(file, "r");
@@ -31,6 +31,7 @@ memory_t *memory_new(char *file) {
   // Caclulate size and load rom into memory.
   size_t numBanks = (size_t)M->header[INES_PRGROM];
   for (int i = 0; i < numBanks; i++) {
+    M->cart[i] = xmalloc(MAP2_BANK_SIZE, sizeof(uint8_t));
     for (int j = 0; j < MAP2_BANK_SIZE; j++) {
       M->cart[i][j] = fgetc(rom);
     }

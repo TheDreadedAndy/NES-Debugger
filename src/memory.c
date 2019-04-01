@@ -8,7 +8,9 @@
 
 #include <stdlib.h>
 #include <stdint.h>
+#include <stdio.h>
 #include "util.h"
+#include "memory.h"
 
 // Creates a new memory structure.
 // Currently only supports mapper 2.
@@ -23,16 +25,16 @@ memory_t *memory_new(char *file) {
 
   // Read in INES/NES2.0 header.
   FILE *rom = fopen(file, "r");
-  M->header = xmalloc(HEADER_SIZE, sizeof(uint8_t));
-  for (int i = 0; i < HEADER_SIZE, i++) {
+  M->header = xmalloc(HEADER_SIZE * sizeof(uint8_t));
+  for (size_t i = 0; i < HEADER_SIZE; i++) {
     M->header[i] = (uint8_t)fgetc(rom);
   }
 
   // Caclulate size and load rom into memory.
   size_t numBanks = (size_t)M->header[INES_PRGROM];
-  for (int i = 0; i < numBanks; i++) {
-    M->cart[i] = xmalloc(MAP2_BANK_SIZE, sizeof(uint8_t));
-    for (int j = 0; j < MAP2_BANK_SIZE; j++) {
+  for (size_t i = 0; i < numBanks; i++) {
+    M->cart[i] = xmalloc(MAP2_BANK_SIZE * sizeof(uint8_t));
+    for (size_t j = 0; j < MAP2_BANK_SIZE; j++) {
       M->cart[i][j] = fgetc(rom);
     }
   }
@@ -47,7 +49,7 @@ memory_t *memory_new(char *file) {
 // Reads memory from a memory structure.
 // Only supports mapper 2.
 uint8_t memory_read(uint8_t locL, uint8_t locH, memory_t *M) {
-  uint16_t addr = (((uint16_t)locH) << 8) | locH;
+  uint16_t addr = (((uint16_t)locH) << 8) | locL;
   // Detect where in memory we need to access and do so.
   if (addr < 0x2000) {
     return M->RAM[addr];
@@ -70,7 +72,7 @@ uint8_t memory_read(uint8_t locL, uint8_t locH, memory_t *M) {
 // Writes memory to the memory structure.
 // Handles bank switches.
 void memory_write(uint8_t val, uint8_t locL, uint8_t locH, memory_t *M) {
-  uint16_t addr = (((uint16_t)locH) << 8) | locH;
+  uint16_t addr = (((uint16_t)locH) << 8) | locL;
   // Detect where in memory we need to access and do so.
   if (addr < 0x2000) {
     M->RAM[addr] = val;
@@ -92,7 +94,7 @@ void memory_write(uint8_t val, uint8_t locL, uint8_t locH, memory_t *M) {
     M->currentBank = val & 0x0f;
     return;
   } else {
-    M->currentBank = val & 0x0f
+    M->currentBank = val & 0x0f;
     return;
   }
 }

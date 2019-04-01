@@ -1,13 +1,10 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include "microops.h"
 
 #ifndef _NES_STATE
 #define _NES_STATE
-
-// Data type for micro instruction constant.
-typedef uint8_t micromem_t;
-typedef uint8_t microdata_t;
 
 typedef struct micro {
   micromem_t mem;

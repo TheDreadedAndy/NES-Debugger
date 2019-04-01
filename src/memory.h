@@ -4,12 +4,19 @@
 #ifndef _NES_MEM
 #define _NES_MEM
 
-// Max number of banks used by mapper 2.
+// Constants used to size and access memory.
 #define MAP2_MAX_BANKS 16
 #define MAP2_BANK_SIZE ((size_t)(1 << 14));
+#define MAP2_BANK_OFFSET (size_t)(0x8000);
+#define MAP2_FIXED_BANK_OFFSET (size_t)(0xC000);
+#define MAP2_BAT_SIZE (size_t)(0x2000);
+#define MAP2_BAT_OFFSET (size_t)(0x6000);
 #define RAM_SIZE ((size_t)(1 << 11));
-#define PPU_SIZE (size_t)(0x2000);
-#define APU_SIZE (
+#define PPU_SIZE (size_t)(0x8);
+#define PPU_OFFSET (size_t)(0x2000);
+#define IO_SIZE (size_t)(0x20);
+#define IO_OFFSET (size_t)(0x4000);
+#define HEADER_SIZE (size_t)(0x10);
 
 // Nes virtual memory data structure.
 // For now, I'll only be implementing mapper 2.
@@ -17,6 +24,8 @@ typedef struct memory {
   uint8_t *RAM;
   uint8_t *PPU;
   uint8_t *IO;
+  uint8_t *bat;
+  uint8_t *header;
   uint8_t *cart[MAX_BANKS];
   uint8_t currentBank;
   // Should always be the final used bank.

@@ -18,6 +18,9 @@
 #define IO_OFFSET (size_t)(0x4000);
 #define HEADER_SIZE (size_t)(0x10);
 
+// INES header constants.
+#define INES_PRGROM 4;
+
 // Nes virtual memory data structure.
 // For now, I'll only be implementing mapper 2.
 typedef struct memory {

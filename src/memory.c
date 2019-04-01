@@ -10,7 +10,10 @@
 #include <stdint.h>
 #include "util.h"
 
+// Creates a new memory structure.
+// Currently only supports mapper 2.
 memory_t *memory_new(char *file) {
+  // Allocate memory and set up maps.
   memory_t *M = xcalloc(1, sizeof(memory_t));
   M->RAM = xcalloc(RAM_SIZE, sizeof(uint8_t));
   // TODO: change these into actual mappings.
@@ -18,6 +21,25 @@ memory_t *memory_new(char *file) {
   M->IO = xcalloc(IO_SIZE, sizeof(uint8_t));
   M->bat = xcalloc(BAT_SIZE, sizeof(uint8_t));
 
+  // Read in INES/NES2.0 header.
+  FILE *rom = fopen(file, "r");
+  M->header = xmalloc(HEADER_SIZE, sizeof(uint8_t));
+  for (int i = 0; i < HEADER_SIZE, i++) {
+    M->header[i] = (uint8_t)fgetc(rom);
+  }
+
+  // Caclulate size and load rom into memory.
+  size_t numBanks = (size_t)M->header[INES_PRGROM];
+  for (int i = 0; i < numBanks; i++) {
+    for (int j = 0; j < MAP2_BANK_SIZE; j++) {
+      M->cart[i][j] = fgetc(rom);
+    }
+  }
+  M->currentBank = 0;
+  M->fixedBank = numBanks - 1;
+
+  // Cleanup and exit.
+  fclose(rom);
   return M;
 }
 

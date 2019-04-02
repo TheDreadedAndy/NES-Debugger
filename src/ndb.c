@@ -14,7 +14,7 @@
 #include "memory.h"
 
 // Helper functions.
-regfile_t *regfile_new(void);
+regfile_t *regfile_new(memory_t *M);
 
 int main(int argc, char *argv[]) {
 
@@ -25,7 +25,7 @@ int main(int argc, char *argv[]) {
   // Parses the users command line input.
   size_t iterations = 0;
   char *file = NULL;
-  char opt;
+  signed char opt;
 
   while ((opt = getopt(argc, argv, "hi:f:")) != -1) {
     switch (opt) {
@@ -45,15 +45,21 @@ int main(int argc, char *argv[]) {
     }
   }
 
+  if (file == NULL) {
+    printf("Please specify a file\n");
+    exit(0);
+  }
+
   // Prepares the 2A03 for execution.
   memory_t *M = memory_new(file);
-  regfile_t *R = regfile_new();
+  regfile_t *R = regfile_new(M);
   state_t *S = state_new();
   state_add_cycle(MEM_FETCH, DAT_NOP, true, S);
 
   for (size_t i = 0; i < iterations; i++) {
     // Executes the next cycle and prints the results.
     cpu_run_cycle(R, M, S);
+    printf("-----------------------------------\n");
     printf("State following iteration %d:\n", i);
     printf("A: %x, X: %x, Y: %x, INST: %x\n", R->A, R->X, R->Y, R->inst);
     printf("State (flags): %x, Stack pointer: %x\n", R->P, R->S);
@@ -67,8 +73,10 @@ int main(int argc, char *argv[]) {
   return 0;
 }
 
-regfile_t *regfile_new(void) {
+regfile_t *regfile_new(memory_t *M) {
   regfile_t *R = xcalloc(1, sizeof(regfile_t));
   R->P = 0x20; // TODO: verify this.
+  R->PCL = memory_read(MEMORY_RESET_LOW, MEMORY_RESET_HIGH, M);
+  R->PCH = memory_read(MEMORY_RESET_LOW+1, MEMORY_RESET_HIGH, M);
   return R;
 }

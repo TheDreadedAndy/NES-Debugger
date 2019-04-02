@@ -39,7 +39,8 @@ int main(int argc, char *argv[]) {
         file = optarg;
         break;
       default:
-        printf("ndb -i <NUM> -f <FILE>\n");
+        printf("usage: ndb -i <NUM> -f <FILE>\n");
+        exit(1);
         break;
     }
   }

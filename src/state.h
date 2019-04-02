@@ -15,16 +15,16 @@ typedef struct micro {
 } micro_t;
 
 // System state is managed by a queue of micro instructions
+typedef struct node {
+  micro_t *elem;
+  struct node *next;
+  struct node *prev;
+} node_t;
+
 typedef struct queue_header {
   node_t *start;
   node_t *end;
 } state_t;
-
-typedef struct node {
-  micro_t *elem;
-  node_t *next;
-  node_t *prev;
-} node_t;
 
 // These are the commands that the 2A03 emulation will use to interact with
 // the processor state structure.

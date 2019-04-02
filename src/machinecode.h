@@ -83,7 +83,7 @@
 #define INST_SBC_IZP_Y 0xF1
 #define INST_SBC_ZPX   0xF5
 #define INST_SBC_ABY   0xF9
-#define INST_SBC_SBX   0xFD
+#define INST_SBC_ABX   0xFD
 
 // Adressing mode list.
 #define AM1_IZPX       0x00

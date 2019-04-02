@@ -1,7 +1,8 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <stdboo.h>
+#include <stdbool.h>
+#include "contracts.h"
 #include "util.h"
 #include "state.h"
 #include "2A03.h"
@@ -14,7 +15,7 @@ bool is_state(state_t *S) {
 
 // Allocates and returns a state structure.
 state_t *state_new() {
-  state_t *S = xcalloc(sizeof(state_t));
+  state_t *S = xcalloc(1, sizeof(state_t));
   CONTRACT(is_state(S));
   return S;
 }
@@ -24,7 +25,7 @@ state_t *state_new() {
 void state_free(state_t *S) {
   CONTRACT(is_state(S));
 
-  state_t *temp = S->start;
+  node_t *temp = S->start;
   // Frees each node and its element.
   while (temp != NULL) {
     S->start = temp;
@@ -51,8 +52,8 @@ void state_add_cycle(micromem_t mem, microdata_t data, bool incPC, state_t *S) {
   CONTRACT(is_state(S));
 
   // Allocate element and load in its data.
-  node_t *node = xcalloc(sizeof(node_t));
-  micro_t *elem = xcalloc(sizeof(micro_t));
+  node_t *node = xcalloc(1, sizeof(node_t));
+  micro_t *elem = xcalloc(1, sizeof(micro_t));
   elem->mem = mem;
   elem->data = data;
   elem->incPC = incPC;
@@ -77,8 +78,8 @@ void state_push_cycle(micromem_t mem, microdata_t data, bool incPC, state_t *S) 
   CONTRACT(is_state(S));
 
   // Allocate element and load in its data.
-  node_t *node = xcalloc(sizeof(node_t));
-  micro_t *elem = xcalloc(sizeof(micro_t));
+  node_t *node = xcalloc(1, sizeof(node_t));
+  micro_t *elem = xcalloc(1, sizeof(micro_t));
   elem->mem = mem;
   elem->data = data;
   elem->incPC = incPC;
@@ -89,9 +90,9 @@ void state_push_cycle(micromem_t mem, microdata_t data, bool incPC, state_t *S) 
     S->start = node;
     S->end = node;
   } else {
-    node->next = S->next
-    S->next->prev = node;
-    S->next = node;
+    node->next = S->start;
+    S->start->prev = node;
+    S->start = node;
   }
 
   return;
@@ -135,7 +136,7 @@ bool state_can_poll(state_t *S) {
 void state_clear(state_t *S) {
   CONTRACT(is_state(S));
 
-  state_t *temp = S->start;
+  node_t *temp = S->start;
   while (temp != NULL) {
     S->start = temp;
     temp = temp->next;

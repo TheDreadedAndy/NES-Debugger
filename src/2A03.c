@@ -28,13 +28,24 @@
 // Interrupt bools.
 bool IRQ, NMI;
 
+// Helper functions
+void cpu_run_mem(micro_t *micro, regfile_t *R, memory_t *M, state_t *S);
+void cpu_run_data(micro_t *micro, regfile_t *R, memory_t *M, state_t *S);
+bool cpu_can_poll(microdata_t dat, regfile_t *R, state_t *S);
+void cpu_fetch_inst(uint8_t inst, bool NMIInt, bool IRQInt, state_t *S);
+
 // Run the next CPU cycle.
 void cpu_run_cycle(regfile_t *R, memory_t *M, state_t *S) {
   // Fetch and run the next micro instructions for the cycle.
   micro_t *nextMicro = state_next_cycle(S);
   cpu_run_mem(nextMicro, R, M, S);
   cpu_run_data(nextMicro, R, M, S);
-  if (nextMicro->incPC) R->PC++;
+  if (nextMicro->incPC) {
+    uint16_t PC = (((uint16_t)(R->PCH)) << 8) | R->PCL;
+    PC++;
+    R->PCL = (uint8_t)PC;
+    R->PCH = (uint8_t)(PC >> 8);
+  }
   // Poll for interrupts if needed.
   if (cpu_can_poll(nextMicro->data, R, S)) {
     state_set_irq(S);
@@ -62,7 +73,7 @@ void cpu_run_mem(micro_t *micro, regfile_t *R, memory_t *M, state_t *S) {
       } else {
         R->inst = memory_read(R->PCL, R->PCH, M);
       }
-      cpu_fetch_inst(R->inst, micro->IRQ, micro->NMI, S);
+      cpu_fetch_inst(R->inst, micro->NMI, micro->IRQ, S);
       break;
     case MEM_READ_PC_NODEST:
       memory_read(R->PCL, R->PCH, M);
@@ -162,10 +173,10 @@ void cpu_run_mem(micro_t *micro, regfile_t *R, memory_t *M, state_t *S) {
       R->PCH = memory_read(MEMORY_RESET_LOW + 1, MEMORY_RESET_HIGH, M);
       break;
     case MEM_IRQ_PCL:
-      R->PCL = memory_read(MEMORY_IRQ_LOW, MEMORY_BRK_HIGH, M);
+      R->PCL = memory_read(MEMORY_IRQ_LOW, MEMORY_IRQ_HIGH, M);
       break;
     case MEM_IRQ_PCH:
-      R->PCH = memory_read(MEMORY_IRQ_LOW + 1, MEMORY_BRK_HIGH, M);
+      R->PCH = memory_read(MEMORY_IRQ_LOW + 1, MEMORY_IRQ_HIGH, M);
       break;
   }
   return;
@@ -180,6 +191,10 @@ void cpu_run_data(micro_t *micro, regfile_t *R, memory_t *M, state_t *S) {
   uint16_t res;
   uint8_t carry;
   uint8_t ovf;
+
+  // Branch declarations.
+  uint8_t flag;
+  bool cond, NMIInt, IRQInt, taken;
 
   switch(data) {
     case DAT_NOP:
@@ -267,10 +282,10 @@ void cpu_run_data(micro_t *micro, regfile_t *R, memory_t *M, state_t *S) {
       // NMI has priority
       if (!(micro->NMI) && IRQ) {
         // We need to undo the previous fetch.
-        state_dump(S);
+        state_clear(S);
         micro->IRQ = IRQ;
         R->inst = INST_BRK;
-        fetch(R->inst, micro->NMI, micro->IRQ, S);
+        cpu_fetch_inst(R->inst, micro->NMI, micro->IRQ, S);
       }
       break;
     case DAT_CLV:
@@ -392,21 +407,26 @@ void cpu_run_data(micro_t *micro, regfile_t *R, memory_t *M, state_t *S) {
       R->addrH = R->addrH + R->carry;
       break;
     case DAT_BRANCH:
-      uint8_t flag = R->inst >> 6;
-      bool cond = (R->inst >> 5) & 1;
+      flag = R->inst >> 6;
+      cond = (bool)((R->inst >> 5) & 1);
       // Black magic that pulls the proper flag from the status reg.
       flag = (flag >> 1) ? ((R->P >> (flag - 2)) & 1)
                          : ((R->P >> (7 - flag)) & 1);
-      bool taken = flag == cond;
-      bool NMIInt = NMI || micro->NMI;
-      bool IRQInt = IRQ || micro->IRQ;
+      taken = (((bool)flag) == cond);
+      NMIInt = NMI || micro->NMI;
+      IRQInt = IRQ || micro->IRQ;
       res = (uint16_t)R->PCL + (uint16_t)R->MDR;
       R->carry = (uint8_t)(res >> 8);
       if (!taken) {
         // Branches are a special case in the micro op abstraction, as they
         // violate the memory/data difference. I could probably fix it with a
         // different implementation, but theres no real point.
-        if (!NMIInt && !IRQInt) R->PC++;
+        if (!NMIInt && !IRQInt) {
+          uint16_t PC = (((uint16_t)(R->PCH)) << 8) | R->PCL;
+          PC++;
+          R->PCL = (uint8_t)PC;
+          R->PCH = (uint8_t)(PC >> 8);
+        }
         R->inst = memory_read(R->PCL, R->PCH, M);
         cpu_fetch_inst(R->inst, NMIInt, IRQInt, S);
       } else if (R->carry) {
@@ -433,7 +453,7 @@ void cpu_fetch_inst(uint8_t inst, bool NMIInt, bool IRQInt, state_t *S) {
     return;
   }
   // No interrupt, so we procede as normal and add the proper micro ops.
-  switch (R->inst) {
+  switch (inst) {
     case INST_ORA_IZPX:
       break;
     case INST_ORA_ZP:

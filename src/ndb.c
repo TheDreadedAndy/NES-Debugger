@@ -13,6 +13,9 @@
 #include "2A03.h"
 #include "memory.h"
 
+// Helper functions.
+regfile_t *regfile_new(void);
+
 int main(int argc, char *argv[]) {
 
   // Global variables needed for getopt.
@@ -36,7 +39,7 @@ int main(int argc, char *argv[]) {
         file = optarg;
         break;
       default:
-        printf("ndb -i <NUM> -f <FILE>");
+        printf("ndb -i <NUM> -f <FILE>\n");
         break;
     }
   }

@@ -443,6 +443,10 @@ void cpu_fetch_inst(uint8_t inst, bool NMIInt, bool IRQInt, state_t *S) {
       state_add_cycle(MEM_FETCH, DAT_ORA_MDR_A, true, S);
       break;
     case INST_ORA_ABS:
+      state_add_cycle(MEM_READ_PC_ADDRL, DAT_NOP, true, S);
+      state_add_cycle(MEM_READ_PC_ADDRH, DAT_NOP, true, S);
+      state_add_cycle(MEM_READ_ADDR_MDR, DAT_NOP, false, S);
+      state_add_cycle(MEM_FETCH, DAT_ORA_MDR_A, true, S);
       break;
     case INST_ORA_IZP_Y:
       break;
@@ -461,6 +465,10 @@ void cpu_fetch_inst(uint8_t inst, bool NMIInt, bool IRQInt, state_t *S) {
       state_add_cycle(MEM_FETCH, DAT_AND_MDR_A, true, S);
       break;
     case INST_AND_ABS:
+      state_add_cycle(MEM_READ_PC_ADDRL, DAT_NOP, true, S);
+      state_add_cycle(MEM_READ_PC_ADDRH, DAT_NOP, true, S);
+      state_add_cycle(MEM_READ_ADDR_MDR, DAT_NOP, false, S);
+      state_add_cycle(MEM_FETCH, DAT_AND_MDR_A, true, S);
       break;
     case INST_AND_IZP_Y:
       break;
@@ -479,6 +487,10 @@ void cpu_fetch_inst(uint8_t inst, bool NMIInt, bool IRQInt, state_t *S) {
       state_add_cycle(MEM_FETCH, DAT_EOR_MDR_A, true, S);
       break;
     case INST_EOR_ABS:
+      state_add_cycle(MEM_READ_PC_ADDRL, DAT_NOP, true, S);
+      state_add_cycle(MEM_READ_PC_ADDRH, DAT_NOP, true, S);
+      state_add_cycle(MEM_READ_ADDR_MDR, DAT_NOP, false, S);
+      state_add_cycle(MEM_FETCH, DAT_EOR_MDR_A, true, S);
       break;
     case INST_EOR_IZP_Y:
       break;
@@ -497,6 +509,10 @@ void cpu_fetch_inst(uint8_t inst, bool NMIInt, bool IRQInt, state_t *S) {
       state_add_cycle(MEM_FETCH, DAT_ADC_MDR_A, true, S);
       break;
     case INST_ADC_ABS:
+      state_add_cycle(MEM_READ_PC_ADDRL, DAT_NOP, true, S);
+      state_add_cycle(MEM_READ_PC_ADDRH, DAT_NOP, true, S);
+      state_add_cycle(MEM_READ_ADDR_MDR, DAT_NOP, false, S);
+      state_add_cycle(MEM_FETCH, DAT_ABS_MDR_A, true, S);
       break;
     case INST_ADC_IZP_Y:
       break;
@@ -511,6 +527,10 @@ void cpu_fetch_inst(uint8_t inst, bool NMIInt, bool IRQInt, state_t *S) {
     case INST_STA_ZP:
       break;
     case INST_STA_ABS:
+      state_add_cycle(MEM_READ_PC_ADDRL, DAT_NOP, true, S);
+      state_add_cycle(MEM_READ_PC_ADDRH, DAT_NOP, true, S);
+      state_add_cycle(MEM_WRITE_A_ADDR, DAT_NOP, false, S);
+      state_add_cycle(MEM_FETCH, DAT_NOP, true, S);
       break;
     case INST_STA_IZP_Y:
       break;
@@ -529,6 +549,10 @@ void cpu_fetch_inst(uint8_t inst, bool NMIInt, bool IRQInt, state_t *S) {
       state_add_cycle(MEM_FETCH, DAT_MOV_MDR_A, true, S);
       break;
     case INST_LDA_ABS:
+      state_add_cycle(MEM_READ_PC_ADDRL, DAT_NOP, true, S);
+      state_add_cycle(MEM_READ_PC_ADDRH, DAT_NOP, true, S);
+      state_add_cycle(MEM_READ_ADDR_MDR, DAT_NOP, false, S);
+      state_add_cycle(MEM_FETCH, DAT_MOV_MDR_A, true, S);
       break;
     case INST_LDA_IZP_Y:
       break;
@@ -547,6 +571,10 @@ void cpu_fetch_inst(uint8_t inst, bool NMIInt, bool IRQInt, state_t *S) {
       state_add_cycle(MEM_FETCH, DAT_CMP_MDR_A, true, S);
       break;
     case INST_CMP_ABS:
+      state_add_cycle(MEM_READ_PC_ADDRL, DAT_NOP, true, S);
+      state_add_cycle(MEM_READ_PC_ADDRH, DAT_NOP, true, S);
+      state_add_cycle(MEM_READ_ADDR_MDR, DAT_NOP, false, S);
+      state_add_cycle(MEM_FETCH, DAT_CMP_MDR_A, true, S);
       break;
     case INST_CMP_IZP_Y:
       break;
@@ -565,6 +593,10 @@ void cpu_fetch_inst(uint8_t inst, bool NMIInt, bool IRQInt, state_t *S) {
       state_add_cycle(MEM_FETCH, DAT_SBC_MDR_A, true, S);
       break;
     case INST_SBC_ABS:
+      state_add_cycle(MEM_READ_PC_ADDRL, DAT_NOP, true, S);
+      state_add_cycle(MEM_READ_PC_ADDRH, DAT_NOP, true, S);
+      state_add_cycle(MEM_READ_ADDR_MDR, DAT_NOP, false, S);
+      state_add_cycle(MEM_FETCH, DAT_SBC_MDR_A, true, S);
       break;
     case INST_SBC_IZP_Y:
       break;
@@ -577,8 +609,16 @@ void cpu_fetch_inst(uint8_t inst, bool NMIInt, bool IRQInt, state_t *S) {
     case INST_ASL_ZP:
       break;
     case INST_ASL_ACC:
+      state_add_cycle(MEM_READ_PC_NODEST, DAT_NOP, false, S);
+      state_add_cycle(MEM_FETCH, DAT_ASL_A, true, S);
       break;
     case INST_ASL_ABS:
+      state_add_cycle(MEM_READ_PC_ADDRL, DAT_NOP, true, S);
+      state_add_cycle(MEM_READ_PC_ADDRH, DAT_NOP, true, S);
+      state_add_cycle(MEM_READ_ADDR_MDR, DAT_NOP, false, S);
+      state_add_cycle(MEM_WRITE_MDR_ADDR, DAT_ASL_MDR, false, S);
+      state_add_cycle(MEM_WRITE_MDR_ADDR, DAT_NOP, false, S);
+      state_add_cycle(MEM_FETCH, DAT_NOP, true, S);
       break;
     case INST_ASL_ZPX:
       break;
@@ -587,8 +627,16 @@ void cpu_fetch_inst(uint8_t inst, bool NMIInt, bool IRQInt, state_t *S) {
     case INST_ROL_ZP:
       break;
     case INST_ROL_ACC:
+      state_add_cycle(MEM_READ_PC_NODEST, DAT_NOP, false, S);
+      state_add_cycle(MEM_FETCH, DAT_ROL_A, true, S);
       break;
     case INST_ROL_ABS:
+      state_add_cycle(MEM_READ_PC_ADDRL, DAT_NOP, true, S);
+      state_add_cycle(MEM_READ_PC_ADDRH, DAT_NOP, true, S);
+      state_add_cycle(MEM_READ_ADDR_MDR, DAT_NOP, false, S);
+      state_add_cycle(MEM_WRITE_MDR_ADDR, DAT_ROL_MDR, false, S);
+      state_add_cycle(MEM_WRITE_MDR_ADDR, DAT_NOP, false, S);
+      state_add_cycle(MEM_FETCH, DAT_NOP, true, S);
       break;
     case INST_ROL_ZPX:
       break;
@@ -597,8 +645,16 @@ void cpu_fetch_inst(uint8_t inst, bool NMIInt, bool IRQInt, state_t *S) {
     case INST_LSR_ZP:
       break;
     case INST_LSR_ACC:
+      state_add_cycle(MEM_READ_PC_NODEST, DAT_NOP, false, S);
+      state_add_cycle(MEM_FETCH, DAT_LSR_A, true, S);
       break;
     case INST_LSR_ABS:
+      state_add_cycle(MEM_READ_PC_ADDRL, DAT_NOP, true, S);
+      state_add_cycle(MEM_READ_PC_ADDRH, DAT_NOP, true, S);
+      state_add_cycle(MEM_READ_ADDR_MDR, DAT_NOP, false, S);
+      state_add_cycle(MEM_WRITE_MDR_ADDR, DAT_LSR_MDR, false, S);
+      state_add_cycle(MEM_WRITE_MDR_ADDR, DAT_NOP, false, S);
+      state_add_cycle(MEM_FETCH, DAT_NOP, true, S);
       break;
     case INST_LSR_ZPX:
       break;
@@ -607,8 +663,16 @@ void cpu_fetch_inst(uint8_t inst, bool NMIInt, bool IRQInt, state_t *S) {
     case INST_ROR_ZP:
       break;
     case INST_ROR_ACC:
+      state_add_cycle(MEM_READ_PC_NODEST, DAT_NOP, false, S);
+      state_add_cycle(MEM_FETCH, DAT_ROR_A, true, S);
       break;
     case INST_ROR_ABS:
+      state_add_cycle(MEM_READ_PC_ADDRL, DAT_NOP, true, S);
+      state_add_cycle(MEM_READ_PC_ADDRH, DAT_NOP, true, S);
+      state_add_cycle(MEM_READ_ADDR_MDR, DAT_NOP, false, S);
+      state_add_cycle(MEM_WRITE_MDR_ADDR, DAT_ROR_MDR, false, S);
+      state_add_cycle(MEM_WRITE_MDR_ADDR, DAT_NOP, false, S);
+      state_add_cycle(MEM_FETCH, DAT_NOP, true, S);
       break;
     case INST_ROR_ZPX:
       break;
@@ -617,6 +681,10 @@ void cpu_fetch_inst(uint8_t inst, bool NMIInt, bool IRQInt, state_t *S) {
     case INST_STX_ZP:
       break;
     case INST_STX_ABS:
+      state_add_cycle(MEM_READ_PC_ADDRL, DAT_NOP, true, S);
+      state_add_cycle(MEM_READ_PC_ADDRH, DAT_NOP, true, S);
+      state_add_cycle(MEM_WRITE_X_ADDR, DAT_NOP, false, S);
+      state_add_cycle(MEM_FETCH, DAT_NOP, true, S);
       break;
     case INST_STX_ZPX:
       break;
@@ -627,6 +695,10 @@ void cpu_fetch_inst(uint8_t inst, bool NMIInt, bool IRQInt, state_t *S) {
     case INST_LDX_ZP:
       break;
     case INST_LDX_ABS:
+      state_add_cycle(MEM_READ_PC_ADDRL, DAT_NOP, true, S);
+      state_add_cycle(MEM_READ_PC_ADDRH, DAT_NOP, true, S);
+      state_add_cycle(MEM_READ_ADDR_MDR, DAT_NOP, false, S);
+      state_add_cycle(MEM_FETCH, DAT_MOV_MDR_X, true, S);
       break;
     case INST_LDX_ZPX:
       break;
@@ -635,6 +707,12 @@ void cpu_fetch_inst(uint8_t inst, bool NMIInt, bool IRQInt, state_t *S) {
     case INST_DEC_ZP:
       break;
     case INST_DEC_ABS:
+      state_add_cycle(MEM_READ_PC_ADDRL, DAT_NOP, true, S);
+      state_add_cycle(MEM_READ_PC_ADDRH, DAT_NOP, true, S);
+      state_add_cycle(MEM_READ_ADDR_MDR, DAT_NOP, false, S);
+      state_add_cycle(MEM_WRITE_MDR_ADDR, DAT_DEC_MDR, false, S);
+      state_add_cycle(MEM_WRITE_MDR_ADDR, DAT_NOP, false, S);
+      state_add_cycle(MEM_FETCH, DAT_NOP, true, S);
       break;
     case INST_DEC_ZPX:
       break;
@@ -643,6 +721,12 @@ void cpu_fetch_inst(uint8_t inst, bool NMIInt, bool IRQInt, state_t *S) {
     case INST_INC_ZP:
       break;
     case INST_INC_ABS:
+      state_add_cycle(MEM_READ_PC_ADDRL, DAT_NOP, true, S);
+      state_add_cycle(MEM_READ_PC_ADDRH, DAT_NOP, true, S);
+      state_add_cycle(MEM_READ_ADDR_MDR, DAT_NOP, false, S);
+      state_add_cycle(MEM_WRITE_MDR_ADDR, DAT_INC_MDR, false, S);
+      state_add_cycle(MEM_WRITE_MDR_ADDR, DAT_NOP, false, S);
+      state_add_cycle(MEM_FETCH, DAT_NOP, true, S);
       break;
     case INST_INC_ZPX:
       break;
@@ -651,14 +735,30 @@ void cpu_fetch_inst(uint8_t inst, bool NMIInt, bool IRQInt, state_t *S) {
     case INST_BIT_ZP:
       break;
     case INST_BIT_ABS:
+      state_add_cycle(MEM_READ_PC_ADDRL, DAT_NOP, true, S);
+      state_add_cycle(MEM_READ_PC_ADDRH, DAT_NOP, true, S);
+      state_add_cycle(MEM_READ_ADDR_MDR, DAT_NOP, false, S);
+      state_add_cycle(MEM_FETCH, DAT_BIT_MDR_A, true, S);
       break;
     case INST_JMP:
+      state_add_cycle(MEM_READ_PC_MDR, DAT_NOP, true, S);
+      state_add_cycle(MEM_READ_PC_PCH, DAT_MOV_MDR_PCL, false, S);
+      state_add_cycle(MEM_FETCH, DAT_NOP, true, S);
       break;
     case INST_JMPI:
+      state_add_cycle(MEM_READ_PC_PTRL, DAT_NOP, true, S);
+      state_add_cycle(MEM_READ_PC_PTRH, DAT_NOP, true, S);
+      state_add_cycle(MEM_READ_PTR_MDR, DAT_NOP, false, S);
+      state_add_cycle(MEM_READ_PTR1_PCH, DAT_MOV_MDR_PCL, false, S);
+      state_add_cycle(MEM_FETCH, DAT_NOP, true, S);
       break;
     case INST_STY_ZP:
       break;
     case INST_STY_ABS:
+      state_add_cycle(MEM_READ_PC_ADDRL, DAT_NOP, true, S);
+      state_add_cycle(MEM_READ_PC_ADDRH, DAT_NOP, true, S);
+      state_add_cycle(MEM_WRITE_Y_ADDR, DAT_NOP, false, S);
+      state_add_cycle(MEM_FETCH, DAT_NOP, true, S);
       break;
     case INST_STY_ZPX:
       break;
@@ -669,6 +769,10 @@ void cpu_fetch_inst(uint8_t inst, bool NMIInt, bool IRQInt, state_t *S) {
     case INST_LDY_ZP:
       break;
     case INST_LDY_ABS:
+      state_add_cycle(MEM_READ_PC_ADDRL, DAT_NOP, true, S);
+      state_add_cycle(MEM_READ_PC_ADDRH, DAT_NOP, true, S);
+      state_add_cycle(MEM_READ_ADDR_MDR, DAT_NOP, false, S);
+      state_add_cycle(MEM_FETCH, DAT_MOV_MDR_Y, true, S);
       break;
     case INST_LDY_ZPX:
       break;
@@ -681,6 +785,10 @@ void cpu_fetch_inst(uint8_t inst, bool NMIInt, bool IRQInt, state_t *S) {
     case INST_CPY_ZP:
       break;
     case INST_CPY_ABS:
+      state_add_cycle(MEM_READ_PC_ADDRL, DAT_NOP, true, S);
+      state_add_cycle(MEM_READ_PC_ADDRH, DAT_NOP, true, S);
+      state_add_cycle(MEM_READ_ADDR_MDR, DAT_NOP, false, S);
+      state_add_cycle(MEM_FETCH, DAT_CMP_MDR_Y, true, S);
       break;
     case INST_CPX_IMM:
       state_add_cycle(MEM_READ_PC_MDR, DAT_NOP, true, S);
@@ -689,6 +797,10 @@ void cpu_fetch_inst(uint8_t inst, bool NMIInt, bool IRQInt, state_t *S) {
     case INST_CPX_ZP:
       break;
     case INST_CPX_ABS:
+      state_add_cycle(MEM_READ_PC_ADDRL, DAT_NOP, true, S);
+      state_add_cycle(MEM_READ_PC_ADDRH, DAT_NOP, true, S);
+      state_add_cycle(MEM_READ_ADDR_MDR, DAT_NOP, false, S);
+      state_add_cycle(MEM_FETCH, DAT_CMP_MDR_X, true, S);
       break;
     case INST_BPL:
     case INST_BMI:
@@ -698,10 +810,19 @@ void cpu_fetch_inst(uint8_t inst, bool NMIInt, bool IRQInt, state_t *S) {
     case INST_BCS:
     case INST_BNE:
     case INST_BEQ:
+      // The branch micro instruction handles all branches.
       state_add_cycle(MEM_READ_PC_MDR, DAT_NOP, true, S);
       state_add_cycle(MEM_NOP, DAT_BRANCH, false, S);
       break;
     case INST_BRK:
+      //TODO: Fix interrupt hijacking.
+      state_add_cycle(MEM_READ_PC_NODEST, DAT_NOP, true, S);
+      state_add_cycle(MEM_PUSH_P_B, DAT_DEC_S, false, S);
+      state_add_cycle(MEM_PUSH_PCL, DAT_DEC_S, false, S);
+      state_add_cycle(MEM_PUSH_PCH, DAT_DEC_S, false, S);
+      state_add_cycle(MEM_IRQ_PCL, DAT_NOP, false, S);
+      state_add_cycle(MEM_IRQ_PCH, DAT_NOP, false, S);
+      state_add_cycle(MEM_FETCH, DAT_NOP, true, S);
       break;
     case INST_JSR:
       state_add_cycle(MEM_READ_PC_MDR, DAT_NOP, true, S);
@@ -750,40 +871,76 @@ void cpu_fetch_inst(uint8_t inst, bool NMIInt, bool IRQInt, state_t *S) {
       state_add_cycle(MEM_FETCH, DAT_NOP, true, S);
       break;
     case INST_SEC:
+      state_add_cycle(MEM_READ_PC_NODEST, DAT_NOP, false, S);
+      state_add_cycle(MEM_FETCH, DAT_SEC, true, S);
       break;
     case INST_SEI:
+      state_add_cycle(MEM_READ_PC_NODEST, DAT_NOP, false, S);
+      state_add_cycle(MEM_FETCH, DAT_SEI, true, S);
       break;
     case INST_SED:
+      state_add_cycle(MEM_READ_PC_NODEST, DAT_NOP, false, S);
+      state_add_cycle(MEM_FETCH, DAT_SED, true, S);
       break;
     case INST_CLI:
+      state_add_cycle(MEM_READ_PC_NODEST, DAT_NOP, false, S);
+      state_add_cycle(MEM_FETCH, DAT_CLI, true, S);
       break;
     case INST_CLC:
+      state_add_cycle(MEM_READ_PC_NODEST, DAT_NOP, false, S);
+      state_add_cycle(MEM_FETCH, DAT_CLC, true, S);
       break;
     case INST_CLD:
+      state_add_cycle(MEM_READ_PC_NODEST, DAT_NOP, false, S);
+      state_add_cycle(MEM_FETCH, DAT_CLD, true, S);
       break;
     case INST_CLV:
+      state_add_cycle(MEM_READ_PC_NODEST, DAT_NOP, false, S);
+      state_add_cycle(MEM_FETCH, DAT_CLV, true, S);
       break;
     case INST_DEY:
+      state_add_cycle(MEM_READ_PC_NODEST, DAT_NOP, false, S);
+      state_add_cycle(MEM_FETCH, DAT_DEY, true, S);
       break;
     case INST_DEX:
+      state_add_cycle(MEM_READ_PC_NODEST, DAT_NOP, false, S);
+      state_add_cycle(MEM_FETCH, DAT_DEX, true, S);
       break;
     case INST_INY:
+      state_add_cycle(MEM_READ_PC_NODEST, DAT_NOP, false, S);
+      state_add_cycle(MEM_FETCH, DAT_INY, true, S);
       break;
     case INST_INX:
+      state_add_cycle(MEM_READ_PC_NODEST, DAT_NOP, false, S);
+      state_add_cycle(MEM_FETCH, DAT_INX, true, S);
       break;
     case INST_TAY:
+      state_add_cycle(MEM_READ_PC_NODEST, DAT_NOP, false, S);
+      state_add_cycle(MEM_FETCH, DAT_MOV_A_Y, true, S);
       break;
     case INST_TYA:
+      state_add_cycle(MEM_READ_PC_NODEST, DAT_NOP, false, S);
+      state_add_cycle(MEM_FETCH, DAT_MOV_Y_A, true, S);
       break;
     case INST_TXA:
+      state_add_cycle(MEM_READ_PC_NODEST, DAT_NOP, false, S);
+      state_add_cycle(MEM_FETCH, DAT_MOV_X_A, true, S);
       break;
     case INST_TXS:
+      state_add_cycle(MEM_READ_PC_NODEST, DAT_NOP, false, S);
+      state_add_cycle(MEM_FETCH, DAT_MOV_X_S, true, S);
       break;
     case INST_TAX:
+      state_add_cycle(MEM_READ_PC_NODEST, DAT_NOP, false, S);
+      state_add_cycle(MEM_FETCH, DAT_MOV_A_X, true, S);
       break;
     case INST_TSX:
+      state_add_cycle(MEM_READ_PC_NODEST, DAT_NOP, false, S);
+      state_add_cycle(MEM_FETCH, DAT_MOV_S_X, true, S);
       break;
     case INST_NOP:
+      state_add_cycle(MEM_READ_PC_NODEST, DAT_NOP, false, S);
+      state_add_cycle(MEM_FETCH, DAT_NOP, true, S);
       break;
     default:
       printf("Instruction %x is not implemented\n", inst);

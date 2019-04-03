@@ -3,8 +3,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include "2A03.h"
-#include "util.h"
-#include "contracts.h"
+#include "cpu_regs.h"
 #include "memory.h"
 #include "machinecode.h"
 #include "state.h"

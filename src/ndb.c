@@ -11,11 +11,10 @@
 #include <getopt.h>
 #include "util.h"
 #include "2A03.h"
+#include "cpu_regs.h"
 #include "memory.h"
 
-// Helper functions.
-regfile_t *regfile_new(memory_t *M);
-
+// Loads in the users argument and starts ndb.
 int main(int argc, char *argv[]) {
 
   // Global variables needed for getopt.
@@ -59,24 +58,12 @@ int main(int argc, char *argv[]) {
   for (size_t i = 0; i < iterations; i++) {
     // Executes the next cycle and prints the results.
     cpu_run_cycle(R, M, S);
-    printf("-----------------------------------\n");
-    printf("State following iteration %ld:\n", i);
-    printf("A: %x, X: %x, Y: %x, INST: %x\n", R->A, R->X, R->Y, R->inst);
-    printf("State (flags): %x, Stack pointer: %x\n", R->P, R->S);
-    printf("PCL: %x, PCH: %x\n", R->PCL, R->PCH);
-    printf("Abstraction register state:\n");
-    printf("MDR: %x, Carry: %x\n", R->MDR, R->carry);
-    printf("Addr Low: %x, Addr High: %x\n", R->addrL, R->addrH);
-    printf("Pointer Low: %x, Pointer High: %x\n", R->ptrL, R->ptrH);
+    regfile_print(R);
   }
 
-  return 0;
-}
+  free(R);
+  //memory_free(M);
+  state_free(S);
 
-regfile_t *regfile_new(memory_t *M) {
-  regfile_t *R = xcalloc(1, sizeof(regfile_t));
-  R->P = 0x20; // TODO: verify this.
-  R->PCL = memory_read(MEMORY_RESET_LOW, MEMORY_RESET_HIGH, M);
-  R->PCH = memory_read(MEMORY_RESET_LOW+1, MEMORY_RESET_HIGH, M);
-  return R;
+  return 0;
 }

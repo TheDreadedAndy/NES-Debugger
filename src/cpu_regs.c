@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include "util.h"
 #include "memory.h"
+#include "cpu_regs.h"
 
 // Creates a regfile and inits it.
 regfile_t *regfile_new(memory_t *M) {
@@ -20,9 +21,9 @@ regfile_t *regfile_new(memory_t *M) {
 }
 
 // Prints a regfile.
-void regfile_print(regfile_t *R) {
+void regfile_print(regfile_t *R, int i) {
   printf("-----------------------------------\n");
-  printf("State following iteration %ld:\n", i);
+  printf("State following iteration %d:\n", i);
   printf("A: %x, X: %x, Y: %x, INST: %x\n", R->A, R->X, R->Y, R->inst);
   printf("State (flags): %x, Stack pointer: %x\n", R->P, R->S);
   printf("PCL: %x, PCH: %x\n", R->PCL, R->PCH);

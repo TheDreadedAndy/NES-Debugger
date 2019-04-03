@@ -55,10 +55,10 @@ int main(int argc, char *argv[]) {
   state_t *S = state_new();
   state_add_cycle(MEM_FETCH, DAT_NOP, true, S);
 
-  for (size_t i = 0; i < iterations; i++) {
+  for (int i = 0; i < iterations; i++) {
     // Executes the next cycle and prints the results.
     cpu_run_cycle(R, M, S);
-    regfile_print(R);
+    regfile_print(R, i);
   }
 
   free(R);

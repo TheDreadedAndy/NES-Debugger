@@ -60,7 +60,7 @@ int main(int argc, char *argv[]) {
     // Executes the next cycle and prints the results.
     cpu_run_cycle(R, M, S);
     printf("-----------------------------------\n");
-    printf("State following iteration %d:\n", i);
+    printf("State following iteration %ld:\n", i);
     printf("A: %x, X: %x, Y: %x, INST: %x\n", R->A, R->X, R->Y, R->inst);
     printf("State (flags): %x, Stack pointer: %x\n", R->P, R->S);
     printf("PCL: %x, PCH: %x\n", R->PCL, R->PCH);

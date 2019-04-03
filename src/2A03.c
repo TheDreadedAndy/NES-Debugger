@@ -215,6 +215,7 @@ void cpu_run_data(micro_t *micro, regfile_t *R, memory_t *M, state_t *S) {
       // Memory Data Register is used to visual modification on memory.
       R->MDR++;
       R->P = (R->P & 0x7D) | (R->MDR & 0x80) | ((R->MDR == 0) << 1);
+      break;
     case DAT_DEC_S:
       R->S--;
       break;

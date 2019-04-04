@@ -29,6 +29,6 @@ typedef struct regfile {
 regfile_t *regfile_new(memory_t *M);
 
 // Prints out the contents of the register file.
-void regfile_print(regfile_t *R, int i);
+void regfile_print(regfile_t *R, size_t i);
 
 #endif

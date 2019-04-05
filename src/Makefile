@@ -1,5 +1,6 @@
-HEADERS = 2A03.h contracts.h cpu_regs.h machinecode.h memory.h microops.h state.h util.h
-OBJECTS = 2A03.o cpu_regs.o memory.o state.o util.o
+HEADERS = $(wildcard *.h)
+MAINS = ndb.o
+OBJECTS = $(filter-out $(MAINS),$(patsubst %.c,%.o,$(wildcard *.c)))
 CC = gcc
 override CFLAGS += -Wall -Wshadow -Wextra -Werror -std=c99 -pedantic
 
@@ -8,10 +9,13 @@ default: ndb
 %.o: %.c $(HEADERS)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-ndb: ndb.o $(OBJECTS)
-	$(CC) ndb.o $(OBJECTS) -o ndb
+$(patsubst %.o,%.c,$(MAINS)): $(HEADERS)
+
+$(patsubst %.o,%,$(MAINS)): $(OBJECTS)
+	$(CC) $(CFLAGS) -c $@.c -o $@.o
+	$(CC) $@.o $(OBJECTS) -o $@
 
 clean:
 	-rm -f $(OBJECTS)
-	-rm -f ndb.o
-	-rm -f ndb
+	-rm -f $(MAINS)
+	-rm -f $(patsubst %.o,%,$(MAINS))

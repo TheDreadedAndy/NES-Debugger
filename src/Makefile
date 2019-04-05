@@ -12,9 +12,6 @@ default: ndb
 %.o: %.c $(HEADERS)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-# Assigns all headers as the prereqs for all main files.
-$(patsubst %.o,%.c,$(MAINS)): $(HEADERS)
-
 # General format for building a main file.
 $(patsubst %.o,%,$(MAINS)): $(OBJECTS)
 	$(CC) $(CFLAGS) -c $@.c -o $@.o

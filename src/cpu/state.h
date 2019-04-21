@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include "microops.h"
+#include "./microops.h"
 
 #ifndef _NES_STATE
 #define _NES_STATE

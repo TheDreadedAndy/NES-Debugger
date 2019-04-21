@@ -2,12 +2,12 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdio.h>
-#include "2A03.h"
-#include "cpu_regs.h"
-#include "memory.h"
-#include "machinecode.h"
-#include "state.h"
-#include "microops.h"
+#include "./2A03.h"
+#include "./regs.h"
+#include "../memory/memory.h"
+#include "./machinecode.h"
+#include "./state.h"
+#include "./microops.h"
 
 /* The microinstructions of the 6502 are handled by the state_t structure.
  * With the exception of brk, branch, and interrupt instructions, interrupt

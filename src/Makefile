@@ -1,7 +1,7 @@
 # Creates a list of main files, headers, and objects (that are not main).
 MAINS = ndb.o
-HEADERS = $(wildcard *.h)
-OBJECTS = $(filter-out $(MAINS),$(patsubst %.c,%.o,$(wildcard *.c)))
+HEADERS = $(wildcard */*.h)
+OBJECTS = $(filter-out $(MAINS),$(patsubst %.c,%.o,$(wildcard */*.c)))
 CC = gcc
 override CFLAGS += -Wall -Wshadow -Wextra -Werror -std=c99 -pedantic
 

@@ -2,10 +2,10 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdbool.h>
-#include "contracts.h"
-#include "util.h"
-#include "state.h"
-#include "2A03.h"
+#include "../util/contracts.h"
+#include "../util/util.h"
+#include "./state.h"
+#include "./2A03.h"
 
 // Verifys that a state structure is safe to access.
 bool is_state(state_t *S) {

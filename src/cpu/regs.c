@@ -7,9 +7,9 @@
 
 #include <stdlib.h>
 #include <stdio.h>
-#include "util.h"
-#include "memory.h"
-#include "cpu_regs.h"
+#include "../util/util.h"
+#include "../memory/memory.h"
+#include "./regs.h"
 
 // Creates a regfile and inits it.
 regfile_t *regfile_new(memory_t *M) {

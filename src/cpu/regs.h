@@ -1,6 +1,6 @@
 #include <stdlib.h>
 #include <stdint.h>
-#include <memory.h>
+#include "../memory/memory.h"
 
 #ifndef _NES_REGS
 #define _NES_REGS

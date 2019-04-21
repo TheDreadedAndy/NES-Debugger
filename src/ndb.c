@@ -9,10 +9,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <getopt.h>
-#include "util.h"
-#include "2A03.h"
-#include "cpu_regs.h"
-#include "memory.h"
+#include "./util/util.h"
+#include "./cpu/2A03.h"
+#include "./cpu/regs.h"
+#include "./memory/memory.h"
 
 // Loads in the users argument and starts ndb.
 int main(int argc, char *argv[]) {

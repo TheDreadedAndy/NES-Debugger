@@ -9,8 +9,8 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdio.h>
-#include "util.h"
-#include "memory.h"
+#include "../util/util.h"
+#include "./memory.h"
 
 // Creates a new memory structure.
 // Currently only supports mapper 2.

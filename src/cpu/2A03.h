@@ -1,9 +1,9 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include "memory.h"
-#include "cpu_regs.h"
-#include "state.h"
+#include "../memory/memory.h"
+#include "./regs.h"
+#include "./state.h"
 
 #ifndef _NES_2A03
 #define _NES_2A03

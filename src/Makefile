@@ -3,8 +3,8 @@ MAINS = ndb.o sdl.o
 HEADERS = $(wildcard */*.h)
 OBJECTS = $(filter-out $(MAINS),$(patsubst %.c,%.o,$(wildcard */*.c)))
 CC = gcc
-SDL = $(shell sdl2-config --cflags --libs)
-override CFLAGS += -Wall -Wshadow -Wextra -Werror -std=c99 -pedantic
+LIBS = $(shell sdl2-config --libs)
+override CFLAGS += -Wall -Wshadow -Wextra -Werror -std=c99 -pedantic $(shell sdl2-config --cflags)
 
 # Sets the default command to ndb
 default: ndb
@@ -16,7 +16,7 @@ default: ndb
 # General format for building a main file.
 $(patsubst %.o,%,$(MAINS)): $(OBJECTS)
 	$(CC) $(CFLAGS) -c $@.c -o $@.o
-	$(CC) $(SDL) $@.o $(OBJECTS) -o $@
+	$(CC) $@.o $(OBJECTS) -o $@ $(LIBS)
 
 # Prevent issues with clean.
 .PHONY: clean

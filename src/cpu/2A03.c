@@ -37,6 +37,7 @@ void cpu_fetch_inst(uint8_t inst, bool NMIInt, bool IRQInt, state_t *S);
 void cpu_run_cycle(regfile_t *R, memory_t *M, state_t *S) {
   // Fetch and run the next micro instructions for the cycle.
   micro_t *nextMicro = state_next_cycle(S);
+
   cpu_run_mem(nextMicro, R, M, S);
   cpu_run_data(nextMicro, R, M, S);
   if (nextMicro->incPC) {
@@ -45,11 +46,15 @@ void cpu_run_cycle(regfile_t *R, memory_t *M, state_t *S) {
     R->PCL = (uint8_t)PC;
     R->PCH = (uint8_t)(PC >> 8);
   }
+
   // Poll for interrupts if needed.
   if (cpu_can_poll(nextMicro->data, R, S)) {
     state_set_irq(S);
     state_set_nmi(S);
   }
+
+  free(nextMicro);
+
   return;
 }
 

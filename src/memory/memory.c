@@ -98,3 +98,5 @@ void memory_write(uint8_t val, uint8_t locL, uint8_t locH, memory_t *M) {
     return;
   }
 }
+
+void memory_free

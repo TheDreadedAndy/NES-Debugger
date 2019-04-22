@@ -46,6 +46,9 @@ uint8_t memory_read(uint8_t locL, uint8_t locH, memory_t *M);
 // Memory write function. Handles memory maps and bank switching.
 void memory_write(uint8_t val, uint8_t locL, uint8_t locH, memory_t *M);
 
+// Memory free function.
+void memory_free(memory_t *M);
+
 // Memory addressing constants.
 #define MEMORY_STACK_HIGH 0x10
 #define MEMORY_IRQ_LOW 0xFE

@@ -62,7 +62,7 @@ int main(int argc, char *argv[]) {
   }
 
   free(R);
-  //memory_free(M);
+  memory_free(M);
   state_free(S);
 
   return 0;

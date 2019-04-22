@@ -99,4 +99,20 @@ void memory_write(uint8_t val, uint8_t locL, uint8_t locH, memory_t *M) {
   }
 }
 
-void memory_free
+// Frees a memory structure.
+void memory_free(memory_t *M) {
+  // TODO: This should change with implementation.
+  free(M->RAM);
+  free(M->PPU);
+  free(M->IO);
+  free(M->bat);
+  free(M->header);
+
+  // Frees each bank.
+  // TODO: This only works for mapper 2.
+  for (size_t i = 0; i < (M->fixedBank + 1U); i++) {
+    free(M->cart[i]);
+  }
+
+  free(M);
+}

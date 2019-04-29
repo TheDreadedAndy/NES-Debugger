@@ -2,3 +2,5 @@
 *.o
 memory-test
 a.out
+ndb
+sdl

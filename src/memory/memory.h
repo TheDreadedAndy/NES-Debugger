@@ -1,52 +1,42 @@
+// Standard includes
 #include <stdlib.h>
 #include <stdint.h>
 
 #ifndef _NES_MEM
 #define _NES_MEM
 
-// Constants used to size and access memory.
-#define MAP2_MAX_BANKS 16
-#define MAP2_BANK_SIZE ((size_t)(1 << 14))
-#define MAP2_BANK_OFFSET (size_t)(0x8000)
-#define MAP2_FIXED_BANK_OFFSET (size_t)(0xC000)
-#define MAP2_BAT_SIZE (size_t)(0x2000)
-#define MAP2_BAT_OFFSET (size_t)(0x6000)
-#define RAM_SIZE ((size_t)(1 << 11))
-#define PPU_SIZE (size_t)(0x8)
-#define PPU_OFFSET (size_t)(0x2000)
-#define IO_SIZE (size_t)(0x20)
-#define IO_OFFSET (size_t)(0x4000)
-#define HEADER_SIZE (size_t)(0x10)
-
 // INES header constants.
 #define INES_PRGROM 4
 
-// Nes virtual memory data structure.
-// For now, I'll only be implementing mapper 2.
+// Function types, used in memory structure to point to the proper
+// mapper function.
+typedef uint8_t memory_read_t(uint8_t locL, uint8_t locH, void *map);
+typedef void memory_write_t(uint8_t val, uint8_t locL, uint8_t locH, void *map);
+typedef void memory_free_t(void *map);
+
+// Generic memory data structure.
+// Includes a pointer to a specific memory implementation and
+// the function necessary to interact with said implementation.
 typedef struct memory {
-  uint8_t *RAM;
-  uint8_t *PPU;
-  uint8_t *IO;
-  uint8_t *bat;
-  uint8_t *header;
-  uint8_t *cart[MAP2_MAX_BANKS];
-  uint8_t currentBank;
-  // Should always be the final used bank.
-  uint8_t fixedBank;
+  void *map;
+  memory_read_t *read;
+  memory_write_t *write;
+  memory_free_t *free;
+  char *header;
 } memory_t;
 
 /* Tools for using NES virtual memory */
 
-// Memory data structure creation function.
+// Memory data structure creation function. Handles memory maps.
 memory_t *memory_new(char *file);
 
-// Memory read function. Handles memory maps.
+// Generic memory read function.
 uint8_t memory_read(uint8_t locL, uint8_t locH, memory_t *M);
 
-// Memory write function. Handles memory maps and bank switching.
+// Generic memory write function.
 void memory_write(uint8_t val, uint8_t locL, uint8_t locH, memory_t *M);
 
-// Memory free function.
+// Generic memory free function.
 void memory_free(memory_t *M);
 
 // Memory addressing constants.

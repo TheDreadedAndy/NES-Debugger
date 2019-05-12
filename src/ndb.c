@@ -28,9 +28,6 @@ int main(int argc, char *argv[]) {
 
   while ((opt = getopt(argc, argv, "hi:f:")) != -1) {
     switch (opt) {
-      case 'h':
-        printf("Hey man, don't we all need help?\n");
-        break;
       case 'i':
         iterations = atoi(optarg);
         break;
@@ -39,13 +36,13 @@ int main(int argc, char *argv[]) {
         break;
       default:
         printf("usage: ndb -i <NUM> -f <FILE>\n");
-        exit(1);
+        exit(0);
         break;
     }
   }
 
   if (file == NULL) {
-    printf("Please specify a file\n");
+    printf("usage: ndb -i <NUM> -f <FILE>\n");
     exit(0);
   }
 

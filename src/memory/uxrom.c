@@ -1,5 +1,11 @@
 /*
- * TODO.
+ * Implementation of INES Mapper 2 (UxROM).
+ *
+ * The third quarter of addressable NES memory is mapped to a switchable
+ * bank, which can be changed by writing to that section of memory.
+ * The last quarter of memory is always mapped to the final bank.
+ *
+ * This implementation can address up to 256KB of cart memory.
  */
 
 #include <stdlib.h>
@@ -8,13 +14,12 @@
 #include "../util/util.h"
 #include "./memory.h"
 #include "./uxrom.h"
-
-// TODO: Ensure this setup is complient with all uxrom systems,
-// not just mapper 2.
+#include "../util/data.h"
 
 /*
  * Takes in an INES/NES2 header and creates a uxrom
  * memory system using it. Assumes the header is valid.
+ *
  * Returns a generic memory structure, which can be used
  * to interact with the uxrom structure.
  */
@@ -29,103 +34,120 @@ memory_t *uxrom_new(char *header, FILE *rom) {
   M->header = header;
 
   // Set up the memory system itself.
-  map->RAM = xcalloc(RAM_SIZE, sizeof(uint8_t));
+  map->ram = xcalloc(RAM_SIZE, sizeof(word_t));
+
+  // Set up the memory mapped IO.
   // TODO: change these into actual mappings.
-  map->PPU = xcalloc(PPU_SIZE, sizeof(uint8_t));
-  map->IO = xcalloc(IO_SIZE, sizeof(uint8_t));
-  map->bat = xcalloc(MAP2_BAT_SIZE, sizeof(uint8_t));
+  map->ppu = xcalloc(PPU_SIZE, sizeof(word_t));
+  map->io = xcalloc(IO_SIZE, sizeof(word_t));
+  map->bat = xcalloc(BAT_SIZE, sizeof(word_t));
 
   // Caclulate rom size and load it into memory.
-  size_t numBanks = (size_t)M->header[INES_PRGROM];
-  for (size_t i = 0; i < numBanks; i++) {
-    map->cart[i] = xmalloc(MAP2_BANK_SIZE * sizeof(uint8_t));
-    for (size_t j = 0; j < MAP2_BANK_SIZE; j++) {
+  size_t num_banks = (size_t)M->header[INES_PRGROM];
+  for (size_t i = 0; i < num_banks; i++) {
+    map->cart[i] = xmalloc(BANK_SIZE * sizeof(word_t));
+    for (size_t j = 0; j < BANK_SIZE; j++) {
       map->cart[i][j] = fgetc(rom);
     }
   }
-  map->currentBank = 0;
-  map->fixedBank = numBanks - 1;
+  map->current_bank = 0;
+  map->fixed_bank = num_banks - 1;
 
   return M;
 }
 
-// TODO: Fix below.
-
-// Reads memory from a memory structure.
-// Only supports mapper 2.
-uint8_t uxrom_read(uint8_t locL, uint8_t locH, void *map) {
-  // The input map is generic for simplification in memory.c/h, we
-  // need to bring it back to the proper structure to use it.
+/*
+ * Takes in two words and a generic mapper pointer.
+ * Uses these bytes to address the memory in the mapper.
+ *
+ * Assumes that the pointer is non-null and points to a valid
+ * UxROM mapper.
+ * Assumes that the address formed by the bytes is valid.
+ */
+word_t uxrom_read(word_t mem_lo, word_t mem_hi, void *map) {
+  // Cast back from generic pointer to the memory structure.
   uxrom_t *M = (uxrom_t*) map;
 
-  uint16_t addr = (((uint16_t)locH) << 8) | locL;
   // Detect where in memory we need to access and do so.
+  dword_t addr = get_dword(mem_lo, mem_hi);
   if (addr < 0x2000) {
-    return M->RAM[addr];
+    return M->ram[addr % RAM_SIZE];
   } else if (addr < 0x4000) {
-    return M->PPU[(addr - PPU_OFFSET) % PPU_SIZE];
+    return M->ppu[(addr - PPU_OFFSET) % PPU_SIZE];
   } else if (addr < 0x4020) {
-    return M->IO[addr - IO_OFFSET];
+    return M->io[addr - IO_OFFSET];
   } else if (addr < 0x6000) {
     printf("FATAL: Memory not implemented");
     abort();
   } else if (addr < 0x8000) {
-    return M->bat[addr - MAP2_BAT_OFFSET];
+    return M->bat[addr - BAT_OFFSET];
   } else if (addr < 0xC000) {
-    return M->cart[M->currentBank][addr - MAP2_BANK_OFFSET];
+    return M->cart[M->current_bank][addr - BANK_OFFSET];
   } else {
-    return M->cart[M->fixedBank][addr - MAP2_FIXED_BANK_OFFSET];
+    return M->cart[M->fixed_bank][addr - FIXED_BANK_OFFSET];
   }
 }
 
-// Writes memory to the memory structure.
-// Handles bank switches.
-void uxrom_write(uint8_t val, uint8_t locL, uint8_t locH, void *map) {
+/*
+ * Takes in two addressing bytes, a value, and a memory mapper.
+ * Uses the addressing bytes to write the value to the mapper.
+ *
+ * Assumes that the mapper pointer is non-null and points
+ * to a valid UxROM mapper.
+ * Assumes that the address formed by the addressing bytes is valid.
+ */
+void uxrom_write(word_t val, word_t mem_lo, word_t mem_hi, void *map) {
+  // Cast back from generic pointer to the memory structure.
   uxrom_t *M = (uxrom_t*) map;
 
-  uint16_t addr = (((uint16_t)locH) << 8) | locL;
   // Detect where in memory we need to access and do so.
+  dword_t addr = get_dword(mem_lo, mem_hi);
   if (addr < 0x2000) {
-    M->RAM[addr] = val;
+    M->ram[addr % RAM_SIZE] = val;
     return;
   } else if (addr < 0x4000) {
-    M->PPU[(addr - PPU_OFFSET) % PPU_SIZE] = val;
+    M->ppu[(addr - PPU_OFFSET) % PPU_SIZE] = val;
     return;
   } else if (addr < 0x4020) {
-    M->IO[addr - IO_OFFSET] = val;
+    M->io[addr - IO_OFFSET] = val;
     return;
   } else if (addr < 0x6000) {
     printf("FATAL: Memory not implemented");
     abort();
   } else if (addr < 0x8000) {
-    M->bat[addr - MAP2_BAT_OFFSET] = val;
+    M->bat[addr - BAT_OFFSET] = val;
     return;
-  } else if (addr < 0xC000) {
+  } else {
     // Writing to the cart area uses the low bits to select a bank.
-    M->currentBank = val & 0x0f;
-    return;
-  } else {
-    M->currentBank = val & 0x0f;
+    M->current_bank = val & BANK_MASK;
     return;
   }
 }
 
-// Frees a memory structure.
+/*
+ * Takes in a uxrom memory structure and frees it.
+ *
+ * Assumes that the fixed bank is the final allocated bank.
+ * Assumes the input pointer is a uxrom memory structure and is non-null.
+ */
 void uxrom_free(void *map) {
   uxrom_t *M = (uxrom_t*) map;
 
   // TODO: This should change with implementation.
-  free(M->RAM);
-  free(M->PPU);
-  free(M->IO);
+  // Free the contents of the structure.
+  free(M->ram);
+  free(M->ppu);
+  free(M->io);
   free(M->bat);
   free(M->header);
 
   // Frees each bank.
-  // TODO: This only works for mapper 2.
-  for (size_t i = 0; i < (M->fixedBank + 1U); i++) {
+  for (size_t i = 0; i < (M->fixed_bank + 1U); i++) {
     free(M->cart[i]);
   }
 
+  // Free the structure itself.
   free(M);
+
+  return;
 }

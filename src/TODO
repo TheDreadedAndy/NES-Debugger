@@ -1,8 +1,8 @@
 Here's a semi-complete list of things that still need to be changes:
   - BRK needs interrupt hijacking to be implemented.
-  - Absolute indexed and indirrect instructions need to be implemented.
   - It's worth it to consider changing interrupt detection to be managed by
     state, though this may not be necessary.
   - A few files are still missing descriptions.
   - Pretty much everything needs to be more rigorously tested.
   - SDL, PPU, APU, NDB are all completely missing.
+  - Consider parsing the INES/NES2 header into a structure.

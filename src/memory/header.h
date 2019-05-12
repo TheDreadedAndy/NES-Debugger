@@ -1,26 +1,27 @@
 #include <stdlib.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 #ifndef _NES_INES
 #define _NES_INES
 
 // Encodes the type of header which the structure was created from.
-typedef enum {ARCHAIC_INES, INES, NES2} nes_header_t;
+typedef enum {INES, ARCHAIC_INES, NES2} nes_header_t;
 
 // Encodes the console we need to emulate.
 typedef enum {NES, VS, PC10, EXT} console_t;
 
 // Encodes the tv standard the rom is expecting.
-typedef enum {NTSC, PAL} tvsystem_t;
+typedef enum {NTSC_TV, PAL_TV} tvsystem_t;
 
 // Encodes the expected cpu/ppu timing mode.
-typedef enum {NTSC, PAL, MULTI, DENDY} timing_t;
+typedef enum timing {NTSC, PAL, MULTI, DENDY} timing_t;
 
 // TODO
-typedef enum {NONE} ext_t;
-typedef enum {NONE} vsppu_t;
-typedef enum {NONE} vshw_t;
-typedef enum {NONE} expansion_t;
+typedef enum extension {NO_EXT} ext_t;
+typedef enum vsppu {NO_VSPPU} vsppu_t;
+typedef enum vshw {NO_VSHW} vshw_t;
+typedef enum expandion {NO_EXP} expansion_t;
 
 /*
  * Contains the decoded archaic INES/INES/NES 2.0 header.
@@ -51,7 +52,7 @@ typedef struct ines_header {
   bool mirror;
   bool battery;
   bool trainer;
-  char *trainer;
+  char *trainer_data;
   bool four_screen;
 
   // Hardware information

@@ -1,8 +1,8 @@
 #include <stdlib.h>
 
 // Avoid multiple definitions.
-#ifndef _64_UTIL
-#define _64_UTIL
+#ifndef _NES_UTIL
+#define _NES_UTIL
 
 // Calloc with a NULL check and oom error.
 void *xcalloc(size_t nobj, size_t size);

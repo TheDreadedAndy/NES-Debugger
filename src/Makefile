@@ -25,4 +25,4 @@ $(patsubst %.o,%,$(MAINS)): $(OBJECTS)
 clean:
 	-rm -f $(OBJECTS)
 	-rm -f $(MAINS)
-	-rm -f $(patsubst %.o,%,$(MAINS))
+#	-rm -f $(patsubst %.o,%,$(MAINS))

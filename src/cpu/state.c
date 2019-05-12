@@ -1,3 +1,7 @@
+/*
+ * TODO
+ */
+
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -7,21 +11,27 @@
 #include "./state.h"
 #include "./2A03.h"
 
-// Verifys that a state structure is safe to access.
+/*
+ * Verifys that a state structure is safe to access.
+ */
 bool is_state(state_t *S) {
   return S != NULL && ((S->start == NULL && S->end == NULL)
            || (S->start != NULL && S->end != NULL));
 }
 
-// Allocates and returns a state structure.
+/*
+ * Allocates and returns a state structure.
+ */
 state_t *state_new() {
   state_t *S = xcalloc(1, sizeof(state_t));
   CONTRACT(is_state(S));
   return S;
 }
 
-// Frees a state structure and all of its contents.
-// Requires that the state be well-formed.
+/*
+ * Frees a state structure and all of its contents.
+ * Requires that the state be well-formed.
+ */
 void state_free(state_t *S) {
   CONTRACT(is_state(S));
 
@@ -38,17 +48,21 @@ void state_free(state_t *S) {
   return;
 }
 
-// Checks if the state is empty.
-// Requires that the state be well-formed.
+/*
+ * Checks if the state is empty.
+ * Requires that the state be well-formed.
+ */
 bool state_empty(state_t *S) {
   CONTRACT(is_state(S));
 
   return S->start == NULL && S->end == NULL;
 }
 
-// Adds a cycle to the state queue.
-// Requires that the state be well-formed.
-void state_add_cycle(micromem_t mem, microdata_t data, bool incPC, state_t *S) {
+/*
+ * Adds a cycle to the state queue.
+ * Requires that the state be well-formed.
+ */
+void state_add_cycle(micromem_t mem, microdata_t data, bool inc_pc, state_t *S) {
   CONTRACT(is_state(S));
 
   // Allocate element and load in its data.
@@ -56,7 +70,7 @@ void state_add_cycle(micromem_t mem, microdata_t data, bool incPC, state_t *S) {
   micro_t *elem = xcalloc(1, sizeof(micro_t));
   elem->mem = mem;
   elem->data = data;
-  elem->incPC = incPC;
+  elem->inc_pc = inc_pc;
   node->elem = elem;
 
   // Update the state.
@@ -72,9 +86,11 @@ void state_add_cycle(micromem_t mem, microdata_t data, bool incPC, state_t *S) {
   return;
 }
 
-// Pushes a cycle to the state queue.
-// Requires that the state be well-formed.
-void state_push_cycle(micromem_t mem, microdata_t data, bool incPC, state_t *S) {
+/*
+ * Pushes a cycle to the state queue.
+ * Requires that the state be well-formed.
+ */
+void state_push_cycle(micromem_t mem, microdata_t data, bool inc_pc, state_t *S) {
   CONTRACT(is_state(S));
 
   // Allocate element and load in its data.
@@ -82,7 +98,7 @@ void state_push_cycle(micromem_t mem, microdata_t data, bool incPC, state_t *S) 
   micro_t *elem = xcalloc(1, sizeof(micro_t));
   elem->mem = mem;
   elem->data = data;
-  elem->incPC = incPC;
+  elem->inc_pc = inc_pc;
   node->elem = elem;
 
   // Update the state.
@@ -98,8 +114,10 @@ void state_push_cycle(micromem_t mem, microdata_t data, bool incPC, state_t *S) 
   return;
 }
 
-// Dequeues the next state cycle and returns it.
-// Requires that the state be non-empty and well-formed.
+/*
+ * Dequeues the next state cycle and returns it.
+ * Requires that the state be non-empty and well-formed.
+ */
 micro_t *state_next_cycle(state_t *S) {
   CONTRACT(is_state(S));
   CONTRACT(!state_empty(S));
@@ -118,21 +136,27 @@ micro_t *state_next_cycle(state_t *S) {
   return cycle;
 }
 
-// Checks if the state is ready to poll for interrupts under normal conditions.
-// Requires that the state be valid.
+/*
+ * Checks if the state is ready to poll for interrupts under normal conditions.
+ * Requires that the state be valid.
+ */
 bool state_can_poll(state_t *S) {
   CONTRACT(is_state(S));
 
-  // Checks if there are two micro ops in the state.
-  // Polling happens at the end of the second-to-last phase of an inst.
-  // Since a fetch should always end a state_t (in general), this is when
-  // there are two ops in the queue.
-  // See nesdev.com for more on interrupts.
+  /*
+   * Checks if there are two micro ops in the state.
+   * Polling happens at the end of the second-to-last phase of an inst.
+   * Since a fetch should always end a state_t (in general), this is when
+   * there are two ops in the queue.
+   * See nesdev.com for more on interrupts.
+   */
   return S->start != NULL && S->start->next == S->end;
 }
 
-// Emptys the state queue, freeing its elements.
-// Requires the state to be valid.
+/*
+ * Emptys the state queue, freeing its elements.
+ * Requires the state to be valid.
+ */
 void state_clear(state_t *S) {
   CONTRACT(is_state(S));
 
@@ -150,26 +174,30 @@ void state_clear(state_t *S) {
   return;
 }
 
-// Sets the IRQ condition to true in the element at the end of the state.
-// Assumes that said element will be a fetch call.
-// Requires that the state be valid and non-empty.
+/*
+ * Sets the IRQ condition to true in the element at the end of the state.
+ * Assumes that said element will be a fetch call.
+ * Requires that the state be valid and non-empty.
+ */
 void state_set_irq(state_t *S) {
   CONTRACT(is_state(S));
   CONTRACT(!state_empty(S));
 
-  S->end->elem->IRQ = IRQ;
+  S->end->elem->irq = irq_interrupt;
 
   return;
 }
 
-// Sets the NMI condition to true in the element at the end of the state.
-// Assumes that said element will be a fetch call.
-// Requires that the state be valid and non-empty.
+/*
+ * Sets the NMI condition to true in the element at the end of the state.
+ * Assumes that said element will be a fetch call.
+ * Requires that the state be valid and non-empty.
+ */
 void state_set_nmi(state_t *S) {
   CONTRACT(is_state(S));
   CONTRACT(!state_empty(S));
 
-  S->end->elem->NMI = NMI;
+  S->end->elem->nmi = nmi_interrupt;
 
   return;
 }

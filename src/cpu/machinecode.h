@@ -1,6 +1,15 @@
 #ifndef _NES_MCHC
 #define _NES_MCHC
 
+/*
+ * Below are constant definitions for all of the instructions
+ * in the 6502 ISA. Undefined instructions are currently unseported.
+ *
+ * The file is split into different types of instructions. This is a
+ * relic of a past implementation, and is irrelevent to the emulator
+ * as of this time.
+ */
+
 /* ####################### */
 /* # Type 1 instructions # */
 /* ####################### */
@@ -242,7 +251,6 @@
 /* # Type 8 instructions # */
 /* ####################### */
 
-// Full instructions.
 #define INST_PHP       0x08
 #define INST_CLC       0x18
 #define INST_PLP       0x28

@@ -52,11 +52,13 @@ int main(int argc, char *argv[]) {
   state_t *S = state_new();
   state_add_cycle(MEM_FETCH, DAT_NOP, true, S);
 
+  printf("Starting emulation...\n");
   for (size_t i = 0; i < iterations; i++) {
     // Executes the next cycle and prints the results.
     cpu_run_cycle(R, M, S);
-    regfile_print(R, i);
+    //regfile_print(R, i);
   }
+  printf("Done!\n");
 
   free(R);
   memory_free(M);

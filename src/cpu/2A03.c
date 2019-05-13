@@ -935,15 +935,10 @@ void cpu_fetch_inst(word_t inst, bool nmi, bool irq, state_t *S) {
       state_add_cycle(MEM_FETCH, DAT_NOP, true, S);
       break;
     case INST_BIT_ZP:
-      state_add_cycle(MEM_READ_PC_ZP_ADDR, DAT_NOP, true, S);
-      state_add_cycle(MEM_READ_ADDR_MDR, DAT_NOP, false, S);
-      state_add_cycle(MEM_FETCH, DAT_BIT_MDR_A, true, S);
+      cpu_fetch_zp(DAT_BIT_MDR_A, S);
       break;
     case INST_BIT_ABS:
-      state_add_cycle(MEM_READ_PC_ADDRL, DAT_NOP, true, S);
-      state_add_cycle(MEM_READ_PC_ADDRH, DAT_NOP, true, S);
-      state_add_cycle(MEM_READ_ADDR_MDR, DAT_NOP, false, S);
-      state_add_cycle(MEM_FETCH, DAT_BIT_MDR_A, true, S);
+      cpu_fetch_abs(DAT_BIT_MDR_A, S);
       break;
     case INST_JMP:
       state_add_cycle(MEM_READ_PC_MDR, DAT_NOP, true, S);

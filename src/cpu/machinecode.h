@@ -140,14 +140,14 @@
 #define OP_STX         0x80
 #define INST_STX_ZP    0x86
 #define INST_STX_ABS   0x8E
-#define INST_STX_ZPX   0x96
+#define INST_STX_ZPY   0x96
 
 #define OP_LDX         0xA0
 #define INST_LDX_IMM   0xA2
 #define INST_LDX_ZP    0xA6
 #define INST_LDX_ABS   0xAE
-#define INST_LDX_ZPX   0xB6
-#define INST_LDX_ABX   0xBE
+#define INST_LDX_ZPY   0xB6
+#define INST_LDX_ABY   0xBE
 
 #define OP_DEC         0xC0
 #define INST_DEC_ZP    0xC6

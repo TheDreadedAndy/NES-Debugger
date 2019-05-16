@@ -572,51 +572,25 @@ void cpu_fetch_inst(word_t inst, bool nmi, bool irq, state_t *S) {
       cpu_fetch_abx(DAT_ADC_MDR_A, S);
       break;
     case INST_STA_IZPX:
-      state_add_cycle(MEM_READ_PC_ZP_PTR, DAT_NOP, true, S);
-      state_add_cycle(MEM_READ_PTR_ADDRL, DAT_ADD_PTRL_X, false, S);
-      state_add_cycle(MEM_READ_PTR_ADDRL, DAT_NOP, false, S);
-      state_add_cycle(MEM_READ_PTR1_ADDRH, DAT_NOP, false, S);
-      state_add_cycle(MEM_WRITE_A_ADDR, DAT_NOP, false, S);
-      state_add_cycle(MEM_FETCH, DAT_NOP, true, S);
+      cpu_fetch_w_izpx(MEM_WRITE_A_ADDR, S);
       break;
     case INST_STA_ZP:
-      state_add_cycle(MEM_READ_PC_ZP_ADDR, DAT_NOP, true, S);
-      state_add_cycle(MEM_WRITE_A_ADDR, DAT_NOP, false, S);
-      state_add_cycle(MEM_FETCH, DAT_NOP, true, S);
+      cpu_fetch_w_zp(MEM_WRITE_A_ADDR, S);
       break;
     case INST_STA_ABS:
-      state_add_cycle(MEM_READ_PC_ADDRL, DAT_NOP, true, S);
-      state_add_cycle(MEM_READ_PC_ADDRH, DAT_NOP, true, S);
-      state_add_cycle(MEM_WRITE_A_ADDR, DAT_NOP, false, S);
-      state_add_cycle(MEM_FETCH, DAT_NOP, true, S);
+      cpu_fetch_w_abs(MEM_WRITE_A_ADDR, S);
       break;
     case INST_STA_IZP_Y:
-      state_add_cycle(MEM_READ_PC_ZP_PTR, DAT_NOP, true, S);
-      state_add_cycle(MEM_READ_PTR_ADDRL, DAT_NOP, false, S);
-      state_add_cycle(MEM_READ_PTR1_ADDRH, DAT_ADD_ADDRL_Y, false, S);
-      state_add_cycle(MEM_READ_ADDR_MDR, DAT_FIX_ADDRH, false, S);
-      state_add_cycle(MEM_WRITE_A_ADDR, DAT_NOP, false, S);
-      state_add_cycle(MEM_FETCH, DAT_NOP, true, S);
+      cpu_fetch_w_izp_y(MEM_WRITE_A_ADDR, S);
       break;
     case INST_STA_ZPX:
-      state_add_cycle(MEM_READ_PC_ZP_ADDR, DAT_NOP, true, S);
-      state_add_cycle(MEM_READ_ADDR_MDR, DAT_ADD_ADDRL_X, false, S);
-      state_add_cycle(MEM_WRITE_A_ADDR, DAT_NOP, false, S);
-      state_add_cycle(MEM_FETCH, DAT_NOP, true, S);
+      cpu_fetch_w_zpx(MEM_WRITE_A_ADDR, S);
       break;
     case INST_STA_ABY:
-      state_add_cycle(MEM_READ_PC_ADDRL, DAT_NOP, true, S);
-      state_add_cycle(MEM_READ_PC_ADDRH, DAT_ADD_ADDRL_Y, true, S);
-      state_add_cycle(MEM_READ_ADDR_MDR, DAT_FIX_ADDRH, false, S);
-      state_add_cycle(MEM_WRITE_A_ADDR, DAT_NOP, false, S);
-      state_add_cycle(MEM_FETCH, DAT_NOP, true, S);
+      cpu_fetch_w_aby(MEM_WRITE_A_ADDR, S);
       break;
     case INST_STA_ABX:
-      state_add_cycle(MEM_READ_PC_ADDRL, DAT_NOP, true, S);
-      state_add_cycle(MEM_READ_PC_ADDRH, DAT_ADD_ADDRL_X, true, S);
-      state_add_cycle(MEM_READ_ADDR_MDR, DAT_FIX_ADDRH, false, S);
-      state_add_cycle(MEM_WRITE_A_ADDR, DAT_NOP, false, S);
-      state_add_cycle(MEM_FETCH, DAT_NOP, true, S);
+      cpu_fetch_w_abx(MEM_WRITE_A_ADDR, S);
       break;
     case INST_LDA_IZPX:
       cpu_fetch_izpx(DAT_MOV_MDR_A, S);
@@ -751,21 +725,13 @@ void cpu_fetch_inst(word_t inst, bool nmi, bool irq, state_t *S) {
       cpu_fetch_rw_abx(DAT_ROR_MDR, S);
       break;
     case INST_STX_ZP:
-      state_add_cycle(MEM_READ_PC_ZP_ADDR, DAT_NOP, true, S);
-      state_add_cycle(MEM_WRITE_X_ADDR, DAT_NOP, false, S);
-      state_add_cycle(MEM_FETCH, DAT_NOP, true, S);
+      cpu_fetch_w_zp(MEM_WRITE_X_ADDR, S);
       break;
     case INST_STX_ABS:
-      state_add_cycle(MEM_READ_PC_ADDRL, DAT_NOP, true, S);
-      state_add_cycle(MEM_READ_PC_ADDRH, DAT_NOP, true, S);
-      state_add_cycle(MEM_WRITE_X_ADDR, DAT_NOP, false, S);
-      state_add_cycle(MEM_FETCH, DAT_NOP, true, S);
+      cpu_fetch_w_abs(MEM_WRITE_X_ADDR, S);
       break;
-    case INST_STX_ZPX:
-      state_add_cycle(MEM_READ_PC_ZP_ADDR, DAT_NOP, true, S);
-      state_add_cycle(MEM_READ_ADDR_MDR, DAT_ADD_ADDRL_Y, false, S);
-      state_add_cycle(MEM_WRITE_X_ADDR, DAT_NOP, false, S);
-      state_add_cycle(MEM_FETCH, DAT_NOP, true, S);
+    case INST_STX_ZPY:
+      cpu_fetch_w_zpy(MEM_WRITE_X_ADDR, S);
       break;
     case INST_LDX_IMM:
       cpu_fetch_imm(DAT_MOV_MDR_X, S);
@@ -776,14 +742,10 @@ void cpu_fetch_inst(word_t inst, bool nmi, bool irq, state_t *S) {
     case INST_LDX_ABS:
       cpu_fetch_abs(DAT_MOV_MDR_X, S);
       break;
-    case INST_LDX_ZPX:
-      // LDX is Y indexed, since it is storing X.
-      state_add_cycle(MEM_READ_PC_ZP_ADDR, DAT_NOP, true, S);
-      state_add_cycle(MEM_READ_PC_MDR, DAT_ADD_ADDRL_Y, false, S);
-      state_add_cycle(MEM_READ_PC_MDR, DAT_NOP, false, S);
-      state_add_cycle(MEM_FETCH, DAT_MOV_MDR_X, true, S);
+    case INST_LDX_ZPY:
+      cpu_fetch_zpy(DAT_MOV_MDR_X, S);
       break;
-    case INST_LDX_ABX:
+    case INST_LDX_ABY:
       cpu_fetch_aby(DAT_MOV_MDR_X, S);
       break;
     case INST_DEC_ZP:
@@ -829,21 +791,13 @@ void cpu_fetch_inst(word_t inst, bool nmi, bool irq, state_t *S) {
       state_add_cycle(MEM_FETCH, DAT_NOP, true, S);
       break;
     case INST_STY_ZP:
-      state_add_cycle(MEM_READ_PC_ZP_ADDR, DAT_NOP, true, S);
-      state_add_cycle(MEM_WRITE_Y_ADDR, DAT_NOP, false, S);
-      state_add_cycle(MEM_FETCH, DAT_NOP, true, S);
+      cpu_fetch_w_zp(MEM_WRITE_Y_ADDR, S);
       break;
     case INST_STY_ABS:
-      state_add_cycle(MEM_READ_PC_ADDRL, DAT_NOP, true, S);
-      state_add_cycle(MEM_READ_PC_ADDRH, DAT_NOP, true, S);
-      state_add_cycle(MEM_WRITE_Y_ADDR, DAT_NOP, false, S);
-      state_add_cycle(MEM_FETCH, DAT_NOP, true, S);
+      cpu_fetch_w_abs(MEM_WRITE_Y_ADDR, S);
       break;
     case INST_STY_ZPX:
-      state_add_cycle(MEM_READ_PC_ZP_ADDR, DAT_NOP, true, S);
-      state_add_cycle(MEM_READ_ADDR_MDR, DAT_ADD_ADDRL_X, false, S);
-      state_add_cycle(MEM_WRITE_Y_ADDR, DAT_NOP, false, S);
-      state_add_cycle(MEM_FETCH, DAT_NOP, true, S);
+      cpu_fetch_w_zpx(MEM_WRITE_Y_ADDR, S);
       break;
     case INST_LDY_IMM:
       cpu_fetch_imm(DAT_MOV_MDR_Y, S);
@@ -925,26 +879,16 @@ void cpu_fetch_inst(word_t inst, bool nmi, bool irq, state_t *S) {
       state_add_cycle(MEM_FETCH, DAT_NOP, true, S);
       break;
     case INST_PHP:
-      state_add_cycle(MEM_READ_PC_NODEST, DAT_NOP, false, S);
-      state_add_cycle(MEM_PUSH_P_B, DAT_DEC_S, false, S);
-      state_add_cycle(MEM_FETCH, DAT_NOP, true, S);
+      cpu_fetch_push(MEM_PUSH_P_B, S);
       break;
     case INST_PHA:
-      state_add_cycle(MEM_READ_PC_NODEST, DAT_NOP, false, S);
-      state_add_cycle(MEM_PUSH_A, DAT_DEC_S, false, S);
-      state_add_cycle(MEM_FETCH, DAT_NOP, true, S);
+      cpu_fetch_push(MEM_PUSH_A, S);
       break;
     case INST_PLP:
-      state_add_cycle(MEM_READ_PC_NODEST, DAT_NOP, false, S);
-      state_add_cycle(MEM_NOP, DAT_INC_S, false, S);
-      state_add_cycle(MEM_PULL_P, DAT_NOP, false, S);
-      state_add_cycle(MEM_FETCH, DAT_NOP, true, S);
+      cpu_fetch_pull(MEM_PULL_P, S);
       break;
     case INST_PLA:
-      state_add_cycle(MEM_READ_PC_NODEST, DAT_NOP, false, S);
-      state_add_cycle(MEM_NOP, DAT_INC_S, false, S);
-      state_add_cycle(MEM_PULL_A, DAT_NOP, false, S);
-      state_add_cycle(MEM_FETCH, DAT_NOP, true, S);
+      cpu_fetch_pull(MEM_PULL_A, S);
       break;
     case INST_SEC:
       cpu_fetch_nomem(DAT_SEC, S);
@@ -1076,6 +1020,17 @@ void cpu_fetch_zpx(microdata_t microop, state_t *S) {
 /*
  * TODO
  */
+void cpu_fetch_zpy(microdata_t microop, state_t *S) {
+  state_add_cycle(MEM_READ_PC_ZP_ADDR, DAT_NOP, PC_INC, S);
+  state_add_cycle(MEM_READ_PC_MDR, DAT_ADD_ADDRL_Y, PC_NOP, S);
+  state_add_cycle(MEM_READ_PC_MDR, DAT_NOP, PC_NOP, S);
+  state_add_cycle(MEM_FETCH, microop, PC_INC, S);
+  return;
+}
+
+/*
+ * TODO
+ */
 void cpu_fetch_aby(microdata_t microop, state_t *S) {
   state_add_cycle(MEM_READ_PC_ADDRL, DAT_NOP, PC_INC, S);
   state_add_cycle(MEM_READ_PC_ADDRH, DAT_ADD_ADDRL_Y, PC_INC, S);
@@ -1152,6 +1107,120 @@ void cpu_fetch_rw_abx(microdata_t microop, state_t *S) {
   state_add_cycle(MEM_READ_ADDR_MDR, DAT_NOP, false, S);
   state_add_cycle(MEM_WRITE_MDR_ADDR, microop, false, S);
   state_add_cycle(MEM_WRITE_MDR_ADDR, DAT_NOP, false, S);
+  state_add_cycle(MEM_FETCH, DAT_NOP, true, S);
+  return;
+}
+
+/*
+ * TODO
+ */
+void cpu_fetch_w_izpx(micromem_t microop, state_t *S) {
+  state_add_cycle(MEM_READ_PC_ZP_PTR, DAT_NOP, true, S);
+  state_add_cycle(MEM_READ_PTR_ADDRL, DAT_ADD_PTRL_X, false, S);
+  state_add_cycle(MEM_READ_PTR_ADDRL, DAT_NOP, false, S);
+  state_add_cycle(MEM_READ_PTR1_ADDRH, DAT_NOP, false, S);
+  state_add_cycle(microop, DAT_NOP, false, S);
+  state_add_cycle(MEM_FETCH, DAT_NOP, true, S);
+  return;
+}
+
+/*
+ * TODO
+ */
+void cpu_fetch_w_zp(micromem_t microop, state_t *S) {
+  state_add_cycle(MEM_READ_PC_ZP_ADDR, DAT_NOP, true, S);
+  state_add_cycle(microop, DAT_NOP, false, S);
+  state_add_cycle(MEM_FETCH, DAT_NOP, true, S);
+  return;
+}
+
+/*
+ * TODO
+ */
+void cpu_fetch_w_abs(micromem_t microop, state_t *S) {
+  state_add_cycle(MEM_READ_PC_ADDRL, DAT_NOP, true, S);
+  state_add_cycle(MEM_READ_PC_ADDRH, DAT_NOP, true, S);
+  state_add_cycle(microop, DAT_NOP, false, S);
+  state_add_cycle(MEM_FETCH, DAT_NOP, true, S);
+  return;
+}
+
+/*
+ * TODO
+ */
+void cpu_fetch_w_izp_y(micromem_t microop, state_t *S) {
+  state_add_cycle(MEM_READ_PC_ZP_PTR, DAT_NOP, true, S);
+  state_add_cycle(MEM_READ_PTR_ADDRL, DAT_NOP, false, S);
+  state_add_cycle(MEM_READ_PTR1_ADDRH, DAT_ADD_ADDRL_Y, false, S);
+  state_add_cycle(MEM_READ_ADDR_MDR, DAT_FIX_ADDRH, false, S);
+  state_add_cycle(microop, DAT_NOP, false, S);
+  state_add_cycle(MEM_FETCH, DAT_NOP, true, S);
+  return;
+}
+
+/*
+ * TODO
+ */
+void cpu_fetch_w_zpx(micromem_t microop, state_t *S) {
+  state_add_cycle(MEM_READ_PC_ZP_ADDR, DAT_NOP, true, S);
+  state_add_cycle(MEM_READ_ADDR_MDR, DAT_ADD_ADDRL_X, false, S);
+  state_add_cycle(microop, DAT_NOP, false, S);
+  state_add_cycle(MEM_FETCH, DAT_NOP, true, S);
+  return;
+}
+
+/*
+ * TODO
+ */
+void cpu_fetch_w_zpy(micromem_t microop, state_t *S) {
+  state_add_cycle(MEM_READ_PC_ZP_ADDR, DAT_NOP, true, S);
+  state_add_cycle(MEM_READ_ADDR_MDR, DAT_ADD_ADDRL_Y, false, S);
+  state_add_cycle(microop, DAT_NOP, false, S);
+  state_add_cycle(MEM_FETCH, DAT_NOP, true, S);
+  return;
+}
+
+/*
+ * TODO
+ */
+void cpu_fetch_w_aby(micromem_t microop, state_t *S) {
+  state_add_cycle(MEM_READ_PC_ADDRL, DAT_NOP, true, S);
+  state_add_cycle(MEM_READ_PC_ADDRH, DAT_ADD_ADDRL_Y, true, S);
+  state_add_cycle(MEM_READ_ADDR_MDR, DAT_FIX_ADDRH, false, S);
+  state_add_cycle(microop, DAT_NOP, false, S);
+  state_add_cycle(MEM_FETCH, DAT_NOP, true, S);
+  return;
+}
+
+/*
+ * TODO
+ */
+void cpu_fetch_w_abx(micromem_t microop, state_t *S) {
+  state_add_cycle(MEM_READ_PC_ADDRL, DAT_NOP, true, S);
+  state_add_cycle(MEM_READ_PC_ADDRH, DAT_ADD_ADDRL_X, true, S);
+  state_add_cycle(MEM_READ_ADDR_MDR, DAT_FIX_ADDRH, false, S);
+  state_add_cycle(microop, DAT_NOP, false, S);
+  state_add_cycle(MEM_FETCH, DAT_NOP, true, S);
+  return;
+}
+
+/*
+ * TODO
+ */
+void cpu_fetch_push(micromem_t microop, state_t *S) {
+  state_add_cycle(MEM_READ_PC_NODEST, DAT_NOP, false, S);
+  state_add_cycle(microop, DAT_DEC_S, false, S);
+  state_add_cycle(MEM_FETCH, DAT_NOP, true, S);
+  return;
+}
+
+/*
+ * TODO
+ */
+void cpu_fetch_pull(micromem_t microop, state_t *S) {
+  state_add_cycle(MEM_READ_PC_NODEST, DAT_NOP, false, S);
+  state_add_cycle(MEM_NOP, DAT_INC_S, false, S);
+  state_add_cycle(microop, DAT_NOP, false, S);
   state_add_cycle(MEM_FETCH, DAT_NOP, true, S);
   return;
 }

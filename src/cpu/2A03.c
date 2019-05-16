@@ -40,9 +40,24 @@ void cpu_fetch_imm(microdata_t microop, state_t *S);
 void cpu_fetch_abs(microdata_t microop, state_t *S);
 void cpu_fetch_izp_y(microdata_t microop, state_t *S);
 void cpu_fetch_zpx(microdata_t microop, state_t *S);
+void cpu_fetch_zpy(microdata_t microop, state_t *S);
 void cpu_fetch_abx(microdata_t microop, state_t *S);
 void cpu_fetch_aby(microdata_t microop, state_t *S);
 void cpu_fetch_nomem(microdata_t microop, state_t *S);
+void cpu_fetch_rw_zp(microdata_t microop, state_t *S);
+void cpu_fetch_rw_abs(microdata_t microop, state_t *S);
+void cpu_fetch_rw_zpx(microdata_t microop, state_t *S);
+void cpu_fetch_rw_abx(microdata_t microop, state_t *S);
+void cpu_fetch_w_izpx(micromem_t microop, state_t *S);
+void cpu_fetch_w_zp(micromem_t microop, state_t *S);
+void cpu_fetch_w_abs(micromem_t microop, state_t *S);
+void cpu_fetch_w_izp_y(micromem_t microop, state_t *S);
+void cpu_fetch_w_zpx(micromem_t microop, state_t *S);
+void cpu_fetch_w_zpy(micromem_t microop, state_t *S);
+void cpu_fetch_w_abx(micromem_t microop, state_t *S);
+void cpu_fetch_w_aby(micromem_t microop, state_t *S);
+void cpu_fetch_push(micromem_t microop, state_t *S);
+void cpu_fetch_pull(micromem_t microop, state_t *S);
 
 /*
  * Runs the next CPU cycle.

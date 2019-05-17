@@ -91,7 +91,7 @@ void state_push_cycle(micromem_t mem, microdata_t data, bool inc_pc, state_t *S)
   S->front = (S->front - 1) % STATE_MAX_OPS;
 
   // Fill the new microop with the given data.
-  micro_t *micro = &(S->queue[S->back]);
+  micro_t *micro = &(S->queue[S->front]);
   micro->mem = mem;
   micro->data = data;
   micro->inc_pc = inc_pc;

@@ -77,8 +77,6 @@ void cpu_run_cycle(regfile_t *R, memory_t *M, state_t *S) {
     state_set_nmi(S);
   }
 
-  free(next_micro);
-
   return;
 }
 

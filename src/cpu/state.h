@@ -7,6 +7,14 @@
 #define _NES_STATE
 
 /*
+ * The state manages the individual micro instructions that happen
+ * on each cycle of each instruction. The largest number of cycles an
+ * instruction can take should be 8, but I put 16 to give some breathing
+ * room.
+ */
+#define STATE_MAX_OPS 16
+
+/*
  * Each micro instruction encodes the opperations that the CPU must
  * perform in that cycle.
  *
@@ -20,16 +28,12 @@ typedef struct micro {
   bool irq;
 } micro_t;
 
-// System state is managed by a queue of micro instructions
-typedef struct node {
-  micro_t *elem;
-  struct node *next;
-  struct node *prev;
-} node_t;
-
-typedef struct queue_header {
-  node_t *start;
-  node_t *end;
+// System state is managed by a fixed size queue of micro instructions
+typedef struct state_header {
+  micro_t *queue;
+  int front;
+  int back;
+  int size;
 } state_t;
 
 // These are the functions that the 2A03 emulation will use to interact with

@@ -12,136 +12,115 @@
 #include "./2A03.h"
 
 /*
- * Verifys that a state structure is safe to access.
- */
-bool is_state(state_t *S) {
-  return S != NULL && ((S->start == NULL && S->end == NULL)
-           || (S->start != NULL && S->end != NULL));
-}
-
-/*
- * Allocates and returns a state structure.
+ * Initializes and returns a state structure of fixed size STATE_MAX_OPS.
  */
 state_t *state_new() {
   state_t *S = xcalloc(1, sizeof(state_t));
-  CONTRACT(is_state(S));
+  S->queue = xcalloc(STATE_MAX_OPS, sizeof(micro_t));
   return S;
 }
 
 /*
- * Frees a state structure and all of its contents.
- * Requires that the state be well-formed.
+ * Frees a state structure.
+ *
+ * Assumes the state is non-null with a non-null queue.
  */
 void state_free(state_t *S) {
-  CONTRACT(is_state(S));
-
-  node_t *temp = S->start;
-  // Frees each node and its element.
-  while (temp != NULL) {
-    S->start = temp;
-    temp = temp->next;
-    free(S->start->elem);
-    free(S->start);
-  }
+  CONTRACT(S != NULL);
+  free(S->queue);
   free(S);
-
   return;
 }
 
 /*
  * Checks if the state is empty.
- * Requires that the state be well-formed.
+ *
+ * Requires that the state be non-null and valid.
  */
 bool state_empty(state_t *S) {
-  CONTRACT(is_state(S));
-
-  return S->start == NULL && S->end == NULL;
+  CONTRACT(S != NULL);
+  return S->size == 0;
 }
 
 /*
  * Adds a cycle to the state queue.
- * Requires that the state be well-formed.
+ *
+ * Requires that the state be non-null and valid.
  */
 void state_add_cycle(micromem_t mem, microdata_t data, bool inc_pc, state_t *S) {
-  CONTRACT(is_state(S));
+  CONTRACT(S != NULL);
+  CONTRACT(S->queue != NULL);
 
-  // Allocate element and load in its data.
-  node_t *node = xcalloc(1, sizeof(node_t));
-  micro_t *elem = xcalloc(1, sizeof(micro_t));
-  elem->mem = mem;
-  elem->data = data;
-  elem->inc_pc = inc_pc;
-  node->elem = elem;
+  // Fill the new microop with the given data.
+  micro_t *micro = &(S->queue[S->back]);
+  micro->mem = mem;
+  micro->data = data;
+  micro->inc_pc = inc_pc;
+  micro->nmi = false;
+  micro->irq = false;
 
-  // Update the state.
-  if (state_empty(S)) {
-    S->start = node;
-    S->end = node;
-  } else {
-    S->end->next = node;
-    node->prev = S->end;
-    S->end = node;
-  }
+  // Add the microop to the queue.
+  S->size++;
+  CONTRACT(S->size <= STATE_MAX_OPS && S->size >= 0);
+  S->back = (S->back + 1) % STATE_MAX_OPS;
 
   return;
 }
 
 /*
  * Pushes a cycle to the state queue.
+ *
  * Requires that the state be well-formed.
  */
 void state_push_cycle(micromem_t mem, microdata_t data, bool inc_pc, state_t *S) {
-  CONTRACT(is_state(S));
+  CONTRACT(S != NULL);
+  CONTRACT(S->queue != NULL);
 
-  // Allocate element and load in its data.
-  node_t *node = xcalloc(1, sizeof(node_t));
-  micro_t *elem = xcalloc(1, sizeof(micro_t));
-  elem->mem = mem;
-  elem->data = data;
-  elem->inc_pc = inc_pc;
-  node->elem = elem;
+  // Add the microop to the queue.
+  S->size++;
+  CONTRACT(S->size <= STATE_MAX_OPS && S->size >= 0);
+  S->front = (S->front - 1) % STATE_MAX_OPS;
 
-  // Update the state.
-  if (state_empty(S)) {
-    S->start = node;
-    S->end = node;
-  } else {
-    node->next = S->start;
-    S->start->prev = node;
-    S->start = node;
-  }
+  // Fill the new microop with the given data.
+  micro_t *micro = &(S->queue[S->back]);
+  micro->mem = mem;
+  micro->data = data;
+  micro->inc_pc = inc_pc;
+  micro->nmi = false;
+  micro->irq = false;
 
   return;
 }
 
 /*
  * Dequeues the next state cycle and returns it.
+ *
  * Requires that the state be non-empty and well-formed.
+ *
+ * The returned micro structure must not be free'd.
  */
 micro_t *state_next_cycle(state_t *S) {
-  CONTRACT(is_state(S));
-  CONTRACT(!state_empty(S));
+  CONTRACT(S != NULL);
+  CONTRACT(S->queue != NULL);
+  CONTRACT(S->size > 0);
 
-  // Remove cycle and node, then free the node.
-  micro_t *cycle = S->start->elem;
-  node_t *temp = S->start;
-  S->start = S->start->next;
-  if (S->start != NULL) {
-    S->start->prev = NULL;
-  } else {
-    S->end = NULL;
-  }
-  free(temp);
+  // Get the next cycle.
+  micro_t *micro = &(S->queue[S->front]);
 
-  return cycle;
+  // Remove it from the queue.
+  S->front = (S->front + 1) % STATE_MAX_OPS;
+  S->size--;
+
+  return micro;
 }
 
 /*
  * Checks if the state is ready to poll for interrupts under normal conditions.
- * Requires that the state be valid.
+ *
+ * Requires that the state be non-null.
  */
 bool state_can_poll(state_t *S) {
-  CONTRACT(is_state(S));
+  CONTRACT(S != NULL);
 
   /*
    * Checks if there are two micro ops in the state.
@@ -150,54 +129,72 @@ bool state_can_poll(state_t *S) {
    * there are two ops in the queue.
    * See nesdev.com for more on interrupts.
    */
-  return S->start != NULL && S->start->next == S->end;
+  return S->size == 2;
 }
 
 /*
- * Emptys the state queue, freeing its elements.
- * Requires the state to be valid.
+ * Emptys the state queue.
+ *
+ * Requires the state to be non-null.
  */
 void state_clear(state_t *S) {
-  CONTRACT(is_state(S));
+  CONTRACT(S != NULL);
 
-  node_t *temp = S->start;
-  while (temp != NULL) {
-    S->start = temp;
-    temp = temp->next;
-    free(S->start->elem);
-    free(S->start);
-  }
-
-  S->start = NULL;
-  S->end = NULL;
+  // We need only set the size and index fields to zero, since off-queue
+  // micro op structures are undefined.
+  S->front = 0;
+  S->back = 0;
+  S->size = 0;
 
   return;
 }
 
 /*
  * Sets the IRQ condition to true in the element at the end of the state.
+ *
  * Assumes that said element will be a fetch call.
+ *
  * Requires that the state be valid and non-empty.
  */
 void state_set_irq(state_t *S) {
-  CONTRACT(is_state(S));
-  CONTRACT(!state_empty(S));
+  CONTRACT(S != NULL);
+  CONTRACT(S->queue != NULL);
+  CONTRACT(S->size > 0);
 
-  S->end->elem->irq = irq_interrupt;
+  // Gets the last element in the queue.
+  int last_elem = (S->back - 1) % STATE_MAX_OPS;
+  micro_t *micro = &(S->queue[last_elem]);
+
+  // Ensures that it is a fetch or branch call.
+  CONTRACT(micro->mem == MEM_FETCH || micro->data == DAT_BRANCH);
+
+  // Sets the IRQ condition.
+  micro->irq = irq_interrupt;
 
   return;
 }
 
 /*
  * Sets the NMI condition to true in the element at the end of the state.
+ *
  * Assumes that said element will be a fetch call.
+ *
  * Requires that the state be valid and non-empty.
  */
 void state_set_nmi(state_t *S) {
-  CONTRACT(is_state(S));
-  CONTRACT(!state_empty(S));
+  CONTRACT(S != NULL);
+  CONTRACT(S->queue != NULL);
+  CONTRACT(S->size > 0);
 
-  S->end->elem->nmi = nmi_interrupt;
+  // Gets the last element in the queue.
+  int last_elem = (S->back - 1) % STATE_MAX_OPS;
+  micro_t *micro = &(S->queue[last_elem]);
+
+  // Ensures that it is a fetch or branch call.
+  CONTRACT(micro->mem == MEM_FETCH || micro->data == DAT_BRANCH);
+
+  // Sets the NMI condition.
+  micro->nmi = nmi_interrupt;
 
   return;
 }

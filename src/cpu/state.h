@@ -61,8 +61,7 @@ bool state_can_poll(state_t *S);
 void state_clear(state_t *S);
 
 // Modifies the last item on the queue to flag that there has been an interrupt.
-// If the last item on the queue is not a fetch request, or if it's empty,
-// behavior of the emulator is undefined.
+// The last item must be a fetch or branch.
 void state_set_irq(state_t *S);
 void state_set_nmi(state_t *S);
 

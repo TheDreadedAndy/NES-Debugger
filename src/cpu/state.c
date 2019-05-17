@@ -1,5 +1,14 @@
 /*
- * TODO
+ * These functions manage the state of the 2A03 processor, which is necessary
+ * for cycle accurate emulation.
+ *
+ * The state is implemented as a fixed size queue, with size STATE_MAX_OPS, of
+ * micro operation structures. This queue is represented as an array, with the
+ * front and back moving depending on the functions the user calls. The front
+ * and back can be anywhere, moving about the array in a circle.
+ *
+ * Each micro op structure contains the information necessary for the processor
+ * to execute all the necessary operations of that cycle.
  */
 
 #include <stdlib.h>

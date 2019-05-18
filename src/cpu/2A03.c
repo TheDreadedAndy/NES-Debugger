@@ -43,6 +43,7 @@ bool irq_ready = false;
 void cpu_run_mem(micro_t *micro, regfile_t *R, memory_t *M, state_t *S);
 void cpu_run_data(micro_t *micro, regfile_t *R, memory_t *M, state_t *S);
 bool cpu_can_poll(regfile_t *R, state_t *S);
+void cpu_fetch(micro_t *micro, regfile_t *R, memory_t *M, state_t *S);
 void cpu_decode_inst(word_t inst, state_t *S);
 void cpu_decode_izpx(microdata_t micro_op, state_t *S);
 void cpu_decode_zp(microdata_t micro_op, state_t *S);
@@ -90,7 +91,6 @@ void cpu_run_cycle(regfile_t *R, memory_t *M, state_t *S) {
   micro_t *next_micro = state_next_cycle(S);
   cpu_run_mem(next_micro, R, M, S);
   cpu_run_data(next_micro, R, M, S);
-  // TODO: The pc should NOT be incremented if we are starting an interrupt.
   if (next_micro->inc_pc) { regfile_inc_pc(R); }
 
   // Poll the interrupt lines and update the detectors.
@@ -112,7 +112,8 @@ bool cpu_can_poll(regfile_t *R, state_t *S) {
 }
 
 /*
- * Executes a memory micro instruction.
+ * Executes the memory micro instruction contained in the field of the
+ * micro opperation structure using the provided structures.
  *
  * Assumes the provided structures are valid.
  *
@@ -124,12 +125,7 @@ void cpu_run_mem(micro_t *micro, regfile_t *R, memory_t *M, state_t *S) {
     case MEM_NOP:
       break;
     case MEM_FETCH:
-      if (nmi_edge || irq_ready) {
-        R->inst = INST_BRK;
-      } else {
-        R->inst = memory_read(R->pc_lo, R->pc_hi, M);
-      }
-      cpu_decode_inst(R->inst, S);
+      cpu_fetch(micro, R, M, S);
       break;
     case MEM_READ_PC_NODEST:
       memory_read(R->pc_lo, R->pc_hi, M);
@@ -238,21 +234,22 @@ void cpu_run_mem(micro_t *micro, regfile_t *R, memory_t *M, state_t *S) {
   return;
 }
 
-// Executes a data micro instruction.
+/*
+ * Executes the data opperation of the given micro instruction using
+ * the provided structures.
+ *
+ * Assumes the provided structures are valid.
+ */
 void cpu_run_data(micro_t *micro, regfile_t *R, memory_t *M, state_t *S) {
-
-  microdata_t data = micro->data;
-
   // Some data operations require temperary storage.
   dword_t res;
-  word_t carry;
-  word_t ovf;
-
-  // Branch declarations.
-  word_t flag;
+  word_t carry, ovf, flag;
   bool cond, taken;
 
-  switch (data) {
+  /*
+   * TODO
+   */
+  switch (micro->data) {
     case DAT_NOP:
       break;
     case DAT_INC_S:
@@ -456,37 +453,70 @@ void cpu_run_data(micro_t *micro, regfile_t *R, memory_t *M, state_t *S) {
     case DAT_FIX_PCH:
       R->pc_hi = R->pc_hi + R->carry;
       break;
+    /*
+     * Branch instructions are of the form xxy10000, and are broken into
+     * three cases:
+     * 1) If the flag indicated by xx has value y, then the reletive address
+     * is added to the PC.
+     * 2) If case 1 results in a page crossing on the pc, an extra cycle is
+     * added.
+     * 3) If xx does not have value y, this micro op is the same as MEM_FETCH.
+     */
     case DAT_BRANCH:
+      // Calculate whether or not the branch was taken.
       flag = R->inst >> 6;
       cond = (bool)((R->inst >> 5) & 1);
       // Black magic that pulls the proper flag from the status reg.
       flag = (flag >> 1) ? ((R->P >> (flag - 2)) & 1)
                          : ((R->P >> (7 - flag)) & 1);
       taken = (((bool)flag) == cond);
-      // TODO: Reletive addressing needs to be signed!
-      res = (dword_t)R->pc_lo + (dword_t)R->mdr;
+
+      // Add the reletive address to pc_lo. Reletive addressing is signed,
+      // so we need to sign extend the mdr before we add it to pc_lo.
+      res = (dword_t)R->pc_lo + (dword_t)(int16_t)(int8_t)R->mdr;
       R->carry = (word_t)(res >> 8);
+
+      // Execute the proper cycles according to the above results.
       if (!taken) {
-        // Branches are a special case in the micro op abstraction, as they
-        // violate the memory/data difference. I could probably fix it with a
-        // different implementation, but theres no real point.
-        if (!nmi_edge && !irq_ready) {
-          regfile_inc_pc(R);
-          R->inst = memory_read(R->pc_lo, R->pc_hi, M);
-        } else {
-          R->inst = INST_BRK;
-        }
-        cpu_decode_inst(R->inst, S);
+        // Case 3.
+        cpu_fetch(micro, R, M, S);
       } else if (R->carry) {
+        // Case 2.
         R->pc_lo = (word_t)res;
         state_add_cycle(MEM_NOP, DAT_FIX_PCH, false, S);
         state_add_cycle(MEM_FETCH, DAT_NOP, true, S);
       } else {
+        // Case 1.
         R->pc_lo = (word_t)res;
         state_add_cycle(MEM_FETCH, DAT_NOP, true, S);
       }
+
       break;
   }
+  return;
+}
+
+/*
+ * TODO
+ */
+void cpu_fetch(micro_t *micro, regfile_t *R, memory_t *M, state_t *S) {
+  // Fetch the next instruction to the instruction register.
+  if (!nmi_edge && !irq_ready) {
+    // A non-interrupt fetch should always be paired with a PC increment.
+    // We set the micro ops pc_inc field here, in case we were coming
+    // from a branch.
+    micro->inc_pc = PC_INC;
+    R->inst = memory_read(R->pc_lo, R->pc_hi, M);
+  } else {
+    // All interrupts fill the instruction register with 0x00 (BRK).
+    R->inst = INST_BRK;
+    // Interrupts should not increment the PC.
+    micro->inc_pc = PC_NOP;
+  }
+
+  // Decode the instruction.
+  cpu_decode_inst(R->inst, S);
+
   return;
 }
 

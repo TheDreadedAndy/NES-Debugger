@@ -25,9 +25,13 @@ int main(int argc, char *argv[]) {
   size_t iterations = 0;
   char *file = NULL;
   signed char opt;
+  bool verbose = false;
 
-  while ((opt = getopt(argc, argv, "hi:f:")) != -1) {
+  while ((opt = getopt(argc, argv, "hvi:f:")) != -1) {
     switch (opt) {
+      case 'v':
+        verbose = true;
+        break;
       case 'i':
         iterations = atoi(optarg);
         break;
@@ -56,7 +60,7 @@ int main(int argc, char *argv[]) {
   for (size_t i = 0; i < iterations; i++) {
     // Executes the next cycle and prints the results.
     cpu_run_cycle(R, M, S);
-    //regfile_print(R, i);
+    if (verbose) { regfile_print(R, i); }
   }
   printf("Done!\n");
 

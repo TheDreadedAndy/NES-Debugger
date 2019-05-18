@@ -24,8 +24,6 @@ typedef struct micro {
   micromem_t mem;
   microdata_t data;
   bool inc_pc;
-  bool nmi;
-  bool irq;
 } micro_t;
 
 // System state is managed by a fixed size queue of micro instructions
@@ -54,15 +52,10 @@ void state_push_cycle(micromem_t mem, microdata_t data, bool inc_pc, state_t *S)
 // Dequeues and returns the next micro op.
 micro_t *state_next_cycle(state_t *S);
 
-// Checks if the state is in a position where interrupt polling is allowed.
-bool state_can_poll(state_t *S);
-
 // Clears the state queue.
 void state_clear(state_t *S);
 
-// Modifies the last item on the queue to flag that there has been an interrupt.
-// The last item must be a fetch or branch.
-void state_set_irq(state_t *S);
-void state_set_nmi(state_t *S);
+// Returns the number of operations in the state queue.
+int state_get_size(state_t *S);
 
 #endif

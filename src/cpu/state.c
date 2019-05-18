@@ -65,8 +65,6 @@ void state_add_cycle(micromem_t mem, microdata_t data, bool inc_pc, state_t *S) 
   micro->mem = mem;
   micro->data = data;
   micro->inc_pc = inc_pc;
-  micro->nmi = false;
-  micro->irq = false;
 
   // Add the microop to the queue.
   S->size++;
@@ -95,8 +93,6 @@ void state_push_cycle(micromem_t mem, microdata_t data, bool inc_pc, state_t *S)
   micro->mem = mem;
   micro->data = data;
   micro->inc_pc = inc_pc;
-  micro->nmi = false;
-  micro->irq = false;
 
   return;
 }
@@ -124,21 +120,14 @@ micro_t *state_next_cycle(state_t *S) {
 }
 
 /*
- * Checks if the state is ready to poll for interrupts under normal conditions.
+ * Returns the number of elements in the queue of the given state.
  *
- * Requires that the state be non-null.
+ * Requires the state to be non-null with a valid size.
  */
-bool state_can_poll(state_t *S) {
+int state_get_size(state_t *S) {
   CONTRACT(S != NULL);
-
-  /*
-   * Checks if there are two micro ops in the state.
-   * Polling happens at the end of the second-to-last phase of an inst.
-   * Since a fetch should always end a state_t (in general), this is when
-   * there are two ops in the queue.
-   * See nesdev.com for more on interrupts.
-   */
-  return S->size == 2;
+  CONTRACT(S->size >= 0 && S->size <= STATE_MAX_OPS);
+  return S->size;
 }
 
 /*
@@ -154,56 +143,6 @@ void state_clear(state_t *S) {
   S->front = 0;
   S->back = 0;
   S->size = 0;
-
-  return;
-}
-
-/*
- * Sets the IRQ condition to true in the element at the end of the state.
- *
- * Assumes that said element will be a fetch call.
- *
- * Requires that the state be valid and non-empty.
- */
-void state_set_irq(state_t *S) {
-  CONTRACT(S != NULL);
-  CONTRACT(S->queue != NULL);
-  CONTRACT(S->size > 0);
-
-  // Gets the last element in the queue.
-  int last_elem = (S->back - 1) % STATE_MAX_OPS;
-  micro_t *micro = &(S->queue[last_elem]);
-
-  // Ensures that it is a fetch or branch call.
-  CONTRACT(micro->mem == MEM_FETCH || micro->data == DAT_BRANCH);
-
-  // Sets the IRQ condition.
-  micro->irq = irq_interrupt;
-
-  return;
-}
-
-/*
- * Sets the NMI condition to true in the element at the end of the state.
- *
- * Assumes that said element will be a fetch call.
- *
- * Requires that the state be valid and non-empty.
- */
-void state_set_nmi(state_t *S) {
-  CONTRACT(S != NULL);
-  CONTRACT(S->queue != NULL);
-  CONTRACT(S->size > 0);
-
-  // Gets the last element in the queue.
-  int last_elem = (S->back - 1) % STATE_MAX_OPS;
-  micro_t *micro = &(S->queue[last_elem]);
-
-  // Ensures that it is a fetch or branch call.
-  CONTRACT(micro->mem == MEM_FETCH || micro->data == DAT_BRANCH);
-
-  // Sets the NMI condition.
-  micro->nmi = nmi_interrupt;
 
   return;
 }

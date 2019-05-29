@@ -145,8 +145,6 @@ void cpu_run_mem(micro_t *micro, regfile_t *R, memory_t *M, state_t *S) {
       break;
     case MEM_READ_PC_ADDRH:
       R->addr_hi = memory_read(R->pc_lo, R->pc_hi, M);
-      break;
-    case MEM_READ_PC_ZP_PTR:
       R->ptr_hi = 0;
       R->ptr_lo = memory_read(R->pc_lo, R->pc_hi, M);
       break;
@@ -247,7 +245,27 @@ void cpu_run_data(micro_t *micro, regfile_t *R, memory_t *M, state_t *S) {
   bool cond, taken;
 
   /*
-   * TODO
+   * These micro instructions do pretty much exactly what their name suggests.
+   * The only bit that really needs to be more clear explained is the purpose
+   * of the seemingly random hex values.
+   *
+   * Whenever a data oppertion is performed, there is a good chance that the
+   * cpu status will need to be updated. The cpu status is represented by
+   * a register with 7 flags, which are layed out in the following way:
+   * Bit:  7 6 5 4 3 2 1 0
+   * flag: N V B B D I Z C
+   *       | | | | | | | |
+   *       | | | | | | | -> Carry out for unsigned arithmetic.
+   *       | | | | | | ---> Zero flag, set when result was zero.
+   *       | | | | | -----> IRQ Block flag, prevents IRQ's from being triggered.
+   *       | | | | -------> BCD Flag, useless in the NES.
+   *       | | -----------> The "B" flag, used to determine where an interrupt
+   *       | |              originated.
+   *       | -------------> Signed overflow flag.
+   *       ---------------> Negative flag, equal to the MSB of the result.
+   *
+   * The hex values in the code that follows are used to mask in or out these
+   * flags.
    */
   switch (micro->data) {
     case DAT_NOP:

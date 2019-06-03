@@ -145,6 +145,8 @@ void cpu_run_mem(micro_t *micro, regfile_t *R, memory_t *M, state_t *S) {
       break;
     case MEM_READ_PC_ADDRH:
       R->addr_hi = memory_read(R->pc_lo, R->pc_hi, M);
+      break;
+    case MEM_READ_PC_ZP_PTR:
       R->ptr_hi = 0;
       R->ptr_lo = memory_read(R->pc_lo, R->pc_hi, M);
       break;

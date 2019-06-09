@@ -270,176 +270,229 @@ void cpu_run_data(micro_t *micro, regfile_t *R, memory_t *M, state_t *S) {
    * flags.
    */
   switch (micro->data) {
+    // I mean, yeah.
     case DAT_NOP:
       break;
+    // Increments the S register. Used in push/pull. Does not set flags.
     case DAT_INC_S:
-      // Flags are not set for S, since it's part of push/pull.
       R->S++;
       break;
+    // Increments the X register. Sets the N and Z flags.
     case DAT_INC_X:
       R->X++;
       R->P = (R->P & 0x7D) | (R->X & 0x80) | ((R->X == 0) << 1);
       break;
+    // Increments the Y register. Sets the N and Z flags.
     case DAT_INC_Y:
       R->Y++;
       R->P = (R->P & 0x7D) | (R->Y & 0x80) | ((R->Y == 0) << 1);
       break;
+    // Increments the MDR. Sets the N and Z flags.
     case DAT_INC_MDR:
-      // Memory Data Register is used to visual modification on memory.
       R->mdr++;
       R->P = (R->P & 0x7D) | (R->mdr & 0x80) | ((R->mdr == 0) << 1);
       break;
+    // Decrements the S register. Used in push/pull. Does not set flags.
     case DAT_DEC_S:
       R->S--;
       break;
+    // Decrements the X register. Sets the N and Z flags.
     case DAT_DEC_X:
       R->X--;
       R->P = (R->P & 0x7D) | (R->X & 0x80) | ((R->X == 0) << 1);
       break;
+    // Decrements the Y register. Sets the N and Z flags.
     case DAT_DEC_Y:
       R->Y--;
       R->P = (R->P & 0x7D) | (R->Y & 0x80) | ((R->Y == 0) << 1);
       break;
+    // Decrements the MDR. Sets the N and Z flags.
     case DAT_DEC_MDR:
       R->mdr--;
       R->P = (R->P & 0x7D) | (R->mdr & 0x80) | ((R->mdr == 0) << 1);
       break;
+    // Copies the value stored in A to X. Sets the N and Z flags.
     case DAT_MOV_A_X:
       R->X = R->A;
       R->P = (R->P & 0x7D) | (R->X & 0x80) | ((R->X == 0) << 1);
       break;
+    // Copies the value stored in A to Y. Sets the N and Z flags.
     case DAT_MOV_A_Y:
       R->Y = R->A;
       R->P = (R->P & 0x7D) | (R->Y & 0x80) | ((R->Y == 0) << 1);
       break;
+    // Copies the value stored in S to X. Sets the N and Z flags.
     case DAT_MOV_S_X:
       R->X = R->S;
       R->P = (R->P & 0x7D) | (R->X & 0x80) | ((R->X == 0) << 1);
       break;
+    // Copies the value stored in X to A. Sets the N and Z flags.
     case DAT_MOV_X_A:
       R->A = R->X;
       R->P = (R->P & 0x7D) | (R->A & 0x80) | ((R->A == 0) << 1);
       break;
+    // Copies the value stored in X to S. Sets no flag (S is the stack pointer).
     case DAT_MOV_X_S:
-      // Flags are not set when changing S.
       R->S = R->X;
       break;
+    // Copies the value stored in Y to A. Sets the N and Z flags.
     case DAT_MOV_Y_A:
       R->A = R->Y;
       R->P = (R->P & 0x7D) | (R->A & 0x80) | ((R->A == 0) << 1);
       break;
+    // Copies the value stored in the MDR to the PCL register. Sets no flags.
     case DAT_MOV_MDR_PCL:
       R->pc_lo = R->mdr;
       break;
+    // Copies the value stored in the MDR to Register A. Sets the N and Z flags.
     case DAT_MOV_MDR_A:
       R->A = R->mdr;
       R->P = (R->P & 0x7D) | (R->A & 0x80) | ((R->A == 0) << 1);
       break;
+    // Copies the value stored in the MDR to Register X. Sets the N and Z flags.
     case DAT_MOV_MDR_X:
       R->X = R->mdr;
       R->P = (R->P & 0x7D) | (R->X & 0x80) | ((R->X == 0) << 1);
       break;
+    // Copies the value stored in the MDR to Register X. Sets the N and Z flags.
     case DAT_MOV_MDR_Y:
       R->Y = R->mdr;
       R->P = (R->P & 0x7D) | (R->Y & 0x80) | ((R->Y == 0) << 1);
       break;
+    // Clears the carry flag.
     case DAT_CLC:
       R->P = R->P & 0xFE;
       break;
+    // Clears the decimal flag.
     case DAT_CLD:
       R->P = R->P & 0xF7;
       break;
+    // Clears the interrupt flag.
     case DAT_CLI:
       R->P = R->P & 0xFB;
       break;
+    // Clears the overflow flag.
     case DAT_CLV:
       R->P = R->P & 0xBF;
       break;
+    // Sets the carry flag.
     case DAT_SEC:
       R->P = R->P | 0x01;
       break;
+    // Sets the decimal flag.
     case DAT_SED:
       R->P = R->P | 0x08;
       break;
+    // Sets the interrupt flag.
     case DAT_SEI:
       R->P = R->P | 0x04;
       break;
+    // Subtracts the MDR from Register A, and stores the N, Z, and C flags
+    // of the result.
     case DAT_CMP_MDR_A:
-      // Carry flag is unsigned overflow.
+      // The carry flag is unsigned overflow. We use a double word to hold
+      // the extra bit.
       res = (dword_t)R->A + (dword_t)(-R->mdr);
       R->P = (R->P & 0x7C) | (res & 0x80) | (res >> 8) | ((res == 0) << 1);
       break;
+    // Subtracts the MDR from Register X, and stores the N, Z, and C flags
+    // of the result.
     case DAT_CMP_MDR_X:
       res = (dword_t)R->X + (dword_t)(-R->mdr);
       R->P = (R->P & 0x7C) | (res & 0x80) | (res >> 8) | ((res == 0) << 1);
       break;
+    // Subtracts the MDR from Register Y, and stores the N, Z, and C flags
+    // of the result.
     case DAT_CMP_MDR_Y:
       res = (dword_t)R->Y + (dword_t)(-R->mdr);
       R->P = (R->P & 0x7C) | (res & 0x80) | (res >> 8) | ((res == 0) << 1);
       break;
+    // Shifts the MDR left once, storing the lost bit in C and setting the
+    // N and Z flags.
     case DAT_ASL_MDR:
-      // The shifted out bit is stored in the carry flag for shifting ops.
       carry = R->mdr >> 7;
       R->mdr = R->mdr << 1;
       R->P = (R->P & 0x7C) | (R->mdr & 0x80) | ((R->mdr == 0) << 1) | carry;
       break;
+    // Shifts A left once, storing the lost bit in C and setting the
+    // N and Z flags.
     case DAT_ASL_A:
       carry = R->A >> 7;
       R->A = R->A << 1;
       R->P = (R->P & 0x7C) | (R->A & 0x80) | ((R->A == 0) << 1) | carry;
       break;
+    // Shifts the MDR right once, storing the lost bit in C and setting the
+    // N and Z flags.
     case DAT_LSR_MDR:
       carry = R->mdr & 0x01;
       R->mdr = R->mdr >> 1;
       R->P = (R->P & 0x7C) | (R->mdr & 0x80) | ((R->mdr == 0) << 1) | carry;
       break;
+    // Shifts A right once, storing the lost bit in C and setting the
+    // N and Z flags.
     case DAT_LSR_A:
       carry = R->A & 0x01;
       R->A = R->A >> 1;
       R->P = (R->P & 0x7C) | (R->A & 0x80) | ((R->A == 0) << 1) | carry;
       break;
+    // Shifts the MDR left once, back filling with C. Stores the lost bit in C,
+    // sets the N and Z flags.
     case DAT_ROL_MDR:
       carry = R->mdr >> 7;
       R->mdr = (R->mdr << 1) | (R->P & 0x01);
       R->P = (R->P & 0x7C) | (R->mdr & 0x80) | ((R->mdr == 0) << 1) | carry;
       break;
+    // Shifts A left once, back filling with C. Stores teh lost bit in C, sets
+    // the N and Z flags.
     case DAT_ROL_A:
       carry = R->A >> 7;
       R->A = (R->A << 1) | (R->P & 0x01);
       R->P = (R->P & 0x7C) | (R->A & 0x80) | ((R->A == 0) << 1) | carry;
       break;
+    // Shifts the MDR right once, back filling with C. Stores the lost bit in C,
+    // sets the N and Z flags.
     case DAT_ROR_MDR:
       carry = R->mdr & 0x01;
       R->mdr = (R->mdr >> 1) | (R->P << 7);
       R->P = (R->P & 0x7C) | (R->mdr & 0x80) | ((R->mdr == 0) << 1) | carry;
       break;
+    // Shifts A right once, back filling with C. Stores the lost bit in C,
+    // sets the N and Z flags.
     case DAT_ROR_A:
       carry = R->A & 0x01;
       R->A = (R->A >> 1) | (R->P << 7);
       R->P = (R->P & 0x7C) | (R->A & 0x80) | ((R->A == 0) << 1) | carry;
       break;
+    // XOR's the MDR and A. Sets the N and Z flags.
     case DAT_EOR_MDR_A:
       R->A = R->A ^ R->mdr;
       R->P = (R->P & 0x7D) | (R->A & 0x80) | ((R->A == 0) << 1);
       break;
+    // AND's the MDR and A. Sets the N and Z flags.
     case DAT_AND_MDR_A:
       R->A = R->A & R->mdr;
       R->P = (R->P & 0x7D) | (R->A & 0x80) | ((R->A == 0) << 1);
       break;
+    // OR's the MDR and A. Sets the N and Z flags.
     case DAT_ORA_MDR_A:
       R->A = R->A | R->mdr;
       R->P = (R->P & 0x7D) | (R->A & 0x80) | ((R->A == 0) << 1);
       break;
+    // Adds the MDR, A, and the C flag, storing the result in A.
+    // Sets the N, V, Z, and C flags.
     case DAT_ADC_MDR_A:
       res = (dword_t)R->A + (dword_t)R->mdr + (dword_t)(R->P & 0x01);
-      ovf = ((R->A & 0x80) == (R->mdr & 0x80)) && ((R->A & 0x80) != (res & 0x80));
+      ovf = ((R->A & 0x80) == (R->mdr & 0x80))
+         && ((R->A & 0x80) != (res & 0x80));
       R->A = (word_t)res;
       R->P = (R->P & 0x3C) | (R->A & 0x80) | ((R->A == 0) << 1)
-           | (ovf << 6) | (res >> 8);
+                           | (ovf << 6) | (res >> 8);
       break;
+    // TODO: This is wrong.
     case DAT_SBC_MDR_A:
       res = (dword_t)R->A + (dword_t)(-R->mdr) + (dword_t)(-(R->P & 0x01));
-      ovf = ((R->A & 0x80) == (R->mdr & 0x80)) && ((R->A & 0x80) != (res & 0x80));
+      ovf = ((R->A & 0x80) == (R->mdr & 0x80))
+         && ((R->A & 0x80) != (res & 0x80));
       R->A = (word_t)res;
       R->P = (R->P & 0x3C) | (R->A & 0x80) | ((R->A == 0) << 1)
            | (ovf << 6) | (res >> 8);

@@ -247,10 +247,6 @@ void cpu_run_data(micro_t *micro, regfile_t *R, memory_t *M, state_t *S) {
   bool cond, taken;
 
   /*
-   * These micro instructions do pretty much exactly what their name suggests.
-   * The only bit that really needs to be more clear explained is the purpose
-   * of the seemingly random hex values.
-   *
    * Whenever a data oppertion is performed, there is a good chance that the
    * cpu status will need to be updated. The cpu status is represented by
    * a register with 7 flags, which are layed out in the following way:
@@ -488,41 +484,54 @@ void cpu_run_data(micro_t *micro, regfile_t *R, memory_t *M, state_t *S) {
       R->P = (R->P & 0x3C) | (R->A & 0x80) | ((R->A == 0) << 1)
                            | (ovf << 6) | (res >> 8);
       break;
-    // TODO: This is wrong.
+    // Subtracts the MDR from A, using C as a borrow flag. The result
+    // is equal to A - MDR - (1 - C). Sets the N, V, Z, and C flags.
     case DAT_SBC_MDR_A:
-      res = (dword_t)R->A + (dword_t)(-R->mdr) + (dword_t)(-(R->P & 0x01));
+      // See documentation for proof of this line. Gives the correct ressult
+      // without issues in the carry out.
+      res = (dword_t)R->A + (dword_t)(~R->mdr) + (dword_t)(R->P & 0x01);
       ovf = ((R->A & 0x80) == (R->mdr & 0x80))
          && ((R->A & 0x80) != (res & 0x80));
       R->A = (word_t)res;
       R->P = (R->P & 0x3C) | (R->A & 0x80) | ((R->A == 0) << 1)
            | (ovf << 6) | (res >> 8);
       break;
+    // Moves the two high bits of A to the state register (N and V).
+    // Sets the zero flag according to A AND MDR.
     case DAT_BIT_MDR_A:
       R->P = (R->P & 0x3D) | (R->mdr & 0xC0) | (((R->A & R->mdr) == 0) << 1);
       break;
+    // Adds X to the low address byte, storing the carry out in the carry
+    // abstraction register.
     case DAT_ADD_ADDRL_X:
       res = (dword_t)R->addr_lo + (dword_t)R->X;
       R->addr_lo = (word_t)res;
       R->carry = res >> 8;
       break;
+    // Adds Y to the low address byte, storing the carry out in the carry
+    // abstraction register.
     case DAT_ADD_ADDRL_Y:
       res = (dword_t)R->addr_lo + (dword_t)R->X;
       R->addr_lo = (word_t)res;
       R->carry = res >> 8;
       break;
+    // Adds X to the low pointer byte. Page crossings are ignored.
     case DAT_ADD_PTRL_X:
       R->ptr_lo = R->ptr_lo + R->X;
       break;
+    // Performs the last addressing operation again if the address crossed a
+    // page bound and needed to be fixed.
     case DAT_FIXA_ADDRH:
       if (R->carry) {
         R->addr_hi += R->carry;
         state_push_cycle(micro->mem, DAT_NOP, false, S);
       }
-      R->carry = 0;
       break;
+    // Adds the carry out from the last addressing data operation to addr_hi.
     case DAT_FIX_ADDRH:
       R->addr_hi = R->addr_hi + R->carry;
       break;
+    // Adds the carry out from the last addressing data operation to PCH.
     case DAT_FIX_PCH:
       R->pc_hi = R->pc_hi + R->carry;
       break;

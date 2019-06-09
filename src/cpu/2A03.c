@@ -82,9 +82,9 @@ void cpu_poll_irq_line(void);
 void cpu_run_cycle(regfile_t *R, memory_t *M, state_t *S) {
   // Poll the interrupt detectors, if it is time to do so.
   if (cpu_can_poll(R, S)) {
-    // irq_ready should only be reset from a fetch call handling it.
-    // TODO: Should depend on the I flag.
-    irq_ready |= irq_level;
+    // irq_ready should only be reset from a fetch call handling it
+    // or from interrupts being blocked.
+    irq_ready = (irq_ready || irq_level) && !((bool) (R->P & 0x04));
   }
 
   // Fetch and run the next micro instructions for the cycle.

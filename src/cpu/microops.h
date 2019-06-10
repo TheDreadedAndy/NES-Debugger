@@ -45,6 +45,8 @@ typedef enum micromem {
   MEM_PUSH_A,
   MEM_PUSH_P,
   MEM_PUSH_P_B,
+  MEM_BRK,
+  MEM_IRQ,
 
   MEM_PULL_PCL,
   MEM_PULL_PCH,

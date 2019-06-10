@@ -116,8 +116,6 @@ bool cpu_can_poll(regfile_t *R, state_t *S) {
  * micro opperation structure using the provided structures.
  *
  * Assumes the provided structures are valid.
- *
- * TODO: A new instruction should probably be added for interrupt hijacking.
  */
 void cpu_run_mem(micro_t *micro, regfile_t *R, memory_t *M, state_t *S) {
   micromem_t mem = micro->mem;
@@ -193,11 +191,46 @@ void cpu_run_mem(micro_t *micro, regfile_t *R, memory_t *M, state_t *S) {
       memory_write(R->A, R->S, MEMORY_STACK_HIGH, M);
       break;
     case MEM_PUSH_P:
+      // Push P and clear the B flag.
       memory_write((R->P | 0x20), R->S, MEMORY_STACK_HIGH, M);
       break;
     case MEM_PUSH_P_B:
-      // Push P and set bit 4.
+      // Push P and set the B flag.
       memory_write((R->P | 0x30), R->S, MEMORY_STACK_HIGH, M);
+      break;
+    // Pushes the state register on the stack with the B flag set, then adds the
+    // next cycles of the interrupt according to hijacking behavior.
+    case MEM_BRK:
+      memory_write((R->P | 0x30), R->S, MEMORY_STACK_HIGH, M);
+
+      // Allows an nmi to hijack the brk instruction.
+      if (nmi_edge) {
+        state_add_cycle(MEM_NMI_PCL, DAT_SEI, PC_NOP, S);
+        state_add_cycle(MEM_NMI_PCH, DAT_NOP, PC_NOP, S);
+        state_add_cycle(MEM_FETCH, DAT_NOP, PC_INC, S);
+      } else {
+        state_add_cycle(MEM_IRQ_PCL, DAT_SEI, PC_NOP, S);
+        state_add_cycle(MEM_IRQ_PCH, DAT_NOP, PC_NOP, S);
+        state_add_cycle(MEM_FETCH, DAT_NOP, PC_INC, S);
+      }
+
+      break;
+    // Pushes the state register on the stack with the B flag clear, then adds
+    // the nexxt cycles of the interrupt according to hijacking behavior.
+    case MEM_IRQ:
+      memory_write((R->P | 0x20), R->S, MEMORY_STACK_HIGH, M);
+
+      // Allows an nmi to hijack an irq interrupt.
+      if (nmi_edge) {
+        state_add_cycle(MEM_NMI_PCL, DAT_SEI, PC_NOP, S);
+        state_add_cycle(MEM_NMI_PCH, DAT_NOP, PC_NOP, S);
+        state_add_cycle(MEM_FETCH, DAT_NOP, PC_INC, S);
+      } else {
+        state_add_cycle(MEM_IRQ_PCL, DAT_SEI, PC_NOP, S);
+        state_add_cycle(MEM_IRQ_PCH, DAT_NOP, PC_NOP, S);
+        state_add_cycle(MEM_FETCH, DAT_NOP, PC_INC, S);
+      }
+
       break;
     case MEM_PULL_PCL:
       R->pc_lo = memory_read(R->S, MEMORY_STACK_HIGH, M);
@@ -609,12 +642,25 @@ void cpu_decode_inst(word_t inst, state_t *S) {
     // An nmi signal has priority over an irq, and resets the ready flag for it.
     nmi_edge = false;
     irq_ready = false;
-    //TODO: Add micro ops.
+
+    // Since an nmi was detected, we queue its cycles and return.
+    state_add_cycle(MEM_READ_PC_NODEST, DAT_NOP, PC_NOP, S);
+    state_add_cycle(MEM_PUSH_PCH, DAT_DEC_S, PC_NOP, S);
+    state_add_cycle(MEM_PUSH_PCL, DAT_DEC_S, PC_NOP, S);
+    state_add_cycle(MEM_PUSH_P, DAT_DEC_S, PC_NOP, S);
+    state_add_cycle(MEM_NMI_PCL, DAT_SEI, PC_NOP, S);
+    state_add_cycle(MEM_NMI_PCH, DAT_NOP, PC_NOP, S);
+    state_add_cycle(MEM_FETCH, DAT_NOP, PC_INC, S);
     return;
   } else if (irq_ready) {
     // The irq has been handled, so we reset the flag.
     irq_ready = false;
-    //TODO: Add micro ops.
+
+    // Since an irq was detected, we queue its cycles and return.
+    state_add_cycle(MEM_READ_PC_NODEST, DAT_NOP, PC_NOP, S);
+    state_add_cycle(MEM_PUSH_PCH, DAT_DEC_S, PC_NOP, S);
+    state_add_cycle(MEM_PUSH_PCL, DAT_DEC_S, PC_NOP, S);
+    state_add_cycle(MEM_IRQ, DAT_DEC_S, PC_NOP, S);
     return;
   }
 
@@ -993,14 +1039,10 @@ void cpu_decode_inst(word_t inst, state_t *S) {
       state_add_cycle(MEM_NOP, DAT_BRANCH, false, S);
       break;
     case INST_BRK:
-      //TODO: Fix interrupt hijacking. The I flag needs to be set.
-      state_add_cycle(MEM_READ_PC_NODEST, DAT_NOP, true, S);
-      state_add_cycle(MEM_PUSH_PCH, DAT_DEC_S, false, S);
-      state_add_cycle(MEM_PUSH_PCL, DAT_DEC_S, false, S);
-      state_add_cycle(MEM_PUSH_P_B, DAT_DEC_S, false, S);
-      state_add_cycle(MEM_IRQ_PCL, DAT_NOP, false, S);
-      state_add_cycle(MEM_IRQ_PCH, DAT_NOP, false, S);
-      state_add_cycle(MEM_FETCH, DAT_NOP, true, S);
+      state_add_cycle(MEM_READ_PC_NODEST, DAT_NOP, PC_NOP, S);
+      state_add_cycle(MEM_PUSH_PCH, DAT_DEC_S, PC_NOP, S);
+      state_add_cycle(MEM_PUSH_PCL, DAT_DEC_S, PC_NOP, S);
+      state_add_cycle(MEM_BRK, DAT_DEC_S, PC_NOP, S);
       break;
     case INST_JSR:
       state_add_cycle(MEM_READ_PC_MDR, DAT_NOP, true, S);

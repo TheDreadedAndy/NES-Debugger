@@ -31,9 +31,6 @@ typedef struct ines_header {
   // Specifies the type of header that was decoded.
   nes_header_t header_type;
 
-  // Should always be "NES" followed by a MS-DOS EOF.
-  char file_header[4];
-
   // Main memory sizes.
   size_t prg_rom_size;
   size_t prg_ram_size;
@@ -71,6 +68,6 @@ typedef struct ines_header {
 } header_t;
 
 // Decodes a 16-byte header into a header structure.
-header_t *decode_header(char *header);
+header_t *decode_header(FILE *rom_file, size_t rom_size);
 
 #endif

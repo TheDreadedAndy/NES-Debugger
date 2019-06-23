@@ -70,3 +70,19 @@ int main(int argc, char *argv[]) {
 
   return 0;
 }
+
+/*
+ * Takes in a file location for an NES rom file, and uses it to prepare
+ * the emulation. Assumes the file location is valid.
+ */
+void start_emu(char *file) {
+  // Open the rom and get its size.
+  FILE *rom_file = fopen(file, "r");
+  size_t rom_size = 0;
+  while (fgetc(rom_file) != EOF) { rom_size++; }
+
+  // Decode the header so that the emulation can be prepared.
+  header_t *header = decode_header(rom_file, rom_size);
+
+  return;
+}

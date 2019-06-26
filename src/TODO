@@ -2,9 +2,14 @@ Here's a semi-complete list of things that still need to be changes:
   - A few files are still missing descriptions.
   - Pretty much everything needs to be more rigorously tested.
   - SDL, PPU, APU, NDB are all completely missing.
-  - Consider parsing the INES/NES2 header into a structure.
 
 Next up:
-  - Header parsing needs to be written.
+  - NES 2.0 parsing needs to be written.
+  - Regfile and state need to be globalized
   - VRAM needs to be implemented so that true work on the ppu can begin.
-  - CPU is still an absolute mess.
+  - CPU is still an absolute mess, style wise.
+
+Small issues:
+  - UxROM PRG-ROM offset calculation currently assumes there is not trainer.
+  - UxROM has no error detection on creation.
+  - Many files include needless headers.

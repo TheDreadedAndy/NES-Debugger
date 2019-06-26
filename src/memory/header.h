@@ -5,6 +5,9 @@
 #ifndef _NES_INES
 #define _NES_INES
 
+// Total size of any NES header in bytes.
+#define HEADER_SIZE 16U
+
 // Encodes the type of header which the structure was created from.
 typedef enum {INES, ARCHAIC_INES, NES2} nes_header_t;
 
@@ -49,7 +52,6 @@ typedef struct ines_header {
   bool mirror;
   bool battery;
   bool trainer;
-  char *trainer_data;
   bool four_screen;
 
   // Hardware information
@@ -68,6 +70,6 @@ typedef struct ines_header {
 } header_t;
 
 // Decodes a 16-byte header into a header structure.
-header_t *decode_header(FILE *rom_file, size_t rom_size);
+header_t *decode_header(FILE *rom_file);
 
 #endif

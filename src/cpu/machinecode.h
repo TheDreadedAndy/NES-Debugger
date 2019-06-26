@@ -3,11 +3,11 @@
 
 /*
  * Below are constant definitions for all of the instructions
- * in the 6502 ISA. Undefined instructions are currently unseported.
+ * in the 6502 ISA. Undefined instructions are currently unsupported.
  *
  * The file is split into different types of instructions. This is a
  * relic of a past implementation, and is irrelevent to the emulator
- * as of this time.
+ * at this time.
  */
 
 /* ####################### */

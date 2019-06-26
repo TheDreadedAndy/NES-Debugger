@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include "../util/util.h"
 #include "./memory.h"
+#include "./header.h"
 #include "./uxrom.h"
 #include "../util/data.h"
 
@@ -23,7 +24,7 @@
  * Returns a generic memory structure, which can be used
  * to interact with the uxrom structure.
  */
-memory_t *uxrom_new(char *header, FILE *rom) {
+memory_t *uxrom_new(FILE *rom_file, header_t *header) {
   // Allocate memory structure and set up its data.
   memory_t *M = xcalloc(1, sizeof(memory_t));
   uxrom_t *map = xcalloc(1, sizeof(uxrom_t));
@@ -43,11 +44,12 @@ memory_t *uxrom_new(char *header, FILE *rom) {
   map->bat = xcalloc(BAT_SIZE, sizeof(word_t));
 
   // Caclulate rom size and load it into memory.
-  size_t num_banks = (size_t)M->header[INES_PRGROM];
+  size_t num_banks = (size_t) (header->prg_rom_size / (1 << 14));
+  fseek(rom_file, HEADER_SIZE, SEEK_SET);
   for (size_t i = 0; i < num_banks; i++) {
     map->cart[i] = xmalloc(BANK_SIZE * sizeof(word_t));
     for (size_t j = 0; j < BANK_SIZE; j++) {
-      map->cart[i][j] = fgetc(rom);
+      map->cart[i][j] = fgetc(rom_file);
     }
   }
   map->current_bank = 0;
@@ -139,7 +141,6 @@ void uxrom_free(void *map) {
   free(M->ppu);
   free(M->io);
   free(M->bat);
-  free(M->header);
 
   // Frees each bank.
   for (size_t i = 0; i < (M->fixed_bank + 1U); i++) {

@@ -15,32 +15,36 @@
 #include <stdio.h>
 #include "../util/util.h"
 #include "./memory.h"
+#include "./header.h"
 #include "./uxrom.h"
 #include "../util/data.h"
 
 /*
- * Creates a new generic memory structure.
- * In doing so, reads the provided rom file into memory.
- *
- * Assumes that the provided string is non-null and contains
- * the location of a valid NES rom file.
- *
- * Returns a memory structure on success and NULL on failure.
+ * Holds the global memory structure. Unavailable outside this file.
+ * Manages mappers, RAM, MMIO, and VRAM
  */
-memory_t *memory_new(char *file) {
-  // Read in INES/NES2.0 header.
-  FILE *rom = fopen(file, "r");
-  char *header = xmalloc(HEADER_SIZE * sizeof(word_t));
-  for (size_t i = 0; i < HEADER_SIZE; i++) {
-    header[i] = (word_t)fgetc(rom);
+memory_t *system_memory = NULL;
+
+/*
+ * Initializes all system memory for the NES emulation.
+ *
+ * Assumes the system memory has not already been initialized.
+ * Assumes that the file is open and valid.
+ * Assumes that the provided header is non-null and valid.
+ */
+bool memory_init(FILE *rom_file, header_t *header) {
+  // Use the decoded header to decide which memory structure should be created.
+  switch(header->mapper) {
+    case UXROM_MAPPER:
+      system_memory = uxrom_new(rom_file, header);
+      break;
+    default:
+      fprintf(stderr, "Error: Rom requires unimplemented mapper\n");
+      return false;
   }
 
-  //TODO: change this to case on the mapper number.
-  memory_t *M = uxrom_new(header, rom);
-
-  // Cleanup and exit.
-  fclose(rom);
-  return M;
+  // Return the result of the mapper creation as a boolean.
+  return system_memory != NULL;
 }
 
 /*
@@ -49,8 +53,8 @@ memory_t *memory_new(char *file) {
  *
  * Assumes the memory structure is valid.
  */
-word_t memory_read(word_t mem_lo, word_t mem_hi, memory_t *M) {
-  return M->read(mem_lo, mem_hi, M->map);
+word_t memory_read(word_t mem_lo, word_t mem_hi) {
+  return system_memory->read(mem_lo, mem_hi, system_memory->map);
 }
 
 /*
@@ -59,8 +63,8 @@ word_t memory_read(word_t mem_lo, word_t mem_hi, memory_t *M) {
  *
  * Assumes the memory structure is valid.
  */
-void memory_write(word_t val, word_t mem_lo, word_t mem_hi, memory_t *M) {
-  M->write(val, mem_lo, mem_hi, M->map);
+void memory_write(word_t val, word_t mem_lo, word_t mem_hi) {
+  system_memory->write(val, mem_lo, mem_hi, system_memory->map);
   return;
 }
 
@@ -68,8 +72,8 @@ void memory_write(word_t val, word_t mem_lo, word_t mem_hi, memory_t *M) {
  * Frees a generic memory structure.
  * Assumes that the structure is valid.
  */
-void memory_free(memory_t *M) {
-  M->free(M->map);
-  free(M->header);
-  free(M);
+void memory_free() {
+  system_memory->free(system_memory->map);
+  free(system_memory->header);
+  free(system_memory);
 }

@@ -1,5 +1,3 @@
-// TODO: make this file.
-//
 // The current idea is for ndb to be a complete reimplementation
 // of gdb for the NES. Using NesIGuess as its emulator.
 //
@@ -13,8 +11,15 @@
 #include "./cpu/2A03.h"
 #include "./cpu/regs.h"
 #include "./memory/memory.h"
+#include "./memory/header.h"
+#include "./ppu/ppu.h"
 
-// Loads in the users argument and starts ndb.
+/* Helper functions */
+void start_emulation(char *file);
+
+/*
+ * Loads in the users arguments and starts ndb.
+ */
 int main(int argc, char *argv[]) {
 
   // Global variables needed for getopt.
@@ -45,44 +50,48 @@ int main(int argc, char *argv[]) {
     }
   }
 
+  // Ensures that the user specified an NES file.
   if (file == NULL) {
     printf("usage: ndb -i <NUM> -f <FILE>\n");
     exit(0);
   }
 
-  // Prepares the 2A03 for execution.
-  memory_t *M = memory_new(file);
-  regfile_t *R = regfile_new(M);
-  state_t *S = state_new();
-  state_add_cycle(MEM_FETCH, DAT_NOP, true, S);
+  // Prepares the NES emulation for execution.
+  start_emulation(file);
 
   printf("Starting emulation...\n");
   for (size_t i = 0; i < iterations; i++) {
     // Executes the next cycle and prints the results.
-    cpu_run_cycle(R, M, S);
-    if (verbose) { regfile_print(R, i); }
+    cpu_run_cycle();
+    if (verbose) { regfile_print(i); }
   }
   printf("Done!\n");
 
-  free(R);
-  memory_free(M);
-  state_free(S);
+  // Clean up any allocated memory.
+  cpu_free();
 
   return 0;
 }
 
 /*
  * Takes in a file location for an NES rom file, and uses it to prepare
- * the emulation. Assumes the file location is valid.
+ * the emulation.
+ *
+ * Assumes the file location is valid.
  */
-void start_emu(char *file) {
-  // Open the rom and get its size.
+void start_emulation(char *file) {
+  // Open the rom.
   FILE *rom_file = fopen(file, "r");
-  size_t rom_size = 0;
-  while (fgetc(rom_file) != EOF) { rom_size++; }
 
   // Decode the header so that the emulation can be prepared.
-  header_t *header = decode_header(rom_file, rom_size);
+  header_t *header = decode_header(rom_file);
+  if (header == NULL) { exit(-1); }
 
+  // Initializes the hardware emulation.
+  cpu_init(rom_file, header);
+  // TODO: add ppu init function.
+
+  // Clean up and exit.
+  fclose(rom_file);
   return;
 }

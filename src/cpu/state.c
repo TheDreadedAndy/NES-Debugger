@@ -21,55 +21,77 @@
 #include "./2A03.h"
 
 /*
- * Initializes and returns a state structure of fixed size STATE_MAX_OPS.
+ * The state manages the individual micro instructions that happen
+ * on each cycle of each instruction. The largest number of cycles an
+ * instruction can take should be 8, but I put 16 to give some breathing
+ * room.
  */
-state_t *state_new() {
-  state_t *S = xcalloc(1, sizeof(state_t));
-  S->queue = xcalloc(STATE_MAX_OPS, sizeof(micro_t));
-  return S;
+#define STATE_MAX_OPS 16
+
+// System state is managed by a fixed size queue of micro instructions
+typedef struct state_header {
+  micro_t *queue;
+  int front;
+  int back;
+  int size;
+} state_t;
+
+/*
+ * Global state structure. Unavailable outside this file.
+ * Manages the NES system state.
+ */
+state_t *system_state = NULL;
+
+/*
+ * Initializes a state structure of fixed size STATE_MAX_OPS.
+ */
+void state_init() {
+  system_state = xcalloc(1, sizeof(state_t));
+  system_state->queue = xcalloc(STATE_MAX_OPS, sizeof(micro_t));
+  return;
 }
 
 /*
- * Frees a state structure.
+ * Frees the state structure.
  *
- * Assumes the state is non-null with a non-null queue.
+ * Assumes the state has been initialized.
  */
-void state_free(state_t *S) {
-  CONTRACT(S != NULL);
-  free(S->queue);
-  free(S);
+void state_free() {
+  CONTRACT(system_state != NULL);
+  free(system_state->queue);
+  free(system_state);
   return;
 }
 
 /*
  * Checks if the state is empty.
  *
- * Requires that the state be non-null and valid.
+ * Assumes the state has been initialized.
  */
-bool state_empty(state_t *S) {
-  CONTRACT(S != NULL);
-  return S->size == 0;
+bool state_empty() {
+  CONTRACT(system_state != NULL);
+  return system_state->size == 0;
 }
 
 /*
  * Adds a cycle to the state queue.
  *
- * Requires that the state be non-null and valid.
+ * Assumes the state has been initialized.
  */
-void state_add_cycle(micromem_t mem, microdata_t data, bool inc_pc, state_t *S) {
-  CONTRACT(S != NULL);
-  CONTRACT(S->queue != NULL);
+void state_add_cycle(micromem_t mem, microdata_t data, bool inc_pc) {
+  CONTRACT(system_state != NULL);
+  CONTRACT(system_state->queue != NULL);
 
   // Fill the new microop with the given data.
-  micro_t *micro = &(S->queue[S->back]);
+  micro_t *micro = &(system_state->queue[system_state->back]);
   micro->mem = mem;
   micro->data = data;
   micro->inc_pc = inc_pc;
 
   // Add the microop to the queue.
-  S->size++;
-  CONTRACT(S->size <= STATE_MAX_OPS && S->size >= 0);
-  S->back = (S->back + 1) % STATE_MAX_OPS;
+  system_state->size++;
+  CONTRACT(system_state->size <= STATE_MAX_OPS && system_state->size >= 0);
+  system_state->back = (system_state->back + 1) % STATE_MAX_OPS;
 
   return;
 }
@@ -77,19 +99,19 @@ void state_add_cycle(micromem_t mem, microdata_t data, bool inc_pc, state_t *S) 
 /*
  * Pushes a cycle to the state queue.
  *
- * Requires that the state be well-formed.
+ * Assumes the state has been initialized.
  */
-void state_push_cycle(micromem_t mem, microdata_t data, bool inc_pc, state_t *S) {
-  CONTRACT(S != NULL);
-  CONTRACT(S->queue != NULL);
+void state_push_cycle(micromem_t mem, microdata_t data, bool inc_pc) {
+  CONTRACT(system_state != NULL);
+  CONTRACT(system_state->queue != NULL);
 
   // Add the microop to the queue.
-  S->size++;
-  CONTRACT(S->size <= STATE_MAX_OPS && S->size >= 0);
-  S->front = (S->front - 1) % STATE_MAX_OPS;
+  system_state->size++;
+  CONTRACT(system_state->size <= STATE_MAX_OPS && system_state->size >= 0);
+  system_state->front = (system_state->front - 1) % STATE_MAX_OPS;
 
   // Fill the new microop with the given data.
-  micro_t *micro = &(S->queue[S->front]);
+  micro_t *micro = &(system_state->queue[system_state->front]);
   micro->mem = mem;
   micro->data = data;
   micro->inc_pc = inc_pc;
@@ -100,21 +122,21 @@ void state_push_cycle(micromem_t mem, microdata_t data, bool inc_pc, state_t *S)
 /*
  * Dequeues the next state cycle and returns it.
  *
- * Requires that the state be non-empty and well-formed.
+ * Assumes the state has been initialized.
  *
  * The returned micro structure must not be free'd.
  */
-micro_t *state_next_cycle(state_t *S) {
-  CONTRACT(S != NULL);
-  CONTRACT(S->queue != NULL);
-  CONTRACT(S->size > 0);
+micro_t *state_next_cycle() {
+  CONTRACT(system_state != NULL);
+  CONTRACT(system_state->queue != NULL);
+  CONTRACT(system_state->size > 0);
 
   // Get the next cycle.
-  micro_t *micro = &(S->queue[S->front]);
+  micro_t *micro = &(system_state->queue[system_state->front]);
 
   // Remove it from the queue.
-  S->front = (S->front + 1) % STATE_MAX_OPS;
-  S->size--;
+  system_state->front = (system_state->front + 1) % STATE_MAX_OPS;
+  system_state->size--;
 
   return micro;
 }
@@ -122,27 +144,27 @@ micro_t *state_next_cycle(state_t *S) {
 /*
  * Returns the number of elements in the queue of the given state.
  *
- * Requires the state to be non-null with a valid size.
+ * Assumes the state has been initialized.
  */
-int state_get_size(state_t *S) {
-  CONTRACT(S != NULL);
-  CONTRACT(S->size >= 0 && S->size <= STATE_MAX_OPS);
-  return S->size;
+int state_get_size() {
+  CONTRACT(system_state != NULL);
+  CONTRACT(system_state->size >= 0 && system_state->size <= STATE_MAX_OPS);
+  return system_state->size;
 }
 
 /*
  * Emptys the state queue.
  *
- * Requires the state to be non-null.
+ * Assumes the state has been initialized.
  */
-void state_clear(state_t *S) {
-  CONTRACT(S != NULL);
+void state_clear() {
+  CONTRACT(system_state != NULL);
 
   // We need only set the size and index fields to zero, since off-queue
   // micro op structures are undefined.
-  S->front = 0;
-  S->back = 0;
-  S->size = 0;
+  system_state->front = 0;
+  system_state->back = 0;
+  system_state->size = 0;
 
   return;
 }

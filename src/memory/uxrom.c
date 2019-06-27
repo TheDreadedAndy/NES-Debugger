@@ -18,6 +18,12 @@
 #include "../util/data.h"
 
 /*
+ * Stores the mirror bit collected from the header. Used to change mirroring
+ * in VRAM.
+ */
+bool name_table_mirror;
+
+/*
  * Takes in an INES/NES2 header and creates a uxrom
  * memory system using it. Assumes the header is valid.
  *
@@ -28,19 +34,19 @@ memory_t *uxrom_new(FILE *rom_file, header_t *header) {
   // Allocate memory structure and set up its data.
   memory_t *M = xcalloc(1, sizeof(memory_t));
   uxrom_t *map = xcalloc(1, sizeof(uxrom_t));
+  M->ram = xcalloc(RAM_SIZE, sizeof(word_t));
   M->map = (void*) map;
   M->read = &uxrom_read;
   M->write = &uxrom_write;
+  M->vram_read = &uxrom_vram_read;
+  M->vram_write = &uxrom_vram_write;
   M->free = &uxrom_free;
   M->header = header;
 
-  // Set up the memory system itself.
-  map->ram = xcalloc(RAM_SIZE, sizeof(word_t));
+  // Store the mirror bit for use with VRAM.
+  name_table_mirror = header->mirror;
 
-  // Set up the memory mapped IO.
-  // TODO: change these into actual mappings.
-  map->ppu = xcalloc(PPU_SIZE, sizeof(word_t));
-  map->io = xcalloc(IO_SIZE, sizeof(word_t));
+  // Set up the cart ram space.
   map->bat = xcalloc(BAT_SIZE, sizeof(word_t));
 
   // Caclulate rom size and load it into memory.
@@ -59,26 +65,18 @@ memory_t *uxrom_new(FILE *rom_file, header_t *header) {
 }
 
 /*
- * Takes in two words and a generic mapper pointer.
+ * Takes in an address and a generic mapper pointer.
  * Uses these bytes to address the memory in the mapper.
  *
  * Assumes that the pointer is non-null and points to a valid
  * UxROM mapper.
- * Assumes that the address formed by the bytes is valid.
  */
-word_t uxrom_read(word_t mem_lo, word_t mem_hi, void *map) {
+word_t uxrom_read(dword_t addr, void *map) {
   // Cast back from generic pointer to the memory structure.
   uxrom_t *M = (uxrom_t*) map;
 
   // Detect where in memory we need to access and do so.
-  dword_t addr = get_dword(mem_lo, mem_hi);
-  if (addr < 0x2000) {
-    return M->ram[addr % RAM_SIZE];
-  } else if (addr < 0x4000) {
-    return M->ppu[(addr - PPU_OFFSET) % PPU_SIZE];
-  } else if (addr < 0x4020) {
-    return M->io[addr - IO_OFFSET];
-  } else if (addr < 0x6000) {
+  if (addr < 0x6000) {
     printf("FATAL: Memory not implemented");
     abort();
   } else if (addr < 0x8000) {
@@ -91,39 +89,47 @@ word_t uxrom_read(word_t mem_lo, word_t mem_hi, void *map) {
 }
 
 /*
- * Takes in two addressing bytes, a value, and a memory mapper.
- * Uses the addressing bytes to write the value to the mapper.
+ * Takes in an address, a value, and a memory mapper.
+ * Uses the address to write the value to the mapper.
  *
  * Assumes that the mapper pointer is non-null and points
  * to a valid UxROM mapper.
- * Assumes that the address formed by the addressing bytes is valid.
  */
-void uxrom_write(word_t val, word_t mem_lo, word_t mem_hi, void *map) {
+void uxrom_write(word_t val, dword_t addr, void *map) {
   // Cast back from generic pointer to the memory structure.
   uxrom_t *M = (uxrom_t*) map;
 
   // Detect where in memory we need to access and do so.
-  dword_t addr = get_dword(mem_lo, mem_hi);
-  if (addr < 0x2000) {
-    M->ram[addr % RAM_SIZE] = val;
-    return;
-  } else if (addr < 0x4000) {
-    M->ppu[(addr - PPU_OFFSET) % PPU_SIZE] = val;
-    return;
-  } else if (addr < 0x4020) {
-    M->io[addr - IO_OFFSET] = val;
-    return;
-  } else if (addr < 0x6000) {
+  if (addr < 0x6000) {
     printf("FATAL: Memory not implemented");
     abort();
   } else if (addr < 0x8000) {
     M->bat[addr - BAT_OFFSET] = val;
-    return;
   } else {
     // Writing to the cart area uses the low bits to select a bank.
     M->current_bank = val & BANK_MASK;
-    return;
   }
+
+  return;
+}
+
+/*
+ * TODO
+ */
+word_t uxrom_vram_read(dword_t addr, void *map) {
+  (void) addr;
+  (void) map;
+  return 0;
+}
+
+/*
+ * TODO
+ */
+void uxrom_vram_write(word_t val, dword_t addr, void *map) {
+  (void) val;
+  (void) addr;
+  (void) map;
+  return;
 }
 
 /*
@@ -137,9 +143,6 @@ void uxrom_free(void *map) {
 
   // TODO: This should change with implementation.
   // Free the contents of the structure.
-  free(M->ram);
-  free(M->ppu);
-  free(M->io);
   free(M->bat);
 
   // Frees each bank.

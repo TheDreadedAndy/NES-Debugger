@@ -55,7 +55,22 @@ bool memory_init(FILE *rom_file, header_t *header) {
  * Assumes the memory structure is valid.
  */
 word_t memory_read(word_t mem_lo, word_t mem_hi) {
-  return system_memory->read(mem_lo, mem_hi, system_memory->map);
+  dword_t addr = get_dword(mem_lo, mem_hi);
+
+  // Determine if the NES address space or the mapper should be accessed.
+  if (addr < PPU_OFFSET) {
+    // Access standard ram.
+    return system_memory->ram[addr & RAM_MASK];
+  } else if (addr < IO_OFFSET) {
+    // Access PPU MMIO.
+    return 0; // TODO.
+  } else if (addr < MAPPER_OFFSET) {
+    // Access APU and IO registers.
+    return 0; // TODO.
+  } else {
+    // Access cartridge space using the mapper.
+    return system_memory->read(addr, system_memory->map);
+  }
 }
 
 /*
@@ -65,7 +80,22 @@ word_t memory_read(word_t mem_lo, word_t mem_hi) {
  * Assumes the memory structure is valid.
  */
 void memory_write(word_t val, word_t mem_lo, word_t mem_hi) {
-  system_memory->write(val, mem_lo, mem_hi, system_memory->map);
+  dword_t addr = get_dword(mem_lo, mem_hi);
+
+  // Determine if the NES address space or the mapper should be accessed.
+  if (addr < PPU_OFFSET) {
+    // Access standard ram.
+    system_memory->ram[addr & RAM_MASK] = val;
+  } else if (addr < IO_OFFSET) {
+    // Access PPU MMIO.
+    // TODO.
+  } else if (addr < MAPPER_OFFSET) {
+    // Access APU and IO registers.
+    // TODO.
+  } else {
+    system_memory->write(val, addr, system_memory->map);
+  }
+
   return;
 }
 

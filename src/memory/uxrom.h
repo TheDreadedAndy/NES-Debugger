@@ -19,17 +19,9 @@
 #define BAT_SIZE 0x2000U
 #define BAT_OFFSET 0x6000U
 
-//TODO Remove these
-#define PPU_SIZE 0x8U
-#define PPU_OFFSET 0x2000U
-#define IO_SIZE 0x20U
-#define IO_OFFSET 0x4000U
-
 // Nes virtual memory data structure for uxrom (mapper 2).
 typedef struct uxrom {
-  // CPU memory.
-  word_t *ram;
-  word_t *io;
+  // Cart memory.
   word_t *bat;
   word_t *cart[MAX_BANKS];
   word_t current_bank;
@@ -48,10 +40,10 @@ typedef struct uxrom {
 memory_t *uxrom_new(FILE *rom_file, header_t *header);
 
 // Memory read function.
-word_t uxrom_read(word_t mem_lo, word_t mem_hi, void *map);
+word_t uxrom_read(dword_t addr, void *map);
 
 // Memory write function. Handles bank switching.
-void uxrom_write(word_t val, word_t mem_lo, word_t mem_hi, void *map);
+void uxrom_write(word_t val, dword_t addr, void *map);
 
 // VRAM read function.
 word_t uxrom_vram_read(dword_t addr, void *map);

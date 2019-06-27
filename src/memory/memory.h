@@ -6,30 +6,39 @@
 #ifndef _NES_MEM
 #define _NES_MEM
 
-// INES header constants.
-#define INES_PRGROM 4
-
-// Memory data constants.
+// RAM data constants.
 #define RAM_SIZE 0x800U
+#define RAM_MASK 0x7FFU
+
+// The address at which PPU registers are located.
+#define PPU_OFFSET 0x2000U
+
+// The address at which APU and IO registers are located.
+#define IO_OFFSET 0x4000U
+
+// The address at which memory begins  to depend on the mapper in use.
+#define MAPPER_OFFSET 0x4020U
+
 
 // Function types, used in memory structure to point to the proper
 // mapper function.
-typedef word_t memory_read_t(word_t mem_lo, word_t mem_hi, void *map);
-typedef void memory_write_t(word_t val, word_t mem_lo,
-                            word_t mem_hi, void *map);
-typedef word_t vram_read_t(dword_t addr, void *map);
-typedef void vram_write_t(word_t val, dword_t addr, void *map);
+typedef word_t memory_read_t(dword_t addr, void *map);
+typedef void memory_write_t(word_t val, dword_t addr, void *map);
 typedef void memory_free_t(void *map);
 
 // Generic memory data structure.
 // Includes a pointer to a specific memory implementation and
 // the function necessary to interact with said implementation.
 typedef struct memory {
+  // NES system RAM. Mappers do not change this or any MMIO.
+  word_t *ram;
+
+  // Mapper information.
   void *map;
   memory_read_t *read;
   memory_write_t *write;
-  vram_read_t *vram_read;
-  vram_write_t *vram_write;
+  memory_read_t *vram_read;
+  memory_write_t *vram_write;
   memory_free_t *free;
   header_t *header;
 } memory_t;

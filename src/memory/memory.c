@@ -70,6 +70,27 @@ void memory_write(word_t val, word_t mem_lo, word_t mem_hi) {
 }
 
 /*
+ * Uses the generic memory structures vram read function to read
+ * a word from vram.
+ *
+ * Assumes memory has been initialized.
+ */
+word_t memory_vram_read(dword_t addr) {
+  return system_memory->vram_read(addr, system_memory->map);
+}
+
+/*
+ * Uses the generic memory structures vram write function to write
+ * a word to vram.
+ *
+ * Assumes memory has been initialized.
+ */
+void memory_vram_write(word_t val, dword_t addr) {
+  system_memory->vram_write(val, addr, system_memory->map);
+  return;
+}
+
+/*
  * Frees the generic memory structure.
  * Assumes that the structure is valid.
  */

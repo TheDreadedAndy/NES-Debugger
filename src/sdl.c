@@ -25,7 +25,7 @@ int main(int argc, char* argv[]) {
   }
 
   // Hold the window for 3 seconds.
-  SDL_Delay(3000);
+  SDL_Delay(10000);
 
   // Close the window and exit.
   SDL_DestroyWindow(window);

@@ -27,14 +27,19 @@
 
 // Nes virtual memory data structure for uxrom (mapper 2).
 typedef struct uxrom {
+  // CPU memory.
   word_t *ram;
-  word_t *ppu;
   word_t *io;
   word_t *bat;
   word_t *cart[MAX_BANKS];
   word_t current_bank;
   // Should always be the final used bank.
   word_t fixed_bank;
+
+  // PPU memory.
+  word_t *pattern_table;
+  word_t *name_table;
+  word_t *palette_ram;
 } uxrom_t;
 
 /* Tools for using NES virtual memory */
@@ -47,6 +52,12 @@ word_t uxrom_read(word_t mem_lo, word_t mem_hi, void *map);
 
 // Memory write function. Handles bank switching.
 void uxrom_write(word_t val, word_t mem_lo, word_t mem_hi, void *map);
+
+// VRAM read function.
+word_t uxrom_vram_read(dword_t addr, void *map);
+
+// VRAM write function.
+void uxrom_vram_write(word_t val, dword_t addr, void *map);
 
 // Memory free function.
 void uxrom_free(void *map);

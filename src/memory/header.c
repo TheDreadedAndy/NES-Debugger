@@ -38,6 +38,9 @@
 // The number of bytes each increment in the INES PRG-RAM field represents.
 #define INES_PRG_RAM_CHUNKSIZE ((size_t) (1 << 13))
 
+// The number of bytes CHR-RAM can be set to hold in the INES format.
+#define INES_CHR_RAM_SIZE ((size_t) (1 << 13))
+
 /* Global constants */
 
 // The first four bytes of all NES files should be this string.
@@ -152,6 +155,12 @@ void decode_archaic_ines(header_t *header, char *file_header) {
   // Gets the ram sizes using the INES standard.
   header->prg_rom_size = get_ines_prg_rom_size(file_header);
   header->chr_rom_size = get_ines_chr_rom_size(file_header);
+
+  // When an INES header does not specify a size for CHR-ROM, 8K of CHR-RAM
+  // is assumed to be present.
+  if (header->chr_rom_size == 0) {
+    header->chr_ram_size = INES_CHR_RAM_SIZE;
+  }
 
   // The archaic ines format supported only 16 mappers, which were
   // determined by the upper four bits of flag 6.

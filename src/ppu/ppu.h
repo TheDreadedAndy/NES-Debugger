@@ -18,7 +18,6 @@ typedef struct ppu {
   word_t ppu_oam_addr;
 
   // Working memory for the ppu.
-  word_t *ppu_vram; // TODO: Determine vram implementation. Depends on mappers.
   word_t *ppu_primary_oam;
   word_t *ppu_secondary_oam;
 } ppu_t;

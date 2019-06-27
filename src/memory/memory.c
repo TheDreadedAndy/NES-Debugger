@@ -39,7 +39,8 @@ bool memory_init(FILE *rom_file, header_t *header) {
       system_memory = uxrom_new(rom_file, header);
       break;
     default:
-      fprintf(stderr, "Error: Rom requires unimplemented mapper\n");
+      fprintf(stderr, "Error: Rom requires unimplemented mapper: %ld\n",
+              header->mapper);
       return false;
   }
 
@@ -69,7 +70,7 @@ void memory_write(word_t val, word_t mem_lo, word_t mem_hi) {
 }
 
 /*
- * Frees a generic memory structure.
+ * Frees the generic memory structure.
  * Assumes that the structure is valid.
  */
 void memory_free() {

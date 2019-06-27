@@ -17,6 +17,8 @@
 typedef word_t memory_read_t(word_t mem_lo, word_t mem_hi, void *map);
 typedef void memory_write_t(word_t val, word_t mem_lo,
                             word_t mem_hi, void *map);
+typedef word_t vram_read_t(dword_t addr, void *map);
+typedef void vram_write_t(word_t val, dword_t addr, void *map);
 typedef void memory_free_t(void *map);
 
 // Generic memory data structure.
@@ -26,6 +28,8 @@ typedef struct memory {
   void *map;
   memory_read_t *read;
   memory_write_t *write;
+  vram_read_t *vram_read;
+  vram_write_t *vram_write;
   memory_free_t *free;
   header_t *header;
 } memory_t;
@@ -40,6 +44,12 @@ word_t memory_read(word_t mem_lo, word_t mem_hi);
 
 // Generic memory write function.
 void memory_write(word_t val, word_t mem_lo, word_t mem_hi);
+
+// Generic vram read function.
+word_t memory_vram_read(dword_t addr);
+
+// Generic vram write function.
+void memory_vram_write(word_t val, dword_t addr);
 
 // Generic memory free function.
 void memory_free();

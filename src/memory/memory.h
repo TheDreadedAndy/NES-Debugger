@@ -61,7 +61,7 @@ word_t memory_vram_read(dword_t addr);
 void memory_vram_write(word_t val, dword_t addr);
 
 // Generic memory free function.
-void memory_free();
+void memory_free(void);
 
 // Memory addressing constants.
 #define MEMORY_STACK_HIGH 0x10U

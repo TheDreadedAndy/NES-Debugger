@@ -124,7 +124,7 @@ void memory_vram_write(word_t val, dword_t addr) {
  * Frees the generic memory structure.
  * Assumes that the structure is valid.
  */
-void memory_free() {
+void memory_free(void) {
   system_memory->free(system_memory->map);
   free(system_memory->header);
   free(system_memory);

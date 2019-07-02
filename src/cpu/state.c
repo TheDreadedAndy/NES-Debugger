@@ -43,11 +43,18 @@ typedef struct state_header {
 state_t *system_state = NULL;
 
 /*
+ * Holds the last micro structure returned. Used in micro op functions.
+ * Its contents are obtainable through state_last_cycle()
+ */
+micro_t *last_micro = NULL;
+
+/*
  * Initializes a state structure of fixed size STATE_MAX_OPS.
  */
-void state_init() {
+void state_init(void) {
   system_state = xcalloc(1, sizeof(state_t));
   system_state->queue = xcalloc(STATE_MAX_OPS, sizeof(micro_t));
+  last_micro = xcalloc(1, sizeof(micro_t));
   return;
 }
 
@@ -56,10 +63,11 @@ void state_init() {
  *
  * Assumes the state has been initialized.
  */
-void state_free() {
+void state_free(void) {
   CONTRACT(system_state != NULL);
   free(system_state->queue);
   free(system_state);
+  free(last_micro);
   return;
 }
 
@@ -68,7 +76,7 @@ void state_free() {
  *
  * Assumes the state has been initialized.
  */
-bool state_empty() {
+bool state_empty(void) {
   CONTRACT(system_state != NULL);
   return system_state->size == 0;
 }
@@ -78,7 +86,7 @@ bool state_empty() {
  *
  * Assumes the state has been initialized.
  */
-void state_add_cycle(micromem_t mem, microdata_t data, bool inc_pc) {
+void state_add_cycle(micromem_t *mem, microdata_t *data, bool inc_pc) {
   CONTRACT(system_state != NULL);
   CONTRACT(system_state->queue != NULL);
 
@@ -101,7 +109,7 @@ void state_add_cycle(micromem_t mem, microdata_t data, bool inc_pc) {
  *
  * Assumes the state has been initialized.
  */
-void state_push_cycle(micromem_t mem, microdata_t data, bool inc_pc) {
+void state_push_cycle(micromem_t *mem, microdata_t *data, bool inc_pc) {
   CONTRACT(system_state != NULL);
   CONTRACT(system_state->queue != NULL);
 
@@ -126,19 +134,38 @@ void state_push_cycle(micromem_t mem, microdata_t data, bool inc_pc) {
  *
  * The returned micro structure must not be free'd.
  */
-micro_t *state_next_cycle() {
+micro_t *state_next_cycle(void) {
   CONTRACT(system_state != NULL);
   CONTRACT(system_state->queue != NULL);
   CONTRACT(system_state->size > 0);
+  CONTRACT(last_micro != NULL);
 
   // Get the next cycle.
   micro_t *micro = &(system_state->queue[system_state->front]);
+
+  // Copy it into the structure which can be accessed by the user.
+  last_micro->mem = micro->mem;
+  last_micro->data = micro->data;
+  last_micro->inc_pc = micro->inc_pc;
 
   // Remove it from the queue.
   system_state->front = (system_state->front + 1) % STATE_MAX_OPS;
   system_state->size--;
 
-  return micro;
+  return last_micro;
+}
+
+/*
+ * Returns the last state cycle dequeued by state_next_cycle.
+ *
+ * Assumes the state has been initialized.
+ *
+ * The returned micro structure must not be free'd.
+ */
+micro_t *state_last_cycle(void) {
+  CONTRACT(last_micro != NULL);
+
+  return last_micro;
 }
 
 /*
@@ -146,7 +173,7 @@ micro_t *state_next_cycle() {
  *
  * Assumes the state has been initialized.
  */
-int state_get_size() {
+int state_get_size(void) {
   CONTRACT(system_state != NULL);
   CONTRACT(system_state->size >= 0 && system_state->size <= STATE_MAX_OPS);
   return system_state->size;
@@ -157,7 +184,7 @@ int state_get_size() {
  *
  * Assumes the state has been initialized.
  */
-void state_clear() {
+void state_clear(void) {
   CONTRACT(system_state != NULL);
 
   // We need only set the size and index fields to zero, since off-queue

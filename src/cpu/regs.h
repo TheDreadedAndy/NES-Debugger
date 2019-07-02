@@ -27,7 +27,7 @@ typedef struct regfile {
 } regfile_t;
 
 /* Global regfile, used in CPU emulation. */
-extern regfile_t *system_regfile;
+extern regfile_t *R;
 
 // Creates a regfile. regfiles can be freed by free.
 void regfile_init();

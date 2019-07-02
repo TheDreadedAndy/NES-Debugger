@@ -27,21 +27,10 @@
 
 #include <stdlib.h>
 #include "../util/data.h"
+#include "./2A03.h"
 #include "./regs.h"
+#include "./micromem.h"
 #include "./state.h"
-
-// Short hand used within this file.
-regfile_t *R = NULL;
-
-/*
- * Assigns the regfile shortcut.
- *
- * Assumes the regfile has been initialized.
- */
-void data_init(void) {
-  R = system_regfile;
-  return;
-}
 
 /*
  * Does nothing.
@@ -488,8 +477,8 @@ void data_add_ptrl_x(void) {
 void data_fixa_addrh(void) {
   if (R->carry) {
     R->addr_hi += R->carry;
-    // TODO: Fix this
-    // state_push_cycle(micro->mem, DAT_NOP, PC_NOP);
+    micro_t *micro = state_last_cycle();
+    state_push_cycle(micro->mem, &data_nop, PC_NOP);
   }
   return;
 }
@@ -535,20 +524,19 @@ void data_branch(void) {
   dword_t res = (dword_t) R->pc_lo + (dword_t) (int16_t) (int8_t) R->mdr;
   R->carry = (word_t)(res >> 8);
 
-  // TODO: Fix this.
   // Execute the proper cycles according to the above results.
   if (!taken) {
     // Case 3.
-    // cpu_fetch(micro);
+    cpu_fetch(state_last_cycle());
   } else if (R->carry) {
     // Case 2.
     R->pc_lo = (word_t) res;
-    // state_add_cycle(MEM_NOP, DAT_FIX_PCH, false);
-    // state_add_cycle(MEM_FETCH, DAT_NOP, true);
+    state_add_cycle(&mem_nop, &data_fix_pch, PC_NOP);
+    state_add_cycle(&mem_fetch, &data_nop, PC_INC);
   } else {
     // Case 1.
     R->pc_lo = (word_t) res;
-    // state_add_cycle(MEM_FETCH, DAT_NOP, true);
+    state_add_cycle(&mem_fetch, &data_nop, PC_INC);
   }
 
   return;

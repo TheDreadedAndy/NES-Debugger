@@ -13,7 +13,7 @@
 #include "./regs.h"
 
 /* Global register file. Used in CPU emulation */
-regfile_t *system_regfile = NULL;
+regfile_t *R = NULL;
 
 /*
  * Initializes the global register file.
@@ -21,7 +21,7 @@ regfile_t *system_regfile = NULL;
  * Assumes the register file has not already been initialized.
  */
 void regfile_init(void) {
-  system_regfile = xcalloc(1, sizeof(regfile_t));
+  R = xcalloc(1, sizeof(regfile_t));
   return;
 }
 
@@ -30,10 +30,10 @@ void regfile_init(void) {
  * Assumes the regfile is non-null.
  */
 void regfile_inc_pc(void) {
-  dword_t pc = get_dword(system_regfile->pc_lo, system_regfile->pc_hi);
+  dword_t pc = get_dword(R->pc_lo, R->pc_hi);
   pc++;
-  system_regfile->pc_lo = (word_t)pc;
-  system_regfile->pc_hi = (word_t)(pc >> 8);
+  R->pc_lo = (word_t)pc;
+  R->pc_hi = (word_t)(pc >> 8);
   return;
 }
 
@@ -43,16 +43,16 @@ void regfile_inc_pc(void) {
 void regfile_print(size_t i) {
   printf("-----------------------------------\n");
   printf("State following iteration %d:\n", (int)i);
-  printf("A: %x, X: %x, Y: %x, INST: %x\n", system_regfile->A,
-         system_regfile->X, system_regfile->Y, system_regfile->inst);
-  printf("State (flags): %x, Stack pointer: %x\n", system_regfile->P,
-         system_regfile->S);
-  printf("PCL: %x, PCH: %x\n", system_regfile->pc_lo, system_regfile->pc_hi);
+  printf("A: %x, X: %x, Y: %x, INST: %x\n", R->A,
+         R->X, R->Y, R->inst);
+  printf("State (flags): %x, Stack pointer: %x\n", R->P,
+         R->S);
+  printf("PCL: %x, PCH: %x\n", R->pc_lo, R->pc_hi);
   printf("Abstraction register state:\n");
-  printf("MDR: %x, Carry: %x\n", system_regfile->mdr, system_regfile->carry);
-  printf("Addr Low: %x, Addr High: %x\n", system_regfile->addr_lo,
-         system_regfile->addr_hi);
-  printf("Pointer Low: %x, Pointer High: %x\n", system_regfile->ptr_lo,
-         system_regfile->ptr_hi);
+  printf("MDR: %x, Carry: %x\n", R->mdr, R->carry);
+  printf("Addr Low: %x, Addr High: %x\n", R->addr_lo,
+         R->addr_hi);
+  printf("Pointer Low: %x, Pointer High: %x\n", R->ptr_lo,
+         R->ptr_hi);
   return;
 }

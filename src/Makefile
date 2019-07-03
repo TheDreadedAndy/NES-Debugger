@@ -10,7 +10,7 @@ override CFLAGS += -Wall -Wshadow -Wextra -Werror -std=c99 -pedantic $(shell sdl
 default: ndb
 
 # Builds a general object file.
-%.o: %.c $(HEADERS)
+%.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # General format for building a main file.

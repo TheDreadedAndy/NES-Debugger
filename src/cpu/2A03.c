@@ -1,4 +1,6 @@
 /*
+ * TODO: Update this.
+ *
  * The microinstructions of the 6502 are handled by the state_t structure.
  * With the exception of brk, branch, and interrupt instructions, interrupt
  * polling happens before each fetch cycle. The plan is to handle these
@@ -92,11 +94,9 @@ void cpu_init(FILE *rom_file, header_t *header) {
 }
 
 /*
- * Takes in a register file, generic memory structure, and
- * cpu state structure. Uses these structures two execute the
- * next cycle in the cpu emulation.
+ * Executes the next cycle in the cpu emulation using the cpu structures.
  *
- * Assumes the provided structures are non-null and valid.
+ * Assumes the cpu has been initialized.
  */
 void cpu_run_cycle() {
   // Poll the interrupt detectors, if it is time to do so.
@@ -131,7 +131,12 @@ bool cpu_can_poll() {
 }
 
 /*
- * TODO
+ * Fetches the next instruction to be executing, storing brk instead
+ * if an interrupt should be started. Adjusts the PC as necessary, since
+ * branch calls which lead into a fetch do not.
+ *
+ * Assumes that all cpu structures have been initialized.
+ * Should only be called from mem_fetch().
  */
 void cpu_fetch(micro_t *micro) {
   // Fetch the next instruction to the instruction register.
@@ -154,7 +159,14 @@ void cpu_fetch(micro_t *micro) {
   return;
 }
 
-// Decode the instruction and queues the necessary micro instructions.
+/*
+ * Decodes the next instruction (or interrupt) into micro instructions and
+ * adds them to the state queue. Resets the interrupt flags if one is
+ * processed.
+ *
+ * Assumes that all cpu structures have been initialized.
+ * Should only be called from cpu_fetch().
+ */
 void cpu_decode_inst(word_t inst) {
   // We only decode the instruction if there are no interrupts.
   if (nmi_edge) {
@@ -184,8 +196,12 @@ void cpu_decode_inst(word_t inst) {
   }
 
   /*
-   * TODO: Expand this explanation.
-   * No interrupt, so we procede as normal and add the proper micro ops.
+   * Since there were no interrupts, we case on the instruction and decode it.
+   *
+   * The 6502 has serveral different addressing modes an instruction can use,
+   * and so most instructions will simply call a helper function to decode that
+   * addressing mode (with one micro op being changed to perform the desired
+   * instruction).
    */
   switch (inst) {
     case INST_ORA_IZPX:
@@ -492,16 +508,16 @@ void cpu_decode_inst(word_t inst) {
       cpu_decode_abs(&data_bit_mdr_a);
       break;
     case INST_JMP:
-      state_add_cycle(&mem_read_pc_mdr, &data_nop, true);
-      state_add_cycle(&mem_read_pc_pch, &data_mov_mdr_pcl, false);
-      state_add_cycle(&mem_fetch, &data_nop, true);
+      state_add_cycle(&mem_read_pc_mdr, &data_nop, PC_INC);
+      state_add_cycle(&mem_read_pc_pch, &data_mov_mdr_pcl, PC_NOP);
+      state_add_cycle(&mem_fetch, &data_nop, PC_INC);
       break;
     case INST_JMPI:
-      state_add_cycle(&mem_read_pc_ptrl, &data_nop, true);
-      state_add_cycle(&mem_read_pc_ptrh, &data_nop, true);
-      state_add_cycle(&mem_read_ptr_mdr, &data_nop, false);
-      state_add_cycle(&mem_read_ptr1_pch, &data_mov_mdr_pcl, false);
-      state_add_cycle(&mem_fetch, &data_nop, true);
+      state_add_cycle(&mem_read_pc_ptrl, &data_nop, PC_INC);
+      state_add_cycle(&mem_read_pc_ptrh, &data_nop, PC_INC);
+      state_add_cycle(&mem_read_ptr_mdr, &data_nop, PC_NOP);
+      state_add_cycle(&mem_read_ptr1_pch, &data_mov_mdr_pcl, PC_NOP);
+      state_add_cycle(&mem_fetch, &data_nop, PC_INC);
       break;
     case INST_STY_ZP:
       cpu_decode_w_zp(&mem_write_y_addr);
@@ -554,8 +570,8 @@ void cpu_decode_inst(word_t inst) {
     case INST_BNE:
     case INST_BEQ:
       // The branch micro instruction handles all branches.
-      state_add_cycle(&mem_read_pc_mdr, &data_nop, true);
-      state_add_cycle(&mem_nop, &data_branch, false);
+      state_add_cycle(&mem_read_pc_mdr, &data_nop, PC_INC);
+      state_add_cycle(&mem_nop, &data_branch, PC_NOP);
       break;
     case INST_BRK:
       state_add_cycle(&mem_read_pc_nodest, &data_nop, PC_NOP);
@@ -564,28 +580,28 @@ void cpu_decode_inst(word_t inst) {
       state_add_cycle(&mem_brk, &data_dec_s, PC_NOP);
       break;
     case INST_JSR:
-      state_add_cycle(&mem_read_pc_mdr, &data_nop, true);
-      state_add_cycle(&mem_nop, &data_nop, false);
-      state_add_cycle(&mem_push_pch, &data_dec_s, false);
-      state_add_cycle(&mem_push_pcl, &data_dec_s, false);
-      state_add_cycle(&mem_read_pc_pch, &data_mov_mdr_pcl, false);
-      state_add_cycle(&mem_fetch, &data_nop, true);
+      state_add_cycle(&mem_read_pc_mdr, &data_nop, PC_INC);
+      state_add_cycle(&mem_nop, &data_nop, PC_NOP);
+      state_add_cycle(&mem_push_pch, &data_dec_s, PC_NOP);
+      state_add_cycle(&mem_push_pcl, &data_dec_s, PC_NOP);
+      state_add_cycle(&mem_read_pc_pch, &data_mov_mdr_pcl, PC_NOP);
+      state_add_cycle(&mem_fetch, &data_nop, PC_INC);
       break;
     case INST_RTI:
-      state_add_cycle(&mem_read_pc_nodest, &data_nop, false);
-      state_add_cycle(&mem_nop, &data_inc_s, false);
-      state_add_cycle(&mem_pull_p, &data_inc_s, false);
-      state_add_cycle(&mem_pull_pcl, &data_inc_s, false);
-      state_add_cycle(&mem_pull_pch, &data_nop, false);
-      state_add_cycle(&mem_fetch, &data_nop, true);
+      state_add_cycle(&mem_read_pc_nodest, &data_nop, PC_NOP);
+      state_add_cycle(&mem_nop, &data_inc_s, PC_NOP);
+      state_add_cycle(&mem_pull_p, &data_inc_s, PC_NOP);
+      state_add_cycle(&mem_pull_pcl, &data_inc_s, PC_NOP);
+      state_add_cycle(&mem_pull_pch, &data_nop, PC_NOP);
+      state_add_cycle(&mem_fetch, &data_nop, PC_INC);
       break;
     case INST_RTS:
-      state_add_cycle(&mem_read_pc_nodest, &data_nop, false);
-      state_add_cycle(&mem_nop, &data_inc_s, false);
-      state_add_cycle(&mem_pull_pcl, &data_inc_s, false);
-      state_add_cycle(&mem_pull_pch, &data_nop, false);
-      state_add_cycle(&mem_nop, &data_nop, true);
-      state_add_cycle(&mem_fetch, &data_nop, true);
+      state_add_cycle(&mem_read_pc_nodest, &data_nop, PC_NOP);
+      state_add_cycle(&mem_nop, &data_inc_s, PC_NOP);
+      state_add_cycle(&mem_pull_pcl, &data_inc_s, PC_NOP);
+      state_add_cycle(&mem_pull_pch, &data_nop, PC_NOP);
+      state_add_cycle(&mem_nop, &data_nop, PC_INC);
+      state_add_cycle(&mem_fetch, &data_nop, PC_INC);
       break;
     case INST_PHP:
       cpu_decode_push(&mem_push_p_b);
@@ -784,12 +800,12 @@ void cpu_decode_rw_zp(microdata_t *micro_op) {
  * TODO
  */
 void cpu_decode_rw_abs(microdata_t *micro_op) {
-  state_add_cycle(&mem_read_pc_addrl, &data_nop, true);
-  state_add_cycle(&mem_read_pc_addrh, &data_nop, true);
-  state_add_cycle(&mem_read_addr_mdr, &data_nop, false);
-  state_add_cycle(&mem_write_mdr_addr, micro_op, false);
-  state_add_cycle(&mem_write_mdr_addr, &data_nop, false);
-  state_add_cycle(&mem_fetch, &data_nop, true);
+  state_add_cycle(&mem_read_pc_addrl, &data_nop, PC_INC);
+  state_add_cycle(&mem_read_pc_addrh, &data_nop, PC_INC);
+  state_add_cycle(&mem_read_addr_mdr, &data_nop, PC_NOP);
+  state_add_cycle(&mem_write_mdr_addr, micro_op, PC_NOP);
+  state_add_cycle(&mem_write_mdr_addr, &data_nop, PC_NOP);
+  state_add_cycle(&mem_fetch, &data_nop, PC_INC);
   return;
 }
 
@@ -797,12 +813,12 @@ void cpu_decode_rw_abs(microdata_t *micro_op) {
  * TODO
  */
 void cpu_decode_rw_zpx(microdata_t *micro_op) {
-  state_add_cycle(&mem_read_pc_zp_addr, &data_nop, true);
-  state_add_cycle(&mem_read_addr_mdr, &data_add_addrl_x, false);
-  state_add_cycle(&mem_read_addr_mdr, &data_nop, false);
-  state_add_cycle(&mem_write_mdr_addr, micro_op, false);
-  state_add_cycle(&mem_write_mdr_addr, &data_nop, false);
-  state_add_cycle(&mem_fetch, &data_nop, true);
+  state_add_cycle(&mem_read_pc_zp_addr, &data_nop, PC_INC);
+  state_add_cycle(&mem_read_addr_mdr, &data_add_addrl_x, PC_NOP);
+  state_add_cycle(&mem_read_addr_mdr, &data_nop, PC_NOP);
+  state_add_cycle(&mem_write_mdr_addr, micro_op, PC_NOP);
+  state_add_cycle(&mem_write_mdr_addr, &data_nop, PC_NOP);
+  state_add_cycle(&mem_fetch, &data_nop, PC_INC);
   return;
 }
 
@@ -810,13 +826,13 @@ void cpu_decode_rw_zpx(microdata_t *micro_op) {
  * TODO
  */
 void cpu_decode_rw_abx(microdata_t *micro_op) {
-  state_add_cycle(&mem_read_pc_addrl, &data_nop, true);
-  state_add_cycle(&mem_read_pc_addrh, &data_add_addrl_x, true);
-  state_add_cycle(&mem_read_addr_mdr, &data_fix_addrh, false);
-  state_add_cycle(&mem_read_addr_mdr, &data_nop, false);
-  state_add_cycle(&mem_write_mdr_addr, micro_op, false);
-  state_add_cycle(&mem_write_mdr_addr, &data_nop, false);
-  state_add_cycle(&mem_fetch, &data_nop, true);
+  state_add_cycle(&mem_read_pc_addrl, &data_nop, PC_INC);
+  state_add_cycle(&mem_read_pc_addrh, &data_add_addrl_x, PC_INC);
+  state_add_cycle(&mem_read_addr_mdr, &data_fix_addrh, PC_NOP);
+  state_add_cycle(&mem_read_addr_mdr, &data_nop, PC_NOP);
+  state_add_cycle(&mem_write_mdr_addr, micro_op, PC_NOP);
+  state_add_cycle(&mem_write_mdr_addr, &data_nop, PC_NOP);
+  state_add_cycle(&mem_fetch, &data_nop, PC_INC);
   return;
 }
 
@@ -824,12 +840,12 @@ void cpu_decode_rw_abx(microdata_t *micro_op) {
  * TODO
  */
 void cpu_decode_w_izpx(micromem_t *micro_op) {
-  state_add_cycle(&mem_read_pc_zp_ptr, &data_nop, true);
-  state_add_cycle(&mem_read_ptr_addrl, &data_add_ptrl_x, false);
-  state_add_cycle(&mem_read_ptr_addrl, &data_nop, false);
-  state_add_cycle(&mem_read_ptr1_addrh, &data_nop, false);
-  state_add_cycle(micro_op, &data_nop, false);
-  state_add_cycle(&mem_fetch, &data_nop, true);
+  state_add_cycle(&mem_read_pc_zp_ptr, &data_nop, PC_INC);
+  state_add_cycle(&mem_read_ptr_addrl, &data_add_ptrl_x, PC_NOP);
+  state_add_cycle(&mem_read_ptr_addrl, &data_nop, PC_NOP);
+  state_add_cycle(&mem_read_ptr1_addrh, &data_nop, PC_NOP);
+  state_add_cycle(micro_op, &data_nop, PC_NOP);
+  state_add_cycle(&mem_fetch, &data_nop, PC_INC);
   return;
 }
 
@@ -837,9 +853,9 @@ void cpu_decode_w_izpx(micromem_t *micro_op) {
  * TODO
  */
 void cpu_decode_w_zp(micromem_t *micro_op) {
-  state_add_cycle(&mem_read_pc_zp_addr, &data_nop, true);
-  state_add_cycle(micro_op, &data_nop, false);
-  state_add_cycle(&mem_fetch, &data_nop, true);
+  state_add_cycle(&mem_read_pc_zp_addr, &data_nop, PC_INC);
+  state_add_cycle(micro_op, &data_nop, PC_NOP);
+  state_add_cycle(&mem_fetch, &data_nop, PC_INC);
   return;
 }
 
@@ -847,10 +863,10 @@ void cpu_decode_w_zp(micromem_t *micro_op) {
  * TODO
  */
 void cpu_decode_w_abs(micromem_t *micro_op) {
-  state_add_cycle(&mem_read_pc_addrl, &data_nop, true);
-  state_add_cycle(&mem_read_pc_addrh, &data_nop, true);
-  state_add_cycle(micro_op, &data_nop, false);
-  state_add_cycle(&mem_fetch, &data_nop, true);
+  state_add_cycle(&mem_read_pc_addrl, &data_nop, PC_INC);
+  state_add_cycle(&mem_read_pc_addrh, &data_nop, PC_INC);
+  state_add_cycle(micro_op, &data_nop, PC_NOP);
+  state_add_cycle(&mem_fetch, &data_nop, PC_INC);
   return;
 }
 
@@ -858,12 +874,12 @@ void cpu_decode_w_abs(micromem_t *micro_op) {
  * TODO
  */
 void cpu_decode_w_izp_y(micromem_t *micro_op) {
-  state_add_cycle(&mem_read_pc_zp_ptr, &data_nop, true);
-  state_add_cycle(&mem_read_ptr_addrl, &data_nop, false);
-  state_add_cycle(&mem_read_ptr1_addrh, &data_add_addrl_y, false);
-  state_add_cycle(&mem_read_addr_mdr, &data_fix_addrh, false);
-  state_add_cycle(micro_op, &data_nop, false);
-  state_add_cycle(&mem_fetch, &data_nop, true);
+  state_add_cycle(&mem_read_pc_zp_ptr, &data_nop, PC_INC);
+  state_add_cycle(&mem_read_ptr_addrl, &data_nop, PC_NOP);
+  state_add_cycle(&mem_read_ptr1_addrh, &data_add_addrl_y, PC_NOP);
+  state_add_cycle(&mem_read_addr_mdr, &data_fix_addrh, PC_NOP);
+  state_add_cycle(micro_op, &data_nop, PC_NOP);
+  state_add_cycle(&mem_fetch, &data_nop, PC_INC);
   return;
 }
 
@@ -871,10 +887,10 @@ void cpu_decode_w_izp_y(micromem_t *micro_op) {
  * TODO
  */
 void cpu_decode_w_zpx(micromem_t *micro_op) {
-  state_add_cycle(&mem_read_pc_zp_addr, &data_nop, true);
-  state_add_cycle(&mem_read_addr_mdr, &data_add_addrl_x, false);
-  state_add_cycle(micro_op, &data_nop, false);
-  state_add_cycle(&mem_fetch, &data_nop, true);
+  state_add_cycle(&mem_read_pc_zp_addr, &data_nop, PC_INC);
+  state_add_cycle(&mem_read_addr_mdr, &data_add_addrl_x, PC_NOP);
+  state_add_cycle(micro_op, &data_nop, PC_NOP);
+  state_add_cycle(&mem_fetch, &data_nop, PC_INC);
   return;
 }
 
@@ -882,10 +898,10 @@ void cpu_decode_w_zpx(micromem_t *micro_op) {
  * TODO
  */
 void cpu_decode_w_zpy(micromem_t *micro_op) {
-  state_add_cycle(&mem_read_pc_zp_addr, &data_nop, true);
-  state_add_cycle(&mem_read_addr_mdr, &data_add_addrl_y, false);
-  state_add_cycle(micro_op, &data_nop, false);
-  state_add_cycle(&mem_fetch, &data_nop, true);
+  state_add_cycle(&mem_read_pc_zp_addr, &data_nop, PC_INC);
+  state_add_cycle(&mem_read_addr_mdr, &data_add_addrl_y, PC_NOP);
+  state_add_cycle(micro_op, &data_nop, PC_NOP);
+  state_add_cycle(&mem_fetch, &data_nop, PC_INC);
   return;
 }
 
@@ -893,11 +909,11 @@ void cpu_decode_w_zpy(micromem_t *micro_op) {
  * TODO
  */
 void cpu_decode_w_aby(micromem_t *micro_op) {
-  state_add_cycle(&mem_read_pc_addrl, &data_nop, true);
-  state_add_cycle(&mem_read_pc_addrh, &data_add_addrl_y, true);
-  state_add_cycle(&mem_read_addr_mdr, &data_fix_addrh, false);
-  state_add_cycle(micro_op, &data_nop, false);
-  state_add_cycle(&mem_fetch, &data_nop, true);
+  state_add_cycle(&mem_read_pc_addrl, &data_nop, PC_INC);
+  state_add_cycle(&mem_read_pc_addrh, &data_add_addrl_y, PC_INC);
+  state_add_cycle(&mem_read_addr_mdr, &data_fix_addrh, PC_NOP);
+  state_add_cycle(micro_op, &data_nop, PC_NOP);
+  state_add_cycle(&mem_fetch, &data_nop, PC_INC);
   return;
 }
 
@@ -905,11 +921,11 @@ void cpu_decode_w_aby(micromem_t *micro_op) {
  * TODO
  */
 void cpu_decode_w_abx(micromem_t *micro_op) {
-  state_add_cycle(&mem_read_pc_addrl, &data_nop, true);
-  state_add_cycle(&mem_read_pc_addrh, &data_add_addrl_x, true);
-  state_add_cycle(&mem_read_addr_mdr, &data_fix_addrh, false);
-  state_add_cycle(micro_op, &data_nop, false);
-  state_add_cycle(&mem_fetch, &data_nop, true);
+  state_add_cycle(&mem_read_pc_addrl, &data_nop, PC_INC);
+  state_add_cycle(&mem_read_pc_addrh, &data_add_addrl_x, PC_INC);
+  state_add_cycle(&mem_read_addr_mdr, &data_fix_addrh, PC_NOP);
+  state_add_cycle(micro_op, &data_nop, PC_NOP);
+  state_add_cycle(&mem_fetch, &data_nop, PC_INC);
   return;
 }
 
@@ -917,9 +933,9 @@ void cpu_decode_w_abx(micromem_t *micro_op) {
  * TODO
  */
 void cpu_decode_push(micromem_t *micro_op) {
-  state_add_cycle(&mem_read_pc_nodest, &data_nop, false);
-  state_add_cycle(micro_op, &data_dec_s, false);
-  state_add_cycle(&mem_fetch, &data_nop, true);
+  state_add_cycle(&mem_read_pc_nodest, &data_nop, PC_NOP);
+  state_add_cycle(micro_op, &data_dec_s, PC_NOP);
+  state_add_cycle(&mem_fetch, &data_nop, PC_INC);
   return;
 }
 
@@ -927,33 +943,30 @@ void cpu_decode_push(micromem_t *micro_op) {
  * TODO
  */
 void cpu_decode_pull(micromem_t *micro_op) {
-  state_add_cycle(&mem_read_pc_nodest, &data_nop, false);
-  state_add_cycle(&mem_nop, &data_inc_s, false);
-  state_add_cycle(micro_op, &data_nop, false);
-  state_add_cycle(&mem_fetch, &data_nop, true);
+  state_add_cycle(&mem_read_pc_nodest, &data_nop, PC_NOP);
+  state_add_cycle(&mem_nop, &data_inc_s, PC_NOP);
+  state_add_cycle(micro_op, &data_nop, PC_NOP);
+  state_add_cycle(&mem_fetch, &data_nop, PC_INC);
   return;
 }
 
 /*
- * TODO
+ * Checks if the global nmi line has signaled for an interrupt using an
+ * edge detector.
+ *
+ * When an nmi is detected, the edge signal stays high until it is handled.
  */
 void cpu_poll_nmi_line(void) {
-  // The internal nmi signal is edge sensitive, so we should only set it
+  // The internal nmi signal is rising edge sensitive, so we should only set it
   // when the previous value was false and the current value is true.
   static bool nmi_prev = false;
-  if (nmi_line == true && nmi_prev == false) {
-    nmi_prev = nmi_line;
-    nmi_edge = true;
-  } else {
-    // The internal nmi signal should only be reset from a fetch call
-    // handling it, so we do nothing in this case.
-    nmi_prev = nmi_line;
-  }
+  if (nmi_line && !nmi_prev) { nmi_edge = true; }
+  nmi_prev = nmi_line;
   return;
 }
 
 /*
- * TODO
+ * Checks if the global irq line has signaled for an interrupt.
  */
 void cpu_poll_irq_line(void) {
   // The internal irq signal is a level detector that update every cycle.

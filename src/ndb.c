@@ -69,6 +69,7 @@ int main(int argc, char *argv[]) {
 
   // Clean up any allocated memory.
   cpu_free();
+  ppu_free();
 
   return 0;
 }
@@ -89,7 +90,7 @@ void start_emulation(char *file) {
 
   // Initializes the hardware emulation.
   cpu_init(rom_file, header);
-  // TODO: add ppu init function.
+  ppu_init();
 
   // Clean up and exit.
   fclose(rom_file);

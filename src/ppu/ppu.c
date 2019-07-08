@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include "../util/data.h"
+#include "../util/util.h"
 #include "./ppu.h"
 
 /*
@@ -12,21 +13,21 @@
  */
 typedef struct ppu {
   // Internal ppu registers.
-  dword_t ppu_vram_addr;
-  dword_t ppu_temp_vram_addr;
-  bool ppu_write_toggle;
-  word_t ppu_fine_x;
+  dword_t vram_addr;
+  dword_t temp_vram_addr;
+  bool write_toggle;
+  word_t fine_x;
 
   // Memory mapped ppu registers.
-  word_t ppu_bus;
-  word_t ppu_ctrl;
-  word_t ppu_mask;
-  word_t ppu_status;
-  word_t ppu_oam_addr;
+  word_t bus;
+  word_t ctrl;
+  word_t mask;
+  word_t status;
+  word_t oam_addr;
 
   // Working memory for the ppu.
-  word_t *ppu_primary_oam;
-  word_t *ppu_secondary_oam;
+  word_t *primary_oam;
+  word_t *secondary_oam;
 } ppu_t;
 
 /*
@@ -39,16 +40,81 @@ size_t current_cycle = 0;
 size_t frame_odd = false;
 
 /*
- * TODO
+ * Global ppu structure. Cannot be accessed outside this file.
+ * Initialized by ppu_init().
+ */
+ppu_t *system_ppu = NULL;
+
+/* Helper functions */
+void ppu_render(void);
+void ppu_eval(void);
+void ppu_inc(void);
+
+/*
+ * Initializes the ppu by creating a ppu structure and storing it in
+ * system_ppu.
  */
 void ppu_init(void) {
+  system_ppu = xcalloc(1, sizeof(ppu_t));
+  system_ppu->primary_oam = xcalloc(PRIMARY_OAM_SIZE, sizeof(word_t));
+  system_ppu->secondary_oam = xcalloc(SECONDARY_OAM_SIZE, sizeof(word_t));
+  return;
+}
+
+/*
+ * Runs the next cycle in the ppu emulation, then increments the cycle/scanline
+ * counters.
+ *
+ * Assumes the ppu and memory have been initialized.
+ */
+void ppu_run_cycle(void) {
+  // Render video using the current scanline/cycle.
+  ppu_render();
+
+  // Run sprite evaluation using the current scanline/cycle.
+  ppu_eval();
+
+  // Increment the cycle/scanline counters.
+  ppu_inc();
+
   return;
 }
 
 /*
  * TODO
  */
-void ppu_run_cycle(void) {
+void ppu_render(void) {
+  return;
+}
+
+/*
+ * TODO
+ */
+void ppu_eval(void) {
+  return;
+}
+
+/*
+ * Increments the scanline, cycle, and frame type and correctly wraps them.
+ * Each ppu frame has 341 cycles and 262 scanlines.
+ */
+void ppu_inc(void) {
+  // Increment the cycle.
+  current_cycle++;
+
+  // Increment the scanline if it is time to wrap the cycle.
+  if ((current_cycle > 341) || ((current_cycle > 339)
+           && frame_odd && (current_scanline >= 261)) {
+    current_scanline++;
+    current_cycle = 0;
+  }
+
+  // Wrap the scanline and toggle the frame if it is time to do so.
+  if (current_scanline > 261) {
+    current_scanline = 0;
+    frame_odd = !frame_odd;
+  }
+
   return;
 }
 
@@ -81,13 +147,19 @@ word_t ppu_read(dword_t reg_addr) {
  * Assumes the ppu has been initialized.
  */
 void ppu_oam_dma(word_t val) {
-  (void)val;
+  system_ppu->primary_oam[system_ppu->oam_addr] = val;
+  system_ppu->oam_addr++;
   return;
 }
 
 /*
- * TODO
+ * Frees the global ppu structure.
+ *
+ * Assumes the ppu has been initialized.
  */
 void ppu_free(void) {
+  free(system_ppu->primary_oam);
+  free(system_ppu->secondary_oam);
+  free(system_ppu);
   return;
 }

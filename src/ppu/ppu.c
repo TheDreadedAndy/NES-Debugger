@@ -103,6 +103,7 @@ void ppu_init(void) {
   system_ppu = xcalloc(1, sizeof(ppu_t));
   system_ppu->primary_oam = xcalloc(PRIMARY_OAM_SIZE, sizeof(word_t));
   system_ppu->secondary_oam = xcalloc(SECONDARY_OAM_SIZE, sizeof(word_t));
+  system_ppu->sprite_memory = xcalloc(SECONDARY_OAM_SIZE, sizeof(word_t));
   return;
 }
 
@@ -233,7 +234,7 @@ void ppu_eval_sprites(void) {
     case COPY_X:
       // Copy the X cord to secondary OAM, then update the state.
       ppu_eval_write_soam();
-      if (system_ppu->soam_addr > SECONDARY_OAM_SIZE) {
+      if (system_ppu->soam_addr >= SECONDARY_OAM_SIZE) {
         system_ppu->eval_state = OVERFLOW;
       } else {
         system_ppu->eval_state = SCAN;
@@ -388,6 +389,7 @@ void ppu_oam_dma(word_t val) {
 void ppu_free(void) {
   free(system_ppu->primary_oam);
   free(system_ppu->secondary_oam);
+  free(system_ppu->sprite_memory);
   free(system_ppu);
   return;
 }

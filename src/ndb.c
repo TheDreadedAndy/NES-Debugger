@@ -62,6 +62,9 @@ int main(int argc, char *argv[]) {
   printf("Starting emulation...\n");
   for (size_t i = 0; i < iterations; i++) {
     // Executes the next cycle and prints the results.
+    ppu_run_cycle();
+    ppu_run_cycle();
+    ppu_run_cycle();
     cpu_run_cycle();
     if (verbose) { regfile_print(i); }
   }

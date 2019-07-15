@@ -4,6 +4,7 @@
 
 #include <stdlib.h>
 #include <stdbool.h>
+#include <assert.h>
 #include "../util/data.h"
 #include "../util/util.h"
 #include "./ppu.h"
@@ -211,15 +212,23 @@ void ppu_eval_sprites(void) {
   }
 
   // We need to check for overflow to determine if evaluation has finished.
-  word_t old_soam_addr = system_ppu->soam_addr;
+  word_t old_oam_addr = system_ppu->oam_addr;
 
   // On even cycles, the evaluation state determines the action.
   switch(system_ppu->eval_state) {
     case SCAN:
       // Copy the Y cord to secondary OAM and change state if the sprite
       // is visible on this scan line.
-      ppu_eval_write_soam();
-      if (ppu_eval_in_range()) { system_ppu->eval_state = COPY_TILE; }
+      system_ppu->secondary_oam[system_ppu->soam_addr] = system_ppu->eval_buf;
+      if (ppu_eval_in_range()) {
+        // Increment and prepare to copy the sprite data to secondary OAM.
+        system_ppu->eval_state = COPY_TILE;
+        system_ppu->oam_addr++;
+        system_ppu->soam_addr++;
+      } else {
+        // Skip to next Y cord.
+        system_ppu->oam_addr += 4;
+      }
       break;
     case COPY_TILE:
       // Copy tile data from the buffer to secondary OAM, then update the state.
@@ -229,7 +238,7 @@ void ppu_eval_sprites(void) {
     case COPY_ATTR:
       // Copy attribute data to secondary OAM, then update the state.
       ppu_eval_write_soam();
-      system_ppu->eval_state = COPY_ATTR;
+      system_ppu->eval_state = COPY_X;
       break;
     case COPY_X:
       // Copy the X cord to secondary OAM, then update the state.
@@ -256,8 +265,8 @@ void ppu_eval_sprites(void) {
       break;
   }
 
-  // If the secondary OAM address overflows, evaluation is complete.
-  if (old_soam_addr > system_ppu->soam_addr) { system_ppu->eval_state = DONE; }
+  // If the primary OAM address overflows, evaluation is complete.
+  if (old_oam_addr > system_ppu->oam_addr) { system_ppu->eval_state = DONE; }
 
   return;
 }
@@ -278,6 +287,7 @@ word_t ppu_oam_read(void) {
  * Assumes the ppu has been initialized.
  */
 void ppu_eval_write_soam(void) {
+  assert(system_ppu->soam_addr < SECONDARY_OAM_SIZE);
   system_ppu->secondary_oam[system_ppu->soam_addr] = system_ppu->eval_buf;
   system_ppu->oam_addr++;
   system_ppu->soam_addr++;
@@ -315,6 +325,7 @@ void ppu_eval_fetch_sprites(void) {
   // Sprite evaluation and rendering alternate access to sprite data every 4
   // cycles between 257 and 320.
   if (((current_cycle - 1) & 0x04) == 0) {
+    assert(system_ppu->soam_addr < SECONDARY_OAM_SIZE);
     system_ppu->sprite_memory[system_ppu->soam_addr] =
                               system_ppu->secondary_oam[system_ppu->soam_addr];
     system_ppu->soam_addr++;

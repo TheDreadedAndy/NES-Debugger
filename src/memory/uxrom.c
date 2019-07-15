@@ -34,7 +34,6 @@ memory_t *uxrom_new(FILE *rom_file, header_t *header) {
   // Allocate memory structure and set up its data.
   memory_t *M = xcalloc(1, sizeof(memory_t));
   uxrom_t *map = xcalloc(1, sizeof(uxrom_t));
-  M->ram = xcalloc(RAM_SIZE, sizeof(word_t));
   M->map = (void*) map;
   M->read = &uxrom_read;
   M->write = &uxrom_write;

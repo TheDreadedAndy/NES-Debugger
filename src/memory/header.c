@@ -104,6 +104,8 @@ header_t *decode_header(FILE *rom_file) {
       break;
   }
 
+  // Clean up and exit
+  free(file_header);
   return header;
 }
 

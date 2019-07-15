@@ -8,6 +8,7 @@
 #include "../util/data.h"
 #include "../util/util.h"
 #include "./ppu.h"
+#include "./palette.h"
 
 /* Emulation constants */
 
@@ -97,14 +98,24 @@ void ppu_eval_fetch_sprites(void);
 void ppu_inc(void);
 
 /*
- * Initializes the ppu by creating a ppu structure and storing it in
- * system_ppu.
+ * Initializes the PPU and palette, using the given file, then creates an
+ * SDL window.
+ *
+ * Assumes the file is non-NULL.
  */
-void ppu_init(void) {
+void ppu_init(char *file) {
+  // Prepare the ppu structure.
   system_ppu = xcalloc(1, sizeof(ppu_t));
   system_ppu->primary_oam = xcalloc(PRIMARY_OAM_SIZE, sizeof(word_t));
   system_ppu->secondary_oam = xcalloc(SECONDARY_OAM_SIZE, sizeof(word_t));
   system_ppu->sprite_memory = xcalloc(SECONDARY_OAM_SIZE, sizeof(word_t));
+
+  // Load in the palette.
+  palette_init(file);
+
+  // Setup the SDL window.
+  // TODO
+
   return;
 }
 
@@ -398,9 +409,14 @@ void ppu_oam_dma(word_t val) {
  * Assumes the ppu has been initialized.
  */
 void ppu_free(void) {
+  // Free the ppu structure.
   free(system_ppu->primary_oam);
   free(system_ppu->secondary_oam);
   free(system_ppu->sprite_memory);
   free(system_ppu);
+
+  // Free the NES palette data.
+  palette_free();
+
   return;
 }

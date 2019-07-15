@@ -15,7 +15,7 @@
 #include "./ppu/ppu.h"
 
 /* Helper functions */
-void start_emulation(char *file);
+void start_emulation(char *rom, char *pal);
 
 /*
  * Loads in the users arguments and starts ndb.
@@ -28,11 +28,12 @@ int main(int argc, char *argv[]) {
 
   // Parses the users command line input.
   size_t iterations = 0;
-  char *file = NULL;
+  char *rom_file = NULL;
+  char *pal_file = NULL;
   signed char opt;
   bool verbose = false;
 
-  while ((opt = getopt(argc, argv, "hvi:f:")) != -1) {
+  while ((opt = getopt(argc, argv, "hvi:f:p:")) != -1) {
     switch (opt) {
       case 'v':
         verbose = true;
@@ -41,7 +42,10 @@ int main(int argc, char *argv[]) {
         iterations = atoi(optarg);
         break;
       case 'f':
-        file = optarg;
+        rom_file = optarg;
+        break;
+      case 'p':
+        pal_file = optarg;
         break;
       default:
         printf("usage: ndb -i <NUM> -f <FILE>\n");
@@ -51,13 +55,13 @@ int main(int argc, char *argv[]) {
   }
 
   // Ensures that the user specified an NES file.
-  if (file == NULL) {
-    printf("usage: ndb -i <NUM> -f <FILE>\n");
+  if (rom_file == NULL || pal_file == NULL) {
+    printf("usage: ndb -i <NUM> -f <ROM FILE> -p <PALETTE FILE>\n");
     exit(0);
   }
 
   // Prepares the NES emulation for execution.
-  start_emulation(file);
+  start_emulation(rom_file, pal_file);
 
   printf("Starting emulation...\n");
   for (size_t i = 0; i < iterations; i++) {
@@ -83,9 +87,9 @@ int main(int argc, char *argv[]) {
  *
  * Assumes the file location is valid.
  */
-void start_emulation(char *file) {
+void start_emulation(char *rom, char *pal) {
   // Open the rom.
-  FILE *rom_file = fopen(file, "r");
+  FILE *rom_file = fopen(rom, "r");
 
   // Decode the header so that the emulation can be prepared.
   header_t *header = decode_header(rom_file);
@@ -93,7 +97,7 @@ void start_emulation(char *file) {
 
   // Initializes the hardware emulation.
   cpu_init(rom_file, header);
-  ppu_init();
+  ppu_init(pal);
 
   // Clean up and exit.
   fclose(rom_file);

@@ -4,7 +4,7 @@
 #define _NES_PPU
 
 // Inits the ppu structure, allowing the ppu to be used.
-void ppu_init(void);
+void ppu_init(char *file);
 
 // Runs the next ppu cycle.
 void ppu_run_cycle(void);

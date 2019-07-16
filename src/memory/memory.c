@@ -39,8 +39,8 @@ bool memory_init(FILE *rom_file, header_t *header) {
       system_memory = uxrom_new(rom_file, header);
       break;
     default:
-      fprintf(stderr, "Error: Rom requires unimplemented mapper: %ld\n",
-              header->mapper);
+      fprintf(stderr, "Error: Rom requires unimplemented mapper: %d\n",
+              (unsigned int) header->mapper);
       return false;
   }
 

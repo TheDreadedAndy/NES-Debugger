@@ -132,6 +132,9 @@ void ppu_run_cycle(void) {
   // Run sprite evaluation using the current scanline/cycle.
   ppu_eval();
 
+  // Pull the NMI line high if one should be generated.
+  ppu_signal();
+
   // Increment the cycle/scanline counters.
   ppu_inc();
 
@@ -139,16 +142,55 @@ void ppu_run_cycle(void) {
 }
 
 /*
- * TODO
+ * Runs the rendering action for the given cycle/scanline.
+ *
+ * Assumes the ppu has been initialized.
  */
 void ppu_render(void) {
+  // Determine which scanline we're on and render accordingly.
+  if (current_scanline < 240) {
+    ppu_render_visible();
+  } else if (current_scanline < 261) {
+    ppu_render_blank();
+  } else {
+    ppu_render_pre();
+  }
+
+  return;
+}
+
+/*
+ * TODO
+ */
+void ppu_render_visible(void) {
+  return;
+}
+
+/*
+ * Performs the rendering action during vertical blank, which consists only
+ * of signaling an NMI on (1,241).
+ *
+ * Assumes the PPU has been initialized.
+ */
+void ppu_render_blank(void) {
+  if (current_scanline == 241 && current_cycle == 1) {
+    // TODO: Implement special case timing.
+    system_ppu->status |= FLAG_VBLANK;
+  }
+  return;
+}
+
+/*
+ * TODO
+ */
+void ppu_render_pre(void) {
   return;
 }
 
 /*
  * Runs the sprite evaluation action for the given cycle/scanline.
  *
- * Assumes the ppu has been initialized.
+ * Assumes the PPU has been initialized.
  */
 void ppu_eval(void) {
   // Sprite evaluation can activate an internal signal which sets all bits in

@@ -88,6 +88,9 @@ ppu_t *system_ppu = NULL;
 
 /* Helper functions */
 void ppu_render(void);
+void ppu_render_visible(void);
+void ppu_render_blank(void);
+void ppu_render_pre(void);
 void ppu_eval(void);
 void ppu_eval_clear_soam(void);
 void ppu_eval_sprites(void);
@@ -95,6 +98,7 @@ word_t ppu_oam_read(void);
 void ppu_eval_write_soam(void);
 bool ppu_eval_in_range(void);
 void ppu_eval_fetch_sprites(void);
+void ppu_signal(void);
 void ppu_inc(void);
 
 /*
@@ -384,6 +388,15 @@ void ppu_eval_fetch_sprites(void) {
     system_ppu->soam_addr++;
   }
 
+  return;
+}
+
+/*
+ * Generates an NMI in the CPU emulation when appropriate.
+ *
+ * Assumes the PPU has been initialized.
+ */
+void ppu_signal(void) {
   return;
 }
 

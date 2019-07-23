@@ -9,6 +9,7 @@
 #include "../util/util.h"
 #include "./ppu.h"
 #include "./palette.h"
+#include "../cpu/2A03.h"
 
 /* Emulation constants */
 
@@ -84,7 +85,7 @@ size_t frame_odd = false;
  * Global ppu structure. Cannot be accessed outside this file.
  * Initialized by ppu_init().
  */
-ppu_t *system_ppu = NULL;
+ppu_t *ppu = NULL;
 
 /* Helper functions */
 void ppu_render(void);
@@ -109,10 +110,10 @@ void ppu_inc(void);
  */
 void ppu_init(char *file) {
   // Prepare the ppu structure.
-  system_ppu = xcalloc(1, sizeof(ppu_t));
-  system_ppu->primary_oam = xcalloc(PRIMARY_OAM_SIZE, sizeof(word_t));
-  system_ppu->secondary_oam = xcalloc(SECONDARY_OAM_SIZE, sizeof(word_t));
-  system_ppu->sprite_memory = xcalloc(SECONDARY_OAM_SIZE, sizeof(word_t));
+  ppu = xcalloc(1, sizeof(ppu_t));
+  ppu->primary_oam = xcalloc(PRIMARY_OAM_SIZE, sizeof(word_t));
+  ppu->secondary_oam = xcalloc(SECONDARY_OAM_SIZE, sizeof(word_t));
+  ppu->sprite_memory = xcalloc(SECONDARY_OAM_SIZE, sizeof(word_t));
 
   // Load in the palette.
   palette_init(file);
@@ -179,7 +180,7 @@ void ppu_render_visible(void) {
 void ppu_render_blank(void) {
   if (current_scanline == 241 && current_cycle == 1) {
     // TODO: Implement special case timing.
-    system_ppu->status |= FLAG_VBLANK;
+    ppu->status |= FLAG_VBLANK;
   }
   return;
 }
@@ -199,7 +200,7 @@ void ppu_render_pre(void) {
 void ppu_eval(void) {
   // Sprite evaluation can activate an internal signal which sets all bits in
   // an OAM read.
-  system_ppu->oam_mask = 0x00;
+  ppu->oam_mask = 0x00;
 
   // Sprite evaluation occurs only on visible scanlines.
   if (current_scanline >= 240) {
@@ -207,7 +208,7 @@ void ppu_eval(void) {
     if (current_scanline >= 261 && current_cycle >= 257
                                 && current_cycle <= 320) {
       // TODO
-      system_ppu->oam_addr = 0;
+      ppu->oam_addr = 0;
     }
     return;
   }
@@ -219,7 +220,7 @@ void ppu_eval(void) {
     ppu_eval_sprites();
   } else if (257 <= current_cycle && current_cycle <= 320) {
     // TODO
-    system_ppu->oam_addr = 0;
+    ppu->oam_addr = 0;
     ppu_eval_fetch_sprites();
   }
 
@@ -235,13 +236,13 @@ void ppu_eval(void) {
 void ppu_eval_clear_soam(void) {
   // An internal signal which makes all primary OAM reads return 0xFF should
   // be raised during this phase of sprite evaluation.
-  system_ppu->oam_mask = 0xFF;
+  ppu->oam_mask = 0xFF;
 
   // The clear operation should consecutively write to secondary OAM every
   // even cycle.
   if ((current_cycle % 2) == 0) {
     word_t oam_addr = (current_cycle >> 1) & 0x1F;
-    system_ppu->secondary_oam[oam_addr] = 0xFF;
+    ppu->secondary_oam[oam_addr] = 0xFF;
   }
 
   return;
@@ -258,63 +259,63 @@ void ppu_eval_clear_soam(void) {
 void ppu_eval_sprites(void) {
   // The evaluation state should be reset on its first cycle.
   if (current_cycle == 65) {
-    system_ppu->eval_state = SCAN;
-    system_ppu->soam_addr = 0;
+    ppu->eval_state = SCAN;
+    ppu->soam_addr = 0;
   }
 
   // On odd cycles, data is read from primary OAM.
   if ((current_cycle % 2) == 1) {
-    system_ppu->eval_buf = ppu_oam_read();
+    ppu->eval_buf = ppu_oam_read();
     return;
   }
 
   // We need to check for overflow to determine if evaluation has finished.
-  word_t old_oam_addr = system_ppu->oam_addr;
+  word_t old_oam_addr = ppu->oam_addr;
 
   // On even cycles, the evaluation state determines the action.
-  switch(system_ppu->eval_state) {
+  switch(ppu->eval_state) {
     case SCAN:
       // Copy the Y cord to secondary OAM and change state if the sprite
       // is visible on this scan line.
-      system_ppu->secondary_oam[system_ppu->soam_addr] = system_ppu->eval_buf;
+      ppu->secondary_oam[ppu->soam_addr] = ppu->eval_buf;
       if (ppu_eval_in_range()) {
         // Increment and prepare to copy the sprite data to secondary OAM.
-        system_ppu->eval_state = COPY_TILE;
-        system_ppu->oam_addr++;
-        system_ppu->soam_addr++;
+        ppu->eval_state = COPY_TILE;
+        ppu->oam_addr++;
+        ppu->soam_addr++;
       } else {
         // Skip to next Y cord.
-        system_ppu->oam_addr += 4;
+        ppu->oam_addr += 4;
       }
       break;
     case COPY_TILE:
       // Copy tile data from the buffer to secondary OAM, then update the state.
       ppu_eval_write_soam();
-      system_ppu->eval_state = COPY_ATTR;
+      ppu->eval_state = COPY_ATTR;
       break;
     case COPY_ATTR:
       // Copy attribute data to secondary OAM, then update the state.
       ppu_eval_write_soam();
-      system_ppu->eval_state = COPY_X;
+      ppu->eval_state = COPY_X;
       break;
     case COPY_X:
       // Copy the X cord to secondary OAM, then update the state.
       ppu_eval_write_soam();
-      if (system_ppu->soam_addr >= SECONDARY_OAM_SIZE) {
-        system_ppu->eval_state = OVERFLOW;
+      if (ppu->soam_addr >= SECONDARY_OAM_SIZE) {
+        ppu->eval_state = OVERFLOW;
       } else {
-        system_ppu->eval_state = SCAN;
+        ppu->eval_state = SCAN;
       }
       break;
     case OVERFLOW:
       // Run the broken overflow behavior until the end of OAM is reached.
       if (ppu_eval_in_range()) {
-        system_ppu->status |= FLAG_OVERFLOW;
-        system_ppu->eval_state = DONE;
+        ppu->status |= FLAG_OVERFLOW;
+        ppu->eval_state = DONE;
       } else {
         // The NES incorrectly increments the OAM address by 5 instead of 4,
         // which results in broken sprite overflow behavior.
-        system_ppu->oam_addr += 5;
+        ppu->oam_addr += 5;
       }
       break;
     case DONE:
@@ -323,7 +324,7 @@ void ppu_eval_sprites(void) {
   }
 
   // If the primary OAM address overflows, evaluation is complete.
-  if (old_oam_addr > system_ppu->oam_addr) { system_ppu->eval_state = DONE; }
+  if (old_oam_addr > ppu->oam_addr) { ppu->eval_state = DONE; }
 
   return;
 }
@@ -335,7 +336,7 @@ void ppu_eval_sprites(void) {
  * Assumes the ppu has been initialized.
  */
 word_t ppu_oam_read(void) {
-  return system_ppu->primary_oam[system_ppu->oam_addr] & system_ppu->oam_mask;
+  return ppu->primary_oam[ppu->oam_addr] & ppu->oam_mask;
 }
 
 /*
@@ -344,10 +345,10 @@ word_t ppu_oam_read(void) {
  * Assumes the ppu has been initialized.
  */
 void ppu_eval_write_soam(void) {
-  assert(system_ppu->soam_addr < SECONDARY_OAM_SIZE);
-  system_ppu->secondary_oam[system_ppu->soam_addr] = system_ppu->eval_buf;
-  system_ppu->oam_addr++;
-  system_ppu->soam_addr++;
+  assert(ppu->soam_addr < SECONDARY_OAM_SIZE);
+  ppu->secondary_oam[ppu->soam_addr] = ppu->eval_buf;
+  ppu->oam_addr++;
+  ppu->soam_addr++;
 }
 
 /*
@@ -359,8 +360,8 @@ void ppu_eval_write_soam(void) {
 bool ppu_eval_in_range(void) {
   // Get the current size of sprites (8x8 or 8x16) from the control register
   // and the Y cord of the sprite from the eval buffer.
-  word_t sprite_size = (system_ppu->ctrl & FLAG_SPRITE_SIZE) ? 16 : 8;
-  word_t sprite_y = system_ppu->eval_buf;
+  word_t sprite_size = (ppu->ctrl & FLAG_SPRITE_SIZE) ? 16 : 8;
+  word_t sprite_y = ppu->eval_buf;
 
   // Check if the sprite is visible on this scanline.
   bool in_range = (sprite_y <= current_scanline) && (sprite_y < 240)
@@ -377,15 +378,15 @@ bool ppu_eval_in_range(void) {
  */
 void ppu_eval_fetch_sprites(void) {
   // Resets the address the first time this function is called for a scanline.
-  if (current_cycle == 257) { system_ppu->soam_addr = 0; }
+  if (current_cycle == 257) { ppu->soam_addr = 0; }
 
   // Sprite evaluation and rendering alternate access to sprite data every 4
   // cycles between 257 and 320.
   if (((current_cycle - 1) & 0x04) == 0) {
-    assert(system_ppu->soam_addr < SECONDARY_OAM_SIZE);
-    system_ppu->sprite_memory[system_ppu->soam_addr] =
-                              system_ppu->secondary_oam[system_ppu->soam_addr];
-    system_ppu->soam_addr++;
+    assert(ppu->soam_addr < SECONDARY_OAM_SIZE);
+    ppu->sprite_memory[ppu->soam_addr] =
+                              ppu->secondary_oam[ppu->soam_addr];
+    ppu->soam_addr++;
   }
 
   return;
@@ -397,6 +398,10 @@ void ppu_eval_fetch_sprites(void) {
  * Assumes the PPU has been initialized.
  */
 void ppu_signal(void) {
+  // NMIs should be generated when they are enabled in ppuctrl and
+  // the ppu is in vblank.
+  nmi_line = (ppu->ctrl & FLAG_ENABLE_VBLANK)
+               && (ppu->status & FLAG_VBLANK);
   return;
 }
 
@@ -453,8 +458,8 @@ word_t ppu_read(dword_t reg_addr) {
  * Assumes the ppu has been initialized.
  */
 void ppu_oam_dma(word_t val) {
-  system_ppu->primary_oam[system_ppu->oam_addr] = val;
-  system_ppu->oam_addr++;
+  ppu->primary_oam[ppu->oam_addr] = val;
+  ppu->oam_addr++;
   return;
 }
 
@@ -465,10 +470,10 @@ void ppu_oam_dma(word_t val) {
  */
 void ppu_free(void) {
   // Free the ppu structure.
-  free(system_ppu->primary_oam);
-  free(system_ppu->secondary_oam);
-  free(system_ppu->sprite_memory);
-  free(system_ppu);
+  free(ppu->primary_oam);
+  free(ppu->secondary_oam);
+  free(ppu->sprite_memory);
+  free(ppu);
 
   // Free the NES palette data.
   palette_free();

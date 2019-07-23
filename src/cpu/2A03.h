@@ -9,7 +9,7 @@
 #define _NES_2A03
 
 // Interrupt bools, which can be set by the PPU/APU
-extern bool irq_interrupt, nmi_interrupt;
+extern bool irq_line, nmi_line;
 
 // Interrupt bools, which can be read (and should not be set) by the micro ops.
 extern bool nmi_edge, irq_ready;

@@ -4,7 +4,7 @@ HEADERS = $(wildcard */*.h)
 OBJECTS = $(filter-out $(MAINS),$(patsubst %.c,%.o,$(wildcard */*.c)))
 CC = gcc
 LIBS = $(shell sdl2-config --libs)
-override CFLAGS += -Wall -Wshadow -Wextra -Werror -std=c99 -pedantic $(shell sdl2-config --cflags)
+override CFLAGS += -Wall -Wshadow -Wextra -Werror -std=c99 -pedantic -O3 $(shell sdl2-config --cflags)
 
 # Sets the default command to ndb
 default: ndb

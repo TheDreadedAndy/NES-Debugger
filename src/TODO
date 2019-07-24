@@ -1,15 +1,19 @@
-Here's a semi-complete list of things that still need to be changes:
+Here's a semi-complete list of things that still need to be changed:
   - A few files are still missing descriptions.
   - Pretty much everything needs to be more rigorously tested.
-  - SDL, PPU, APU, NDB are all completely missing.
+  - SDL, APU, NDB are all completely missing.
+  - PPU and VRAM are half finished.
 
 Next up:
   - NES 2.0 parsing needs to be written.
-  - Regfile and state need to be globalized
-  - VRAM needs to be implemented so that true work on the ppu can begin.
-  - CPU is still an absolute mess, style wise.
+  - VRAM needs to be implemented so that the ppu can be tested.
+  - CPU still needs a little more cleaning.
+  - SDL rendering needs to be implemented.
 
 Small issues:
   - UxROM PRG-ROM offset calculation currently assumes there is not trainer.
   - UxROM has no error detection on creation.
   - Many files include needless headers.
+  - Initialization error checking is abysmal. Ex. Palette can fail but the ppu
+    doesnt do anything about it so the program still segfaults.
+  - Contracts are used almost nowhere.

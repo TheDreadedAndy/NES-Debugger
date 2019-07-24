@@ -17,18 +17,47 @@
 #include "./uxrom.h"
 #include "../util/data.h"
 
-/*
- * Stores the mirror bit collected from the header. Used to change mirroring
- * in VRAM.
- */
-bool name_table_mirror;
+// Constants used to size and access memory.
+#define MAX_BANKS 16U
+#define BANK_SIZE ((size_t)(1 << 14))
+#define BANK_OFFSET 0x8000U
+#define BANK_MASK 0x0f
+#define FIXED_BANK_OFFSET 0xC000U
+#define BAT_SIZE 0x2000U
+#define BAT_OFFSET 0x6000U
+
+// Constants used to size and access VRAM.
+#define PATTERN_TABLE_SIZE ((size_t)(1 << 13))
+#define NAMETABLE_SIZE ((size_t)(1 << 10))
+#define MAX_SCREENS 4U
+
+// Nes virtual memory data structure for uxrom (mapper 2).
+typedef struct uxrom {
+  // Cart memory.
+  word_t *bat;
+  word_t *cart[MAX_BANKS];
+  word_t current_bank;
+  // Should always be the final used bank.
+  word_t fixed_bank;
+
+  // PPU memory.
+  word_t *pattern_table;
+  bool is_chr_ram;
+  word_t *nametable[MAX_SCREENS];
+  word_t *palette_ram;
+} uxrom_t;
+
+/* Helper functions */
+void uxrom_load_prg(FILE *rom_file, memory_t *M);
+void uxrom_load_chr(FILE *rom_file, memory_t *M);
 
 /*
- * Takes in an INES/NES2 header and creates a uxrom
- * memory system using it. Assumes the header is valid.
+ * Uses the header within the provided memory structure to create
+ * a uxrom mapper structure and load the game data into the mapper.
+ * The mapper structure and its functions are then stored within
+ * the provided memory structure.
  *
- * Returns a generic memory structure, which can be used
- * to interact with the uxrom structure.
+ * Assumes the provided memory structure and rom file are non-null and valid.
  */
 void uxrom_new(FILE *rom_file, memory_t *M) {
   // Allocate memory structure and set up its data.
@@ -40,13 +69,41 @@ void uxrom_new(FILE *rom_file, memory_t *M) {
   M->vram_write = &uxrom_vram_write;
   M->free = &uxrom_free;
 
-  // Store the mirror bit for use with VRAM.
-  name_table_mirror = M->header->mirror;
-
   // Set up the cart ram space.
   map->bat = xcalloc(BAT_SIZE, sizeof(word_t));
 
-  // Caclulate rom size and load it into memory.
+  // Load the rom data into memory.
+  uxrom_load_prg(rom_file, M);
+  uxrom_load_chr(rom_file, M);
+
+  // Setup the nametable in vram.
+  map->nametable[0] = xcalloc(sizeof(word_t), NAMETABLE_SIZE);
+  map->nametable[3] = xcalloc(sizeof(word_t), NAMETABLE_SIZE);
+  if (M->header->mirror) {
+    // Vertical mirroring.
+    map->nametable[1] = map->nametable[3];
+    map->nametable[2] = map->nametable[0];
+  } else {
+    // Horizontal mirroring.
+    map->nametable[1] = map->nametable[0];
+    map->nametable[2] = map->nametable[3];
+  }
+
+  return;
+}
+
+/*
+ * Loads the prg section of a ROM into the mapped memory system.
+ *
+ * Assumes the mapper structure has been allocated and is of type uxrom_t.
+ * Assumes the header within the memory structure is valid.
+ */
+void uxrom_load_prg(FILE *rom_file, memory_t *M) {
+  // Cast back from the generic structure.
+  uxrom_t *map = (uxrom_t*) M->map;
+
+  // Calculate the number of prg banks used by the rom, then load
+  // the rom into memory.
   size_t num_banks = (size_t) (M->header->prg_rom_size / BANK_SIZE);
   fseek(rom_file, HEADER_SIZE, SEEK_SET);
   for (size_t i = 0; i < num_banks; i++) {
@@ -57,6 +114,36 @@ void uxrom_new(FILE *rom_file, memory_t *M) {
   }
   map->current_bank = 0;
   map->fixed_bank = num_banks - 1;
+
+  return;
+}
+
+/*
+ * Loads the chr section of a ROM into the mapped memory system.
+ * If the size of the chr rom is 0, chr ram is created instead.
+ *
+ * Assumes the mapper structure has been allocated and is of type uxrom_t.
+ * Assumes the header within the memory structure is valid.
+ */
+void uxrom_load_chr(FILE *rom_file, memory_t *M) {
+  // Cast the mapper back from the generic structure.
+  uxrom_t *map = (uxrom_t*) M->map;
+
+  // Check if the rom is using chr-ram, and allocate it if so.
+  if (M->header->chr_ram_size > 0) {
+    map->is_chr_ram = true;
+    // chr-ram should always be 8K for this mapper.
+    map->pattern_table = xcalloc(sizeof(word_t), PATTERN_TABLE_SIZE);
+    return;
+  }
+
+  // Otherwise, the rom uses chr-rom and the data needs to be copied
+  // from the rom file.
+  map->pattern_table = xcalloc(sizeof(word_t), M->header->chr_rom_size);
+  fseek(rom_file, HEADER_SIZE + M->header->prg_rom_size, SEEK_SET);
+  for (size_t i = 0; i < M->header->chr_rom_size; i++) {
+    map->pattern_table[i] = fgetc(rom_file);
+  }
 
   return;
 }
@@ -136,11 +223,14 @@ void uxrom_vram_write(word_t val, dword_t addr, void *map) {
  * Assumes the input pointer is a uxrom memory structure and is non-null.
  */
 void uxrom_free(void *map) {
+  // Cast back from the generic structure.
   uxrom_t *M = (uxrom_t*) map;
 
-  // TODO: This should change with implementation.
   // Free the contents of the structure.
   free(M->bat);
+  free(M->pattern_table);
+  free(M->nametable[0]);
+  free(M->nametable[3]);
 
   // Frees each bank.
   for (size_t i = 0; i < (M->fixed_bank + 1U); i++) {

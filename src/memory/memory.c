@@ -19,6 +19,19 @@
 #include "./uxrom.h"
 #include "../util/data.h"
 
+// RAM data constants.
+#define RAM_SIZE 0x800U
+#define RAM_MASK 0x7FFU
+
+// The address at which PPU registers are located.
+#define PPU_OFFSET 0x2000U
+
+// The address at which APU and IO registers are located.
+#define IO_OFFSET 0x4000U
+
+// The address at which memory begins  to depend on the mapper in use.
+#define MAPPER_OFFSET 0x4020U
+
 /*
  * Holds the global memory structure. Unavailable outside this file.
  * Manages mappers, RAM, MMIO, and VRAM

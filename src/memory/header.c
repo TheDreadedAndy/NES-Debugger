@@ -217,6 +217,12 @@ void decode_ines(header_t *header, char *file_header) {
   header->prg_rom_size = get_ines_prg_rom_size(file_header);
   header->chr_rom_size = get_ines_chr_rom_size(file_header);
 
+  // When an INES header does not specify a size for CHR-ROM, 8K of CHR-RAM
+  // is assumed to be present.
+  if (header->chr_rom_size == 0) {
+    header->chr_ram_size = INES_CHR_RAM_SIZE;
+  }
+
   // Get the header using the INES standard.
   header->mapper = get_ines_mapper(file_header);
 

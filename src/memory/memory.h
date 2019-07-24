@@ -6,20 +6,6 @@
 #ifndef _NES_MEM
 #define _NES_MEM
 
-// RAM data constants.
-#define RAM_SIZE 0x800U
-#define RAM_MASK 0x7FFU
-
-// The address at which PPU registers are located.
-#define PPU_OFFSET 0x2000U
-
-// The address at which APU and IO registers are located.
-#define IO_OFFSET 0x4000U
-
-// The address at which memory begins  to depend on the mapper in use.
-#define MAPPER_OFFSET 0x4020U
-
-
 // Function types, used in memory structure to point to the proper
 // mapper function.
 typedef word_t memory_read_t(dword_t addr, void *map);

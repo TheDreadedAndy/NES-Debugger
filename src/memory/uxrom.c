@@ -30,9 +30,8 @@ bool name_table_mirror;
  * Returns a generic memory structure, which can be used
  * to interact with the uxrom structure.
  */
-memory_t *uxrom_new(FILE *rom_file, header_t *header) {
+void uxrom_new(FILE *rom_file, memory_t *M) {
   // Allocate memory structure and set up its data.
-  memory_t *M = xcalloc(1, sizeof(memory_t));
   uxrom_t *map = xcalloc(1, sizeof(uxrom_t));
   M->map = (void*) map;
   M->read = &uxrom_read;
@@ -40,16 +39,15 @@ memory_t *uxrom_new(FILE *rom_file, header_t *header) {
   M->vram_read = &uxrom_vram_read;
   M->vram_write = &uxrom_vram_write;
   M->free = &uxrom_free;
-  M->header = header;
 
   // Store the mirror bit for use with VRAM.
-  name_table_mirror = header->mirror;
+  name_table_mirror = M->header->mirror;
 
   // Set up the cart ram space.
   map->bat = xcalloc(BAT_SIZE, sizeof(word_t));
 
   // Caclulate rom size and load it into memory.
-  size_t num_banks = (size_t) (header->prg_rom_size / (1 << 14));
+  size_t num_banks = (size_t) (M->header->prg_rom_size / BANK_SIZE);
   fseek(rom_file, HEADER_SIZE, SEEK_SET);
   for (size_t i = 0; i < num_banks; i++) {
     map->cart[i] = xmalloc(BANK_SIZE * sizeof(word_t));
@@ -60,7 +58,7 @@ memory_t *uxrom_new(FILE *rom_file, header_t *header) {
   map->current_bank = 0;
   map->fixed_bank = num_banks - 1;
 
-  return M;
+  return;
 }
 
 /*

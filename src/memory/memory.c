@@ -33,10 +33,15 @@ memory_t *system_memory = NULL;
  * Assumes that the provided header is non-null and valid.
  */
 bool memory_init(FILE *rom_file, header_t *header) {
+  // Allocate the generic memory structure.
+  system_memory = xcalloc(1, sizeof(memory_t));
+  system_memory->ram = xcalloc(sizeof(word_t), RAM_SIZE);
+  system_memory->header = header;
+
   // Use the decoded header to decide which memory structure should be created.
   switch(header->mapper) {
     case UXROM_MAPPER:
-      system_memory = uxrom_new(rom_file, header);
+      uxrom_new(rom_file, system_memory);
       break;
     default:
       fprintf(stderr, "Error: Rom requires unimplemented mapper: %d\n",
@@ -125,7 +130,11 @@ void memory_vram_write(word_t val, dword_t addr) {
  * Assumes that the structure is valid.
  */
 void memory_free(void) {
+  // Free the mapper structure using its specified function.
   system_memory->free(system_memory->map);
+
+  // Free the generic structure.
   free(system_memory->header);
+  free(system_memory->ram);
   free(system_memory);
 }

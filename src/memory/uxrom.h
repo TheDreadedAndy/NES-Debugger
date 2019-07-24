@@ -37,7 +37,7 @@ typedef struct uxrom {
 /* Tools for using NES virtual memory */
 
 // Memory data structure creation function.
-memory_t *uxrom_new(FILE *rom_file, header_t *header);
+void uxrom_new(FILE *rom_file, memory_t *M);
 
 // Memory read function.
 word_t uxrom_read(dword_t addr, void *map);

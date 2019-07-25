@@ -10,6 +10,7 @@
 #include "./ppu.h"
 #include "./palette.h"
 #include "../cpu/2A03.h"
+#include "../sdl/window.h"
 
 /* Emulation constants */
 
@@ -108,7 +109,7 @@ void ppu_inc(void);
  *
  * Assumes the file is non-NULL.
  */
-void ppu_init(char *file) {
+bool ppu_init(char *file) {
   // Prepare the ppu structure.
   ppu = xcalloc(1, sizeof(ppu_t));
   ppu->primary_oam = xcalloc(PRIMARY_OAM_SIZE, sizeof(word_t));
@@ -116,12 +117,16 @@ void ppu_init(char *file) {
   ppu->sprite_memory = xcalloc(SECONDARY_OAM_SIZE, sizeof(word_t));
 
   // Load in the palette.
-  palette_init(file);
+  if (!palette_init(file)) {
+    fprintf(stderr, "Failed to initialize NES palette.\n");
+    return false;
+  }
 
   // Setup the SDL window.
-  // TODO
+  if (!window_init()) { return false; }
 
-  return;
+  // Return success.
+  return true;
 }
 
 /*
@@ -477,6 +482,9 @@ void ppu_free(void) {
 
   // Free the NES palette data.
   palette_free();
+
+  // Close the SDL window.
+  window_close();
 
   return;
 }

@@ -2,17 +2,18 @@ Here's a semi-complete list of things that still need to be changed:
   - A few files are still missing descriptions.
   - Pretty much everything needs to be more rigorously tested.
   - SDL, APU, NDB are all completely missing.
-  - PPU and VRAM are half finished.
+  - PPU is only half finished.
 
 Next up:
   - NES 2.0 parsing needs to be written.
-  - VRAM needs to be implemented so that the ppu can be tested.
   - CPU still needs a little more cleaning.
   - SDL rendering needs to be implemented.
 
 Small issues:
   - UxROM PRG-ROM offset calculation currently assumes there is not trainer.
   - UxROM has no error detection on creation.
+  - UxROM does not implement four screen nametables. Not part of the spec, but
+    needed for full homebrew compatibility.
   - Many files include needless headers.
   - Initialization error checking is abysmal. Ex. Palette can fail but the ppu
     doesnt do anything about it so the program still segfaults.

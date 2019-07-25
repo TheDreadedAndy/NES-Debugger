@@ -18,6 +18,7 @@
 #include "./header.h"
 #include "./uxrom.h"
 #include "../util/data.h"
+#include "../ppu/ppu.h"
 
 // RAM data constants.
 #define RAM_SIZE 0x800U
@@ -31,6 +32,15 @@
 
 // The address at which memory begins  to depend on the mapper in use.
 #define MAPPER_OFFSET 0x4020U
+
+// Size of NES palette data.
+#define PALETTE_SIZE 0x20U
+
+// Used to determine if (and where) the palette is being addressed.
+#define PALETTE_ACCESS_MASK 0x3F00U
+#define PALETTE_ADDR_MASK 0x001FU
+#define PALETTE_BG_ACCESS_MASK 0x0003U
+#define PALETTE_BG_MASK 0x000CU
 
 /*
  * Holds the global memory structure. Unavailable outside this file.
@@ -49,6 +59,7 @@ bool memory_init(FILE *rom_file, header_t *header) {
   // Allocate the generic memory structure.
   system_memory = xcalloc(1, sizeof(memory_t));
   system_memory->ram = xcalloc(sizeof(word_t), RAM_SIZE);
+  system_memory->palette_data = xcalloc(sizeof(word_t), PALETTE_SIZE);
   system_memory->header = header;
 
   // Use the decoded header to decide which memory structure should be created.
@@ -81,7 +92,7 @@ word_t memory_read(word_t mem_lo, word_t mem_hi) {
     return system_memory->ram[addr & RAM_MASK];
   } else if (addr < IO_OFFSET) {
     // Access PPU MMIO.
-    return 0; // TODO.
+    return ppu_read(addr);
   } else if (addr < MAPPER_OFFSET) {
     // Access APU and IO registers.
     return 0; // TODO.
@@ -106,7 +117,7 @@ void memory_write(word_t val, word_t mem_lo, word_t mem_hi) {
     system_memory->ram[addr & RAM_MASK] = val;
   } else if (addr < IO_OFFSET) {
     // Access PPU MMIO.
-    // TODO.
+    ppu_write(addr, val);
   } else if (addr < MAPPER_OFFSET) {
     // Access APU and IO registers.
     // TODO.
@@ -119,22 +130,41 @@ void memory_write(word_t val, word_t mem_lo, word_t mem_hi) {
 
 /*
  * Uses the generic memory structures vram read function to read
- * a word from vram.
+ * a word from vram. Handles palette accesses.
  *
  * Assumes memory has been initialized.
  */
 word_t memory_vram_read(dword_t addr) {
-  return system_memory->vram_read(addr, system_memory->map);
+  // Check if the palette is being accessed.
+  if ((addr & PALETTE_ACCESS_MASK) == PALETTE_ACCESS_MASK) {
+    // Convert the address into an access to the palette data array.
+    addr = (addr & PALETTE_BG_ACCESS_MASK) ? (addr & PALETTE_ADDR_MASK)
+                                           : (addr & PALETTE_BG_MASK);
+    return system_memory->palette_data[addr];
+  } else {
+    // Access the pattern table/nametable.
+    return system_memory->vram_read(addr, system_memory->map);
+  }
 }
 
 /*
  * Uses the generic memory structures vram write function to write
- * a word to vram.
+ * a word to vram. Handles palette accesses.
  *
  * Assumes memory has been initialized.
  */
 void memory_vram_write(word_t val, dword_t addr) {
-  system_memory->vram_write(val, addr, system_memory->map);
+  // Check if the palette is being accessed.
+  if ((addr & PALETTE_ACCESS_MASK) == PALETTE_ACCESS_MASK) {
+    // Convert the address into an access to the palette data array.
+    addr = (addr & PALETTE_BG_ACCESS_MASK) ? (addr & PALETTE_ADDR_MASK)
+                                           : (addr & PALETTE_BG_MASK);
+    system_memory->palette_data[addr] = val;
+  } else {
+    // Access the pattern table/nametable.
+    system_memory->vram_write(val, addr, system_memory->map);
+  }
+
   return;
 }
 
@@ -149,5 +179,6 @@ void memory_free(void) {
   // Free the generic structure.
   free(system_memory->header);
   free(system_memory->ram);
+  free(system_memory->palette_data);
   free(system_memory);
 }

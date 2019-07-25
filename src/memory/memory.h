@@ -6,6 +6,15 @@
 #ifndef _NES_MEM
 #define _NES_MEM
 
+// Memory addressing constants.
+#define MEMORY_STACK_HIGH 0x10U
+#define MEMORY_IRQ_LOW 0xFEU
+#define MEMORY_IRQ_HIGH 0xFFU
+#define MEMORY_RESET_LOW 0xFCU
+#define MEMORY_RESET_HIGH 0xFFU
+#define MEMORY_NMI_LOW 0xFAU
+#define MEMORY_NMI_HIGH 0xFFU
+
 // Function types, used in memory structure to point to the proper
 // mapper function.
 typedef word_t memory_read_t(dword_t addr, void *map);
@@ -16,8 +25,10 @@ typedef void memory_free_t(void *map);
 // Includes a pointer to a specific memory implementation and
 // the function necessary to interact with said implementation.
 typedef struct memory {
-  // NES system RAM. Mappers do not change this or any MMIO.
+  // NES system RAM and VRAM palette data.
+  // Mappers do not change this or any MMIO.
   word_t *ram;
+  word_t *palette_data;
 
   // Mapper information.
   void *map;
@@ -48,14 +59,5 @@ void memory_vram_write(word_t val, dword_t addr);
 
 // Generic memory free function.
 void memory_free(void);
-
-// Memory addressing constants.
-#define MEMORY_STACK_HIGH 0x10U
-#define MEMORY_IRQ_LOW 0xFEU
-#define MEMORY_IRQ_HIGH 0xFFU
-#define MEMORY_RESET_LOW 0xFCU
-#define MEMORY_RESET_HIGH 0xFFU
-#define MEMORY_NMI_LOW 0xFAU
-#define MEMORY_NMI_HIGH 0xFFU
 
 #endif

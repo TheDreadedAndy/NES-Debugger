@@ -30,6 +30,11 @@
 #define PATTERN_TABLE_SIZE ((size_t)(1 << 13))
 #define NAMETABLE_SIZE ((size_t)(1 << 10))
 #define MAX_SCREENS 4U
+#define NAMETABLE_ACCESS_BIT 0x2000U
+#define NAMETABLE_SELECT_MASK 0x0C00U
+#define NAMETABLE_ADDR_MASK 0x03FFU
+#define PATTERN_TABLE_MASK 0x1FFFU
+
 
 // Nes virtual memory data structure for uxrom (mapper 2).
 typedef struct uxrom {
@@ -44,7 +49,6 @@ typedef struct uxrom {
   word_t *pattern_table;
   bool is_chr_ram;
   word_t *nametable[MAX_SCREENS];
-  word_t *palette_ram;
 } uxrom_t;
 
 /* Helper functions */
@@ -198,21 +202,47 @@ void uxrom_write(word_t val, dword_t addr, void *map) {
 }
 
 /*
- * TODO
+ * Reads a word from the remappable section of VRAM.
+ *
+ * Assumes the mapper pointer is non-null and points
+ * to a valid UxROM mapper.
  */
 word_t uxrom_vram_read(dword_t addr, void *map) {
-  (void) addr;
-  (void) map;
-  return 0;
+  // Cast back from the generic structure.
+  uxrom_t *M = (uxrom_t*) map;
+
+  // Determine which part of VRAM is being accessed.
+  if (addr & NAMETABLE_ACCESS_BIT) {
+    // Name table is being accessed.
+    word_t table = (addr & NAMETABLE_SELECT_MASK) >> 10;
+    return M->nametable[table][addr & NAMETABLE_ADDR_MASK];
+  } else {
+    // Pattern table is being accessed.
+    return M->pattern_table[addr & PATTERN_TABLE_MASK];
+  }
 }
 
 /*
- * TODO
+ * Writes a word to the remappable section of VRAM.
+ * Does nothing if the program attempts to write to CHR-ROM.
+ *
+ * Assumes the mapper pointer is non-null and points
+ * to a valid UxROM mapper.
  */
 void uxrom_vram_write(word_t val, dword_t addr, void *map) {
-  (void) val;
-  (void) addr;
-  (void) map;
+  // Cast back from the generic structure.
+  uxrom_t *M = (uxrom_t*) map;
+
+  // Determine which part of VRAM is being accessed.
+  if (addr & NAMETABLE_ACCESS_BIT) {
+    // Name table is being accessed.
+    word_t table = (addr & NAMETABLE_SELECT_MASK) >> 10;
+    M->nametable[table][addr & NAMETABLE_ADDR_MASK] = val;
+  } else if (M->is_chr_ram) {
+    // Pattern table is being accessed.
+    M->pattern_table[addr & PATTERN_TABLE_MASK] = val;
+  }
+
   return;
 }
 

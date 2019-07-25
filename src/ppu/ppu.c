@@ -186,6 +186,7 @@ void ppu_render_blank(void) {
   if (current_scanline == 241 && current_cycle == 1) {
     // TODO: Implement special case timing.
     ppu->status |= FLAG_VBLANK;
+    window_draw_frame();
   }
   return;
 }

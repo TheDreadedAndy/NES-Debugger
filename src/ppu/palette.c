@@ -41,11 +41,13 @@ bool palette_init(char *file) {
   // Open the palette file and verify it is in the proper format.
   FILE *pal_file = fopen(file, "r");
   if (palette_invalid(pal_file)) {
+    fprintf(stderr, "Invalid palette file.\n");
     fclose(pal_file);
     return false;
   }
 
   // Load the palette file into the decoded palette array.
+  fseek(pal_file, 0, SEEK_SET);
   decoded_palette = xcalloc(PALETTE_SIZE, sizeof(uint32_t));
   uint32_t red, green, blue;
   for (size_t i = 0; i < PALETTE_SIZE; i++) {

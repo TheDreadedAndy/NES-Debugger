@@ -6,6 +6,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <SDL2/SDL.h>
+#include "../util/data.h"
 #include "./window.h"
 #include "./render.h"
 #include "../util/contracts.h"

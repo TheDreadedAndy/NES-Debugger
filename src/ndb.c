@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <getopt.h>
+#include "./sdl/window.h"
 #include "./util/util.h"
 #include "./cpu/2A03.h"
 #include "./cpu/regs.h"
@@ -61,6 +62,7 @@ int main(int argc, char *argv[]) {
   }
 
   // Prepares the NES emulation for execution.
+  window_init();
   start_emulation(rom_file, pal_file);
 
   printf("Starting emulation...\n");
@@ -77,6 +79,7 @@ int main(int argc, char *argv[]) {
   // Clean up any allocated memory.
   cpu_free();
   ppu_free();
+  window_close();
 
   return 0;
 }

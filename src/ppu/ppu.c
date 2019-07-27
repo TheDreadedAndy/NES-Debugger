@@ -122,10 +122,6 @@ bool ppu_init(char *file) {
     return false;
   }
 
-  // TODO: Remove this
-  // Setup the SDL window.
-  if (!window_init()) { return false; }
-
   // Return success.
   return true;
 }
@@ -484,9 +480,6 @@ void ppu_free(void) {
 
   // Free the NES palette data.
   palette_free();
-
-  // Close the SDL window.
-  window_close();
 
   return;
 }

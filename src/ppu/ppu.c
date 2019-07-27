@@ -10,7 +10,7 @@
 #include "./ppu.h"
 #include "./palette.h"
 #include "../cpu/2A03.h"
-#include "../sdl/window.h"
+#include "../sdl/render.h"
 
 /* Emulation constants */
 
@@ -122,6 +122,7 @@ bool ppu_init(char *file) {
     return false;
   }
 
+  // TODO: Remove this
   // Setup the SDL window.
   if (!window_init()) { return false; }
 
@@ -186,7 +187,7 @@ void ppu_render_blank(void) {
   if (current_scanline == 241 && current_cycle == 1) {
     // TODO: Implement special case timing.
     ppu->status |= FLAG_VBLANK;
-    window_draw_frame();
+    render_frame();
   }
   return;
 }

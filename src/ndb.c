@@ -9,6 +9,7 @@
 #include <getopt.h>
 #include <time.h>
 #include "./ndb.h"
+#include "./emulation/emutime.h"
 #include "./sdl/window.h"
 #include "./sdl/render.h"
 #include "./util/util.h"
@@ -18,9 +19,10 @@
 #include "./memory/header.h"
 #include "./ppu/ppu.h"
 
-// The number of clocks per frame of emulation.
-// Used to throttle the emulation.
-#define FRAME_LENGTH (CLOCKS_PER_SEC / 60)
+// The number of 6502 cycles that will be emulated per emulation cycle.
+// Setting a low number will greatly decrease emulation speed.
+// Setting a high number will cause timing issues.
+#define EMU_CYCLE_SIZE 3000
 
 // Global running variable. Available to other files through ndb.h.
 // Setting this value to false closes the program.
@@ -29,6 +31,7 @@ bool ndb_running = true;
 /* Helper functions */
 void start_emulation(char *rom, char *pal);
 clock_t get_delay(clock_t last_time);
+void run_emulation_cycle(void);
 
 /*
  * Loads in the users arguments and starts ndb.
@@ -74,27 +77,46 @@ int main(int argc, char *argv[]) {
   start_emulation(rom_file, pal_file);
 
   // Init the timing variables.
-  clock_t sdl_wait = clock();
-  clock_t emu_wait = sdl_wait;
+  emutime_t current_time;
+  emutime_t sdl_wait;
+  emutime_t emu_wait;
+  emutime_t fps_wait;
+  emutime_get(&sdl_wait);
+  emutime_get(&emu_wait);
+  emutime_get(&fps_wait);
+  time_t last_fps_display = time(NULL);
+  double frames_drawn = 0;
 
   // Main emulation loop.
   printf("Starting emulation...\n");
   while (ndb_running) {
+    // Get the clock time for this loop.
+    emutime_get(&current_time);
+
     // Process any events on the SDL event queue.
-    if (clock() > sdl_wait) {
+    if (emutime_gt(&current_time, &sdl_wait)) {
       window_process_events();
-      sdl_wait = get_delay(sdl_wait);
+      emutime_update(&current_time, &sdl_wait, FRAME_LENGTH);
+    }
+
+    // Update the frame rate display.
+    if (emutime_gt(&current_time, &fps_wait)) {
+      time_t now = time(NULL);
+      window_display_fps(frames_drawn / difftime(now, last_fps_display));
+      last_fps_display = now;
+      frames_drawn = 0;
+      emutime_update(&current_time, &fps_wait, NSECS_PER_SEC);
     }
 
     // Update the timing for the emulation.
-    if (render_has_drawn()) { emu_wait = get_delay(emu_wait); }
+    if (render_has_drawn()) {
+      emutime_update(&current_time, &emu_wait, FRAME_LENGTH);
+      frames_drawn++;
+    }
 
     // Executes the next cycle and prints the results.
-    if (clock() > emu_wait) {
-      ppu_run_cycle();
-      ppu_run_cycle();
-      ppu_run_cycle();
-      cpu_run_cycle();
+    if (emutime_gt(&current_time, &emu_wait)) {
+      run_emulation_cycle();
       if (verbose) { regfile_print(0); }
     }
   }
@@ -132,17 +154,16 @@ void start_emulation(char *rom, char *pal) {
 }
 
 /*
- * Determines the next clock time an action should be performed using the time
- * at which it was started and the current time, assuming the action should run
- * 60 times a second.
+ * Runs a predetermined number of emulation cycles.
  *
- * The returned value is the time at which the action should again be performed.
+ * Assumes the emulation has been initialized.
  */
-clock_t get_delay(clock_t last_time) {
-  // Check if its been longer then a frame since the last delay.
-  clock_t current_time = clock();
-  if (FRAME_LENGTH < (current_time - last_time)) { return current_time; }
-
-  // Otherwise, set a delay to help the emulator run at 60FPS.
-  return last_time + FRAME_LENGTH;
+void run_emulation_cycle(void) {
+  for (size_t i = 0; i < EMU_CYCLE_SIZE; i++) {
+    ppu_run_cycle();
+    ppu_run_cycle();
+    ppu_run_cycle();
+    cpu_run_cycle();
+  }
+  return;
 }

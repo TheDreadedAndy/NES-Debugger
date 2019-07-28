@@ -15,6 +15,9 @@ bool window_init(void);
 // Processes all relevent events on the SDL event queue.
 void window_process_events(void);
 
+// Displays the given FPS in the main window title.
+void window_display_fps(double fps);
+
 // Closes the SDL window.
 void window_close(void);
 

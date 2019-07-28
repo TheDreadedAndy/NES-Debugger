@@ -25,6 +25,7 @@
 // Window size constants
 #define NES_WIDTH 256
 #define NES_HEIGHT 240
+#define MAX_TITLE_SIZE 256
 
 // The name displayed in the SDL window.
 const char *window_name = "NES, I guess?";
@@ -82,20 +83,18 @@ bool window_init(void) {
  */
 void window_process_events(void) {
   // Loop over all events on the SDL event queue.
-  SDL_Event *event = xmalloc(sizeof(SDL_Event));
-  while (SDL_PollEvent(event)) {
+  SDL_Event event;
+  while (SDL_PollEvent(&event)) {
     // Determine the event type and call its handling function.
-    switch (event->type) {
+    switch (event.type) {
       case SDL_WINDOWEVENT:
-        window_process_window_event(event);
+        window_process_window_event(&event);
         break;
       default:
         break;
     }
   }
 
-  // Clean up and return.
-  free(event);
   return;
 }
 
@@ -116,6 +115,18 @@ void window_process_window_event(SDL_Event *event) {
       break;
   }
 
+  return;
+}
+
+/*
+ * Displays the current fps of the emulation in the window title.
+ *
+ * Assumes that SDL has been initialized.
+ */
+void window_display_fps(double fps) {
+  char buf[MAX_TITLE_SIZE];
+  sprintf(buf, "%s | FPS: %.1f", window_name, fps);
+  SDL_SetWindowTitle(window, buf);
   return;
 }
 

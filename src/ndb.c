@@ -7,7 +7,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <getopt.h>
+#include <time.h>
+#include "./ndb.h"
 #include "./sdl/window.h"
+#include "./sdl/render.h"
 #include "./util/util.h"
 #include "./cpu/2A03.h"
 #include "./cpu/regs.h"
@@ -15,8 +18,17 @@
 #include "./memory/header.h"
 #include "./ppu/ppu.h"
 
+// The number of clocks per frame of emulation.
+// Used to throttle the emulation.
+#define FRAME_LENGTH (CLOCKS_PER_SEC / 60)
+
+// Global running variable. Available to other files through ndb.h.
+// Setting this value to false closes the program.
+bool ndb_running = true;
+
 /* Helper functions */
 void start_emulation(char *rom, char *pal);
+clock_t get_delay(clock_t last_time);
 
 /*
  * Loads in the users arguments and starts ndb.
@@ -28,19 +40,15 @@ int main(int argc, char *argv[]) {
   extern int optind, opterr, optopt;
 
   // Parses the users command line input.
-  size_t iterations = 0;
   char *rom_file = NULL;
   char *pal_file = NULL;
   signed char opt;
   bool verbose = false;
 
-  while ((opt = getopt(argc, argv, "hvi:f:p:")) != -1) {
+  while ((opt = getopt(argc, argv, "hvf:p:")) != -1) {
     switch (opt) {
       case 'v':
         verbose = true;
-        break;
-      case 'i':
-        iterations = atoi(optarg);
         break;
       case 'f':
         rom_file = optarg;
@@ -49,7 +57,7 @@ int main(int argc, char *argv[]) {
         pal_file = optarg;
         break;
       default:
-        printf("usage: ndb -i <NUM> -f <FILE>\n");
+        printf("usage: ndb -f <FILE>\n");
         exit(0);
         break;
     }
@@ -57,7 +65,7 @@ int main(int argc, char *argv[]) {
 
   // Ensures that the user specified an NES file.
   if (rom_file == NULL || pal_file == NULL) {
-    printf("usage: ndb -i <NUM> -f <ROM FILE> -p <PALETTE FILE>\n");
+    printf("usage: ndb -f <ROM FILE> -p <PALETTE FILE>\n");
     exit(0);
   }
 
@@ -65,14 +73,30 @@ int main(int argc, char *argv[]) {
   window_init();
   start_emulation(rom_file, pal_file);
 
+  // Init the timing variables.
+  clock_t sdl_wait = clock();
+  clock_t emu_wait = sdl_wait;
+
+  // Main emulation loop.
   printf("Starting emulation...\n");
-  for (size_t i = 0; i < iterations; i++) {
+  while (ndb_running) {
+    // Process any events on the SDL event queue.
+    if (clock() > sdl_wait) {
+      window_process_events();
+      sdl_wait = get_delay(sdl_wait);
+    }
+
+    // Update the timing for the emulation.
+    if (render_has_drawn()) { emu_wait = get_delay(emu_wait); }
+
     // Executes the next cycle and prints the results.
-    ppu_run_cycle();
-    ppu_run_cycle();
-    ppu_run_cycle();
-    cpu_run_cycle();
-    if (verbose) { regfile_print(i); }
+    if (clock() > emu_wait) {
+      ppu_run_cycle();
+      ppu_run_cycle();
+      ppu_run_cycle();
+      cpu_run_cycle();
+      if (verbose) { regfile_print(0); }
+    }
   }
   printf("Done!\n");
 
@@ -105,4 +129,20 @@ void start_emulation(char *rom, char *pal) {
   // Clean up and exit.
   fclose(rom_file);
   return;
+}
+
+/*
+ * Determines the next clock time an action should be performed using the time
+ * at which it was started and the current time, assuming the action should run
+ * 60 times a second.
+ *
+ * The returned value is the time at which the action should again be performed.
+ */
+clock_t get_delay(clock_t last_time) {
+  // Check if its been longer then a frame since the last delay.
+  clock_t current_time = clock();
+  if (FRAME_LENGTH < (current_time - last_time)) { return current_time; }
+
+  // Otherwise, set a delay to help the emulator run at 60FPS.
+  return last_time + FRAME_LENGTH;
 }

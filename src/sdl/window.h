@@ -12,6 +12,9 @@ extern SDL_Surface *render;
 // Creates the SDL window.
 bool window_init(void);
 
+// Processes all relevent events on the SDL event queue.
+void window_process_events(void);
+
 // Closes the SDL window.
 void window_close(void);
 

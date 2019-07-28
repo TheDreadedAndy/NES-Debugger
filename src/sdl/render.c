@@ -13,10 +13,23 @@
 #include "../ppu/palette.h"
 
 /*
+ * Set whenever the ppu draws a frame (which happens at vblank).
+ * Reset whenever render_has_drawn() is called.
+ * Used to track the frame rate of the emulator and, thus, throttle it.
+ */
+bool frame_output = false;
+
+/*
  * Draws a pixel to the render surface.
  *
  * Assumes the render surface has been initialized.
  * Assumes the row and column are in range of the surface size.
+ *
+ * TODO: Consider using only a basic array access with the surface.
+ *       If locking is messing with threads, it may slow things down.
+ *
+ *       It seems that you need only lock RLE accelerated surfaces.
+ *       Locking may not be needed at all.
  */
 void render_pixel(size_t row, size_t col, word_t pixel) {
   CONTRACT(row < render->h);
@@ -48,9 +61,23 @@ void render_frame(void) {
   SDL_Surface *window_surface = SDL_GetWindowSurface(window);
 
   // Copy the render surface to the window surface.
-  SDL_BlitSurface(render, NULL, window_surface, NULL);
+  SDL_BlitScaled(render, NULL, window_surface, NULL);
 
   // Update the window.
   SDL_UpdateWindowSurface(window);
+
+  // Signal that a frame was drawn.
+  frame_output = true;
+
   return;
+}
+
+/*
+ * Returns the current value of frame_output, sets frame_output to false.
+ * Used to track frame timing in the emulation.
+ */
+bool render_has_drawn(void) {
+  bool frame = frame_output;
+  frame_output = false;
+  return frame;
 }

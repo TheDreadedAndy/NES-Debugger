@@ -17,6 +17,7 @@
 #include <stdint.h>
 #include <SDL2/SDL.h>
 #include "./window.h"
+#include "./input.h"
 #include "../util/contracts.h"
 #include "../util/util.h"
 #include "../ppu/palette.h"
@@ -89,6 +90,12 @@ void window_process_events(void) {
     switch (event.type) {
       case SDL_WINDOWEVENT:
         window_process_window_event(&event);
+        break;
+      case SDL_KEYDOWN:
+        input_press(event.key.keysym.sym);
+        break;
+      case SDL_KEYUP:
+        input_release(event.key.keysym.sym);
         break;
       default:
         break;

@@ -77,10 +77,7 @@ int main(int argc, char *argv[]) {
   start_emulation(rom_file, pal_file);
 
   // Init the timing variables.
-  emutime_t current_time;
-  emutime_t sdl_wait;
-  emutime_t emu_wait;
-  emutime_t fps_wait;
+  emutime_t current_time, sdl_wait, emu_wait, fps_wait;
   emutime_get(&sdl_wait);
   emutime_get(&emu_wait);
   emutime_get(&fps_wait);

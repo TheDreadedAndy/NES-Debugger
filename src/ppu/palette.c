@@ -65,13 +65,9 @@ bool palette_init(char *file) {
 /*
  * Checks if the given file is in the 8-bit rgb palette format
  * for NES colors (exactly 192 bytes long).
- *
- * Assumes the file pointer is at the begining of the file.
  */
 bool palette_invalid(FILE *pal_file) {
-  size_t size = 0;
-  while (fgetc(pal_file) != EOF) { size++; }
-  return size != PALETTE_FILE_SIZE;
+  return get_file_size(pal_file) != PALETTE_FILE_SIZE;
 }
 
 /*

@@ -12,6 +12,7 @@
 #include "./emulation/emutime.h"
 #include "./sdl/window.h"
 #include "./sdl/render.h"
+#include "./sdl/input.h"
 #include "./util/util.h"
 #include "./cpu/2A03.h"
 #include "./cpu/regs.h"
@@ -74,6 +75,7 @@ int main(int argc, char *argv[]) {
 
   // Prepares the NES emulation for execution.
   window_init();
+  input_load(NULL);
   start_emulation(rom_file, pal_file);
 
   // Init the timing variables.

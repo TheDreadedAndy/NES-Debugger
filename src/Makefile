@@ -6,6 +6,18 @@ CC = gcc
 LIBS = $(shell sdl2-config --libs)
 override CFLAGS += -Wall -Wshadow -Wextra -Werror -std=c99 -pedantic -O3 $(shell sdl2-config --cflags)
 
+# Determine which OS is being compiled for.
+ifeq ($(OS),Windows_NT)
+    override CFLAGS += -D_NES_OSWIN
+else
+    UNAME := $(shell uname -s)
+    ifeq ($(UNAME),Linux)
+        override CFLAGS += -D_NES_OSLIN
+    else
+        $(error Fatal: Cannot determine target OS.)
+    endif
+endif
+
 # Sets the default command to ndb
 default: ndb
 

@@ -31,7 +31,6 @@ uint32_t *decoded_palette = NULL;
 /* Helper Functions */
 bool palette_invalid(FILE *pal_file);
 
-
 /*
  * Initializes the palette using the given file.
  *
@@ -39,7 +38,7 @@ bool palette_invalid(FILE *pal_file);
  */
 bool palette_init(char *file) {
   // Open the palette file and verify it is in the proper format.
-  FILE *pal_file = fopen(file, "r");
+  FILE *pal_file = fopen(file, "rb");
   if (palette_invalid(pal_file)) {
     fprintf(stderr, "Invalid palette file.\n");
     fclose(pal_file);

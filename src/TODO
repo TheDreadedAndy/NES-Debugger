@@ -6,7 +6,6 @@ Here's a semi-complete list of things that still need to be changed:
   - SDL is only partially implemented.
 
 Next up:
-  - System calls should be wrapped to make compilation OS independent (linux/windows).
   - NES 2.0 parsing needs to be written.
   - CPU still needs a little more cleaning.
   - PPU rendering needs to be implemented.

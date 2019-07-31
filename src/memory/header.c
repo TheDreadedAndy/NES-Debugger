@@ -76,9 +76,7 @@ header_t *decode_header(FILE *rom_file) {
   for (size_t i = 0; i < HEADER_SIZE; i++) { file_header[i] = fgetc(rom_file); }
 
   // Calculate the size of the rom file.
-  size_t rom_size = 0;
-  fseek(rom_file, 0, SEEK_SET);
-  while (fgetc(rom_file) != EOF) { rom_size++; }
+  size_t rom_size = get_file_size(rom_file);
 
   // Verify that the header is correct.
   if (strncmp(file_header, ines_preface, PREFACE_SIZE)) {

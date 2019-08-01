@@ -20,7 +20,11 @@ void emutime_diff(emutime_t *time1, emutime_t *time2, emutime_t *res);
  * Gets the current time and stores it in a time spec structure.
  */
 void emutime_get(emutime_t *time) {
+#ifdef _NES_OSLIN
+  clock_gettime(CLOCK_MONOTONIC_RAW, time);
+#else
   clock_gettime(CLOCK_MONOTONIC, time);
+#endif
   return;
 }
 

@@ -29,6 +29,43 @@
 // Flag masks for the PPU control register.
 #define FLAG_ENABLE_VBLANK 0x80U
 #define FLAG_SPRITE_SIZE 0x20U
+#define FLAG_VRAM_VINC 0x04U
+
+/*
+ * The lower three bits of an mmio access to the ppu determine which register
+ * is used.
+ */
+#define PPU_CTRL_ACCESS 0
+#define PPU_MASK_ACCESS 1
+#define PPU_STATUS_ACCESS 2
+#define OAM_ADDR_ACCESS 3
+#define OAM_DATA_ACCESS 4
+#define PPU_SCROLL_ACCESS 5
+#define PPU_ADDR_ACCESS 6
+#define PPU_DATA_ACCESS 7
+
+/*
+ * Accesses to PPU scroll adjust the PPU address in non-standard ways.
+ * These constants determine how to update the scroll value.
+ */
+#define SCROLL_X_MASK 0x001FU
+#define SCROLL_Y_MASK 0x73E0U
+#define SCROLL_NT_MASK 0x0C00U
+#define FINE_Y_SHIFT 12
+#define FINE_X_MASK 0x0007U
+#define COARSE_Y_SHIFT 2
+#define COARSE_X_SHIFT 3
+#define COARSE_Y_MASK 0x03E0U
+#define COARSE_X_MASK 0x001FU
+
+/*
+ * The vram address of the ppu can be incremented based on the X and Y
+ * scroll values. These constants facilitate that.
+ */
+#define COARSE_X_CARRY_MASK 0x0020U
+#define Y_INC_OVERFLOW 0x03A0U
+#define TOGGLE_HNT_SHIFT 4
+#define TOGGLE_VNT_MASK 0x0800U
 
 /*
  * Sprite evaluation may perform several different actions independent of the
@@ -71,6 +108,10 @@ typedef struct ppu {
   word_t eval_buf;
   eval_t eval_state;
   word_t soam_addr;
+
+  // MDR and write toggle, used for 2-cycle r/w system.
+  word_t mdr;
+  bool mdr_write;
 } ppu_t;
 
 /*
@@ -170,6 +211,47 @@ void ppu_render(void) {
  * TODO
  */
 void ppu_render_visible(void) {
+  return;
+}
+
+/*
+ * Performs a coarse X increment on the vram address. Accounts for the
+ * nametable bits.
+ *
+ * Assumes the PPU has been initialized.
+ */
+void ppu_scroll_xinc(void) {
+  // Increment the coarse X.
+  dword_t xinc = (ppu->vram_addr & COARSE_X_MASK) + 1;
+
+  // When coarse X overflows, bit 10 (horizontal nametable select) is flipped.
+  ppu->vram_addr = ((ppu->vram_addr & ~COARSE_X_MASK)
+                 | (xinc & COARSE_X_MASK))
+                 ^ ((xinc & COARSE_X_CARRY_MASK) << TOGGLE_HNT_SHIFT);
+  return;
+}
+
+/*
+ * Performs a Y increment on the vram address. Accounts for both coarse Y,
+ * fine Y, and the nametable bits.
+ *
+ * Assumes the PPU has been initialized.
+ */
+void ppu_scroll_yinc(void) {
+  // Increment fine Y.
+  ppu->vram_addr = (ppu->vram_addr & VRAM_ADDR_MASK) + FINE_Y_INC;
+
+  // Add overflow to coarse Y.
+  ppu->vram_addr = (ppu->vram_addr & ~COARSE_Y_MASK)
+                 | ((ppu->vram_addr + ((ppu->vram_addr & FINE_Y_CARRY_MASK)
+                 >> FINE_Y_CARRY_SHIFT)) & COARSE_Y_MASK);
+
+  // The vertical name table bit should be toggled if coarse Y was incremented
+  // to 30.
+  if ((ppu->vram_addr & SCROLL_Y_MASK) == Y_INC_OVERFLOW) {
+    ppu->vram_addr ^= TOGGLE_VNT_MASK;
+  }
+
   return;
 }
 
@@ -386,9 +468,8 @@ void ppu_eval_fetch_sprites(void) {
   // Sprite evaluation and rendering alternate access to sprite data every 4
   // cycles between 257 and 320.
   if (((current_cycle - 1) & 0x04) == 0) {
-    assert(ppu->soam_addr < SECONDARY_OAM_SIZE);
-    ppu->sprite_memory[ppu->soam_addr] =
-                              ppu->secondary_oam[ppu->soam_addr];
+    CONTRACT(ppu->soam_addr < SECONDARY_OAM_SIZE);
+    ppu->sprite_memory[ppu->soam_addr] = ppu->secondary_oam[ppu->soam_addr];
     ppu->soam_addr++;
   }
 
@@ -403,8 +484,7 @@ void ppu_eval_fetch_sprites(void) {
 void ppu_signal(void) {
   // NMIs should be generated when they are enabled in ppuctrl and
   // the ppu is in vblank.
-  nmi_line = (ppu->ctrl & FLAG_ENABLE_VBLANK)
-               && (ppu->status & FLAG_VBLANK);
+  nmi_line = (ppu->ctrl & FLAG_ENABLE_VBLANK) && (ppu->status & FLAG_VBLANK);
   return;
 }
 
@@ -439,8 +519,115 @@ void ppu_inc(void) {
  * Assumes the ppu has been initialized.
  */
 void ppu_write(dword_t reg_addr, word_t val) {
-  (void)reg_addr;
-  (void)val;
+  // Fill the PPU bus with the value being written.
+  ppu->bus = val;
+
+  // Determine which register is being accessed.
+  reg_addr = reg_addr & PPU_MMIO_MASK;
+  switch(reg_addr) {
+    case PPU_CTRL_ACCESS:
+      ppu->ctrl = val;
+      // Update the scrolling nametable selection.
+      ppu->temp_vram_addr = (ppu->temp_vram_addr & ~SCROLL_NT_MASK)
+               | (((dword_t) (ppu->ctrl & CTRL_NT_MASK)) << SCROLL_NT_SHIFT);
+      break;
+    case PPU_MASK_ACCESS:
+      ppu->mask = val;
+      break;
+    case PPU_STATUS_ACCESS:
+      // Read only.
+      break;
+    case OAM_ADDR_ACCESS:
+      // TODO: OAM Corruption on write.
+      ppu->oam_addr = val;
+      break;
+    case OAM_DATA_ACCESS:
+      ppu->primary_oam[ppu->oam_addr] = val;
+      // TODO: OAM write increments should be wrong during rendering.
+      ppu->oam_addr++;
+      break;
+    case PPU_SCROLL_ACCESS:
+      ppu_mmio_scroll_write(val);
+      break;
+    case PPU_ADDR_ACCESS:
+      ppu_mmio_addr_write(val);
+      break;
+    case PPU_DATA_ACCESS:
+      memory_vram_write(ppu->vram_addr, val);
+      ppu_mmio_vram_addr_inc();
+      break;
+  }
+
+  return;
+}
+
+/*
+ * Writes the the PPU scroll register. Toggles the write bit.
+ *
+ * Assumes the PPU has been initialized.
+ */
+void ppu_mmio_scroll_write(word_t val) {
+  // Determine which write should be done.
+  if (ppu->write_toggle) {
+    // Update scroll X.
+    ppu->fine_x = val & FINE_X_MASK;
+    ppu->temp_vram_addr = (ppu->temp_vram_addr & SCROLL_Y_MASK)
+                        | (ppu->temp_vram_addr & SCROLL_NT_MASK)
+                        | (val >> COARSE_X_SHIFT);
+  } else {
+    // Update scroll Y.
+    ppu->temp_vram_addr = (ppu->temp_vram_addr & SCROLL_X_MASK)
+             | (ppu->temp_vram_addr & SCROLL_NT_MASK)
+             | ((((dword_t) val) << COARSE_Y_SHIFT) & COARSE_Y_MASK)
+             | (((dword_t) val) << FINE_Y_SHIFT);
+  }
+
+  // Toggle the write bit.
+  ppu->write_toggle = !(ppu->write_toggle);
+  return;
+}
+
+/*
+ * Writes to the PPU addr register. Toggles the write bit.
+ *
+ * Assumes the PPU has been initialized.
+ */
+void ppu_mmio_addr_write(word_t val) {
+  // Determine which write should be done.
+  if (ppu->write_toggle) {
+    // Write the low byte and update v.
+    ppu->temp_vram_addr = (ppu->temp_vram_addr & PPU_ADDR_HIGH_MASK) | val;
+    ppu->vram_addr = ppu->temp_vram_addr;
+  } else {
+    // Write the high byte.
+    ppu->temp_vram_addr = (ppu->temp_vram_addr & PPU_ADDR_LOW_MASK)
+        | ((((dword_t) val) << PPU_ADDR_HIGH_SHIFT) & PPU_ADDR_HIGH_MASK);
+  }
+
+  // Toggle the write bit.
+  ppu->write_toggle = !(ppu->write_toggle);
+
+  return;
+}
+
+/*
+ * Increments the vram address after a PPU data access, implementing the
+ * buggy behavior expected during rendering.
+ *
+ * Assumes the PPU has been initialized.
+ */
+void ppu_mmio_vram_addr_inc(void) {
+  // Determine how the increment should work.
+  if (current_scanline >= 240 && current_scanline <= 260) {
+    ppu->vram_addr += (ppu->ctrl & FLAG_VRAM_VINC) ? 32 : 1;
+  } else if (!(((current_cycle > 0 && current_cycle <= 256)
+         || current_cycle > 320) && (current_cycle % 8) == 0)) {
+    // Writing to PPU data during rendering causes a X and Y increment.
+    // This only happens when the PPU would not otherwise be incrementing them.
+    ppu_scroll_yinc();
+    ppu_scroll_xinc();
+  }
+
   return;
 }
 

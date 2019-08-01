@@ -7,10 +7,12 @@
 #include <assert.h>
 #include "../util/data.h"
 #include "../util/util.h"
+#include "../util/contracts.h"
 #include "./ppu.h"
 #include "./palette.h"
 #include "../cpu/2A03.h"
 #include "../sdl/render.h"
+#include "../memory/memory.h"
 
 /* Emulation constants */
 
@@ -21,6 +23,9 @@
 // The number of planes in a sprite or tile.
 #define BIT_PLANES 2U
 
+// Mask for determining which register a mmio access is trying to use.
+#define PPU_MMIO_MASK 0x0007U
+
 // Flags masks for the PPU status register.
 #define FLAG_VBLANK 0x80U
 #define FLAG_HIT 0x40U
@@ -30,6 +35,7 @@
 #define FLAG_ENABLE_VBLANK 0x80U
 #define FLAG_SPRITE_SIZE 0x20U
 #define FLAG_VRAM_VINC 0x04U
+#define FLAG_NAMETABLE 0x03U
 
 /*
  * The lower three bits of an mmio access to the ppu determine which register
@@ -44,6 +50,12 @@
 #define PPU_ADDR_ACCESS 6
 #define PPU_DATA_ACCESS 7
 
+// Masks for accessing the vram address register.
+#define PPU_ADDR_HIGH_MASK 0x3F00U
+#define PPU_ADDR_HIGH_SHIFT 8
+#define PPU_ADDR_LOW_MASK 0x00FFU
+#define VRAM_ADDR_MASK 0x3FFFU
+
 /*
  * Accesses to PPU scroll adjust the PPU address in non-standard ways.
  * These constants determine how to update the scroll value.
@@ -51,6 +63,7 @@
 #define SCROLL_X_MASK 0x001FU
 #define SCROLL_Y_MASK 0x73E0U
 #define SCROLL_NT_MASK 0x0C00U
+#define SCROLL_NT_SHIFT 10
 #define FINE_Y_SHIFT 12
 #define FINE_X_MASK 0x0007U
 #define COARSE_Y_SHIFT 2
@@ -62,6 +75,9 @@
  * The vram address of the ppu can be incremented based on the X and Y
  * scroll values. These constants facilitate that.
  */
+#define FINE_Y_INC 0x1000U
+#define FINE_Y_CARRY_MASK 0x8000U
+#define FINE_Y_CARRY_SHIFT 10
 #define COARSE_X_CARRY_MASK 0x0020U
 #define Y_INC_OVERFLOW 0x03A0U
 #define TOGGLE_HNT_SHIFT 4
@@ -143,6 +159,9 @@ bool ppu_eval_in_range(void);
 void ppu_eval_fetch_sprites(void);
 void ppu_signal(void);
 void ppu_inc(void);
+void ppu_mmio_scroll_write(word_t val);
+void ppu_mmio_addr_write(word_t val);
+void ppu_mmio_vram_addr_inc(void);
 
 /*
  * Initializes the PPU and palette, using the given file, then creates an
@@ -529,7 +548,7 @@ void ppu_write(dword_t reg_addr, word_t val) {
       ppu->ctrl = val;
       // Update the scrolling nametable selection.
       ppu->temp_vram_addr = (ppu->temp_vram_addr & ~SCROLL_NT_MASK)
-               | (((dword_t) (ppu->ctrl & CTRL_NT_MASK)) << SCROLL_NT_SHIFT);
+               | (((dword_t) (ppu->ctrl & FLAG_NAMETABLE)) << SCROLL_NT_SHIFT);
       break;
     case PPU_MASK_ACCESS:
       ppu->mask = val;

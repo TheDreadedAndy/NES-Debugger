@@ -261,7 +261,7 @@ void data_sei(void) {
 void data_cmp_mdr_a(void) {
   // The carry flag is unsigned overflow. We use a double word to hold
   // the extra bit.
-  dword_t res = (dword_t) R->A + (dword_t) (-R->mdr);
+  dword_t res = ((dword_t) R->A) + ((dword_t) (-R->mdr));
   R->P = (R->P & 0x7C) | (res & 0x80) | (res >> 8) | ((res == 0) << 1);
   return;
 }
@@ -271,7 +271,7 @@ void data_cmp_mdr_a(void) {
  * of the result.
  */
 void data_cmp_mdr_x(void) {
-  dword_t res = (dword_t) R->X + (dword_t) (-R->mdr);
+  dword_t res = ((dword_t) R->X) + ((dword_t) (-R->mdr));
   R->P = (R->P & 0x7C) | (res & 0x80) | (res >> 8) | ((res == 0) << 1);
   return;
 }
@@ -281,7 +281,7 @@ void data_cmp_mdr_x(void) {
  * of the result.
  */
 void data_cmp_mdr_y(void) {
-  dword_t res = (dword_t) R->Y + (dword_t) (-R->mdr);
+  dword_t res = ((dword_t) R->Y) + ((dword_t) (-R->mdr));
   R->P = (R->P & 0x7C) | (res & 0x80) | (res >> 8) | ((res == 0) << 1);
   return;
 }
@@ -406,7 +406,8 @@ void data_ora_mdr_a(void) {
  * Sets the N, V, Z, and C flags.
  */
 void data_adc_mdr_a(void) {
-  dword_t res = (dword_t) R->A + (dword_t) R->mdr + (dword_t) (R->P & 0x01);
+  dword_t res = ((dword_t) R->A) + ((dword_t) R->mdr)
+                                 + ((dword_t) (R->P & 0x01));
   word_t ovf = ((R->A & 0x80) == (R->mdr & 0x80))
             && ((R->A & 0x80) != (res & 0x80));
   R->A = (word_t) res;
@@ -422,7 +423,8 @@ void data_adc_mdr_a(void) {
 void data_sbc_mdr_a(void) {
   // See documentation for proof of this line. Gives the correct result
   // without issues in the carry out.
-  dword_t res = (dword_t) R->A + (dword_t) (~R->mdr) + (dword_t) (R->P & 0x01);
+  dword_t res = ((dword_t) R->A) + ((dword_t) (~R->mdr))
+                                 + ((dword_t) (R->P & 0x01));
   word_t ovf = ((R->A & 0x80) == (R->mdr & 0x80))
             && ((R->A & 0x80) != (res & 0x80));
   R->A = (word_t) res;
@@ -432,7 +434,7 @@ void data_sbc_mdr_a(void) {
 }
 
 /*
- * Moves the two high bits of A to the state register (N and V).
+ * Moves the two high bits of the MDR to the state register (N and V).
  * Sets the zero flag according to A AND MDR.
  */
 void data_bit_mdr_a(void) {
@@ -445,7 +447,7 @@ void data_bit_mdr_a(void) {
  * abstraction register.
  */
 void data_add_addrl_x(void) {
-  dword_t res = (dword_t) R->addr_lo + (dword_t) R->X;
+  dword_t res = ((dword_t) R->addr_lo) + ((dword_t) R->X);
   R->addr_lo = (word_t) res;
   R->carry = res >> 8;
   return;
@@ -456,7 +458,7 @@ void data_add_addrl_x(void) {
  * abstraction register.
  */
 void data_add_addrl_y(void) {
-  dword_t res = (dword_t) R->addr_lo + (dword_t) R->X;
+  dword_t res = ((dword_t) R->addr_lo) + ((dword_t) R->Y);
   R->addr_lo = (word_t) res;
   R->carry = res >> 8;
   return;
@@ -521,7 +523,7 @@ void data_branch(void) {
 
   // Add the reletive address to pc_lo. Reletive addressing is signed,
   // so we need to sign extend the mdr before we add it to pc_lo.
-  dword_t res = (dword_t) R->pc_lo + (dword_t) (int16_t) (int8_t) R->mdr;
+  dword_t res = ((dword_t) R->pc_lo) + ((dword_t) (int16_t) (int8_t) R->mdr);
   R->carry = (word_t)(res >> 8);
 
   // Execute the proper cycles according to the above results.

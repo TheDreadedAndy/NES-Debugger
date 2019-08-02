@@ -186,6 +186,7 @@ void cpu_execute_dma(void) {
     dma_mdr = memory_read(dma_low, dma_high);
   }
   dma_cycles_remaining--;
+  dma_low++;
 
   return;
 }

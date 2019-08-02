@@ -19,6 +19,7 @@
 // Object Attribute Memory size.
 #define PRIMARY_OAM_SIZE 256U
 #define SECONDARY_OAM_SIZE 32U
+#define SPRITE_DATA_SIZE 16U
 
 // The number of planes in a sprite or tile.
 #define BIT_PLANES 2U
@@ -66,7 +67,9 @@
  */
 #define SCROLL_X_MASK 0x001FU
 #define SCROLL_Y_MASK 0x73E0U
-#define SCROLL_NT_MASK 0x0C00U
+#define SCROLL_VNT_MASK 0x0800U
+#define SCROLL_HNT_MASK 0x0400U
+#define SCROLL_NT_MASK (SCROLL_VNT_MASK | SCROLL_HNT_MASK)
 #define SCROLL_NT_SHIFT 10
 #define FINE_Y_SHIFT 12
 #define FINE_X_MASK 0x0007U
@@ -85,7 +88,6 @@
 #define COARSE_X_CARRY_MASK 0x0020U
 #define Y_INC_OVERFLOW 0x03A0U
 #define TOGGLE_HNT_SHIFT 4
-#define TOGGLE_VNT_MASK 0x0800U
 
 /*
  * Sprite evaluation may perform several different actions independent of the
@@ -96,7 +98,7 @@ typedef enum eval_state {
 } eval_t;
 
 /*
- * TODO: Document better.
+ * Contains the registers and memory internal to the PPU.
  */
 typedef struct ppu {
   // Internal ppu registers.
@@ -118,6 +120,7 @@ typedef struct ppu {
   word_t *primary_oam;
   word_t *secondary_oam;
   word_t *sprite_memory;
+  word_t sprite_data[BIT_PLANES][SPRITE_DATA_SIZE];
 
   // Temporary storage used in rendering.
   word_t next_tile[BIT_PLANES];
@@ -153,8 +156,14 @@ ppu_t *ppu = NULL;
 /* Helper functions */
 void ppu_render(void);
 void ppu_render_visible(void);
+void ppu_render_pixels(bool output);
+void ppu_render_update_hori(void);
+void ppu_render_prepare_sprites(void);
+void ppu_render_prepare_bg(void);
+void ppu_render_dummy_nametable(void);
 void ppu_render_blank(void);
 void ppu_render_pre(void);
+void ppu_render_update_vert(void);
 void ppu_eval(void);
 void ppu_eval_clear_soam(void);
 void ppu_eval_sprites(void);
@@ -232,9 +241,97 @@ void ppu_render(void) {
 }
 
 /*
- * TODO
+ * Performs the current cycles action for a rendering scanline.
+ *
+ * Assumes the PPU has been initialized.
  */
 void ppu_render_visible(void) {
+  /*
+   * Determine which phase of rendering the scanline is in.
+   * The first cycle may finish a read, when coming from a pre-render
+   * line on an odd frame.
+   */
+  if (current_cycle == 0 && ppu->mdr_write) {
+    // Finish the garbage nametable write that got skipped.
+    ppu_render_dummy_nametable();
+  } else if (current_cycle > 0 && current_cycle <= 256) {
+    ppu_render_pixels(true);
+  } else if (current_cycle > 256 && current_cycle <= 320) {
+    // Fetch next sprite tile data.
+    ppu_render_prepare_sprites();
+  } else if (current_cycle > 320 && current_cycle <= 336) {
+    // Fetch bg tile data.
+    ppu_render_prepare_bg();
+  } else if (current_cycle > 336 && current_cycle <= 340) {
+    // Unused NT byte fetches, mappers may clock this.
+    ppu_render_dummy_nametable();
+  }
+
+  return;
+}
+
+/*
+ * TODO
+ */
+void ppu_render_pixels(bool output) {
+  return;
+}
+
+/*
+ * Updates the horizontal piece of the vram address.
+ *
+ * Assumes the PPU has been initialized.
+ */
+void ppu_render_update_hori(void) {
+  // Copies the coarse X and horizontal nametable bit from t to v.
+  ppu->vram_addr = (ppu->vram_addr & (SCROLL_Y_MASK | SCROLL_VNT_MASK))
+                 | (ppu->temp_vram_addr & (SCROLL_X_MASK | SCROLL_HNT_MASK));
+  return;
+}
+
+/*
+ * Fetches the tile data for the sprites on the next scanline.
+ *
+ * Assumes the PPU has been initialized.
+ */
+void ppu_render_prepare_sprites(void) {
+  // The OAM address is reset to zero to prepare for sprite evaluation
+  // on the next scanline.
+  ppu->oam_addr = 0;
+
+  // Determine if rendering has control of memory accesses,
+  // or if evaluation is using it; since they share during these cycles.
+  if ((current_cycle - 1) & 0x04) {
+    // TODO: Need a way to determine how many sprites are on the scanline.
+    // Once I have this, pattern data can be safely copied.
+  }
+
+  return;
+}
+
+/*
+ * TODO
+ */
+void ppu_render_prepare_bg(void) {
+  return;
+}
+
+/*
+ * Executes 2 dummy nametable fetches over 4 cycles.
+ *
+ * Assumes the PPU has been initialized.
+ */
+void ppu_render_dummy_nametable(void) {
+  // Determine which cycle of the fetch we are on.
+  if (ppu->mdr_write) {
+    // Second cycle, thrown away internally.
+    ppu->mdr_write = false;
+  } else {
+    // First cycle, reads from vram.
+    ppu->mdr = memory_vram_read(ppu->vram_addr);
+    ppu->mdr_write = true;
+  }
+
   return;
 }
 
@@ -244,7 +341,7 @@ void ppu_render_visible(void) {
  *
  * Assumes the PPU has been initialized.
  */
-void ppu_scroll_xinc(void) {
+void ppu_render_xinc(void) {
   // Increment the coarse X.
   dword_t xinc = (ppu->vram_addr & COARSE_X_MASK) + 1;
 
@@ -261,7 +358,7 @@ void ppu_scroll_xinc(void) {
  *
  * Assumes the PPU has been initialized.
  */
-void ppu_scroll_yinc(void) {
+void ppu_render_yinc(void) {
   // Increment fine Y.
   ppu->vram_addr = (ppu->vram_addr & VRAM_ADDR_MASK) + FINE_Y_INC;
 
@@ -273,7 +370,7 @@ void ppu_scroll_yinc(void) {
   // The vertical name table bit should be toggled if coarse Y was incremented
   // to 30.
   if ((ppu->vram_addr & SCROLL_Y_MASK) == Y_INC_OVERFLOW) {
-    ppu->vram_addr ^= TOGGLE_VNT_MASK;
+    ppu->vram_addr ^= SCROLL_VNT_MASK;
   }
 
   return;
@@ -295,9 +392,46 @@ void ppu_render_blank(void) {
 }
 
 /*
- * TODO
+ * Execute the pre-render scanline acording to the current cycle.
+ * Resets to the status flags are performed here.
+ *
+ * Assumes the PPU has been initialized.
  */
 void ppu_render_pre(void) {
+  // Determine which phase of rendering the scanline is in.
+  if (current_cycle > 0 && current_cycle <= 256) {
+    // Accesses are made, but nothing is rendered.
+    ppu_render_pixels(false);
+
+    // The status flags are reset at the begining of the pre-render scanline.
+    ppu->status = 0;
+  } else if (current_cycle >= 280 && current_cycle <= 304) {
+    // Update the vertical part of the vram address register.
+    ppu_render_update_vert();
+  } else if (current_cycle > 320 && current_cycle <= 336) {
+    // Fetch bg tile data.
+    ppu_render_prepare_bg();
+  } else if (current_cycle > 336 && current_cycle <= 340) {
+    // Unused NT byte fetches, mappers may clock this.
+    ppu_render_dummy_nametable();
+  }
+
+  // The OAM addr is reset here to prepare for sprite evaluation on the next
+  // scanline.
+  if (current_cycle > 256 && current_cycle <= 320 { ppu->oam_addr = 0; }
+
+  return;
+}
+
+/*
+ * Updates the vertical piece of the vram address.
+ *
+ * Assumes the PPU has been initialized.
+ */
+void ppu_render_update_vert(void) {
+  // Copies the fine Y, coarse Y, and vertical nametable bit from t to v.
+  ppu->vram_addr = (ppu->vram_addr & (SCROLL_X_MASK | SCROLL_HNT_MASK))
+                 | (ppu->temp_vram_addr & (SCROLL_Y_MASK | SCROLL_VNT_MASK));
   return;
 }
 
@@ -312,15 +446,7 @@ void ppu_eval(void) {
   ppu->oam_mask = 0x00;
 
   // Sprite evaluation occurs only on visible scanlines.
-  if (current_scanline >= 240) {
-    // OAM addr is reset between 257 and 320 on the pre-render scanline.
-    if (current_scanline >= 261 && current_cycle >= 257
-                                && current_cycle <= 320) {
-      // TODO
-      ppu->oam_addr = 0;
-    }
-    return;
-  }
+  if (current_scanline >= 240) { return; }
 
   // Runs the sprite evaluation action for the given cycle.
   if (1 <= current_cycle && current_cycle <= 64) {
@@ -328,8 +454,6 @@ void ppu_eval(void) {
   } else if (65 <= current_cycle && current_cycle <= 256) {
     ppu_eval_sprites();
   } else if (257 <= current_cycle && current_cycle <= 320) {
-    // TODO
-    ppu->oam_addr = 0;
     ppu_eval_fetch_sprites();
   }
 
@@ -647,8 +771,8 @@ void ppu_mmio_vram_addr_inc(void) {
          || current_cycle > 320) && (current_cycle % 8) == 0)) {
     // Writing to PPU data during rendering causes a X and Y increment.
     // This only happens when the PPU would not otherwise be incrementing them.
-    ppu_scroll_yinc();
-    ppu_scroll_xinc();
+    ppu_render_yinc();
+    ppu_render_xinc();
   }
 
   return;

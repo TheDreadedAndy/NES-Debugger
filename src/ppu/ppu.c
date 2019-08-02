@@ -274,6 +274,7 @@ void ppu_render_visible(void) {
  * TODO
  */
 void ppu_render_pixels(bool output) {
+  (void)output;
   return;
 }
 
@@ -418,7 +419,7 @@ void ppu_render_pre(void) {
 
   // The OAM addr is reset here to prepare for sprite evaluation on the next
   // scanline.
-  if (current_cycle > 256 && current_cycle <= 320 { ppu->oam_addr = 0; }
+  if (current_cycle > 256 && current_cycle <= 320) { ppu->oam_addr = 0; }
 
   return;
 }

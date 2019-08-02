@@ -4,7 +4,7 @@ HEADERS = $(wildcard */*.h)
 OBJECTS = $(filter-out $(MAINS),$(patsubst %.c,%.o,$(wildcard */*.c)))
 CC = gcc
 LIBS = $(shell sdl2-config --libs)
-override CFLAGS += -Wall -Wshadow -Wextra -Werror -std=c99 -pedantic -O3 $(shell sdl2-config --cflags)
+override CFLAGS += -Wall -Wshadow -Wextra -Werror -std=c99 -pedantic -ggdb $(shell sdl2-config --cflags)
 
 # Determine which OS is being compiled for.
 ifeq ($(OS),Windows_NT)

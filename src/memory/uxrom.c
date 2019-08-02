@@ -21,7 +21,9 @@
 #define MAX_BANKS 16U
 #define BANK_SIZE ((size_t)(1 << 14))
 #define BANK_OFFSET 0x8000U
-#define BANK_MASK 0x0f
+#define UOROM_BANK_MASK 0x0FU
+#define UNROM_BANK_MASK 0x07U
+#define MAX_UNROM_BANKS 8
 #define FIXED_BANK_OFFSET 0xC000U
 #define BAT_SIZE 0x2000U
 #define BAT_OFFSET 0x6000U
@@ -44,6 +46,7 @@ typedef struct uxrom {
   word_t current_bank;
   // Should always be the final used bank.
   word_t fixed_bank;
+  word_t bank_mask;
 
   // PPU memory.
   word_t *pattern_table;
@@ -116,8 +119,12 @@ void uxrom_load_prg(FILE *rom_file, memory_t *M) {
       map->cart[i][j] = fgetc(rom_file);
     }
   }
+
+  // Setup the default banks and max banks.
   map->current_bank = 0;
   map->fixed_bank = num_banks - 1;
+  map->bank_mask = (num_banks > MAX_UNROM_BANKS)
+                 ? UOROM_BANK_MASK : UNROM_BANK_MASK;
 
   return;
 }
@@ -195,7 +202,7 @@ void uxrom_write(word_t val, dword_t addr, void *map) {
     M->bat[addr - BAT_OFFSET] = val;
   } else {
     // Writing to the cart area uses the low bits to select a bank.
-    M->current_bank = val & BANK_MASK;
+    M->current_bank = val & M->bank_mask;
   }
 
   return;

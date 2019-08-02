@@ -31,6 +31,9 @@
 #define FLAG_HIT 0x40U
 #define FLAG_OVERFLOW 0x20U
 
+// PPU status is a 3 bit register.
+#define PPU_STATUS_MASK 0xE0U
+
 // Flag masks for the PPU control register.
 #define FLAG_ENABLE_VBLANK 0x80U
 #define FLAG_SPRITE_SIZE 0x20U
@@ -55,6 +58,7 @@
 #define PPU_ADDR_HIGH_SHIFT 8
 #define PPU_ADDR_LOW_MASK 0x00FFU
 #define VRAM_ADDR_MASK 0x3FFFU
+#define PPU_PALETTE_OFFSET 0x3F00U
 
 /*
  * Accesses to PPU scroll adjust the PPU address in non-standard ways.
@@ -103,6 +107,7 @@ typedef struct ppu {
 
   // Memory mapped ppu registers.
   word_t bus;
+  word_t vram_bus;
   word_t ctrl;
   word_t mask;
   word_t status;
@@ -542,8 +547,7 @@ void ppu_write(dword_t reg_addr, word_t val) {
   ppu->bus = val;
 
   // Determine which register is being accessed.
-  reg_addr = reg_addr & PPU_MMIO_MASK;
-  switch(reg_addr) {
+  switch(reg_addr & PPU_MMIO_MASK) {
     case PPU_CTRL_ACCESS:
       ppu->ctrl = val;
       // Update the scrolling nametable selection.
@@ -657,8 +661,41 @@ void ppu_mmio_vram_addr_inc(void) {
  * Assumes the ppu has been initialized.
  */
 word_t ppu_read(dword_t reg_addr) {
-  (void)reg_addr;
-  return 0;
+  // Determine which register is being read from.
+  switch(reg_addr & PPU_MMIO_MASK) {
+    case PPU_STATUS_ACCESS:
+      // PPU status contains only 3 bits (high 3).
+      ppu->bus = (ppu->bus & ~PPU_STATUS_MASK)
+               | (ppu->status & PPU_STATUS_MASK);
+      // Reads to PPU status reset the write toggle and clear the vblank flag.
+      ppu->status &= ~FLAG_VBLANK;
+      ppu->write_toggle = false;
+      break;
+    case OAM_DATA_ACCESS:
+      ppu->bus = ppu->primary_oam[ppu->oam_addr];
+      break;
+    case PPU_DATA_ACCESS:
+      // Reading from mappable VRAM (not the palette) returns the value to an
+      // internal bus.
+      if (reg_addr < PPU_PALETTE_OFFSET) {
+        ppu->bus = ppu->vram_bus;
+        ppu->vram_bus = memory_vram_read(reg_addr);
+      } else {
+        ppu->bus = memory_vram_read(reg_addr);
+      }
+      break;
+    case PPU_CTRL_ACCESS:
+    case PPU_MASK_ACCESS:
+    case OAM_ADDR_ACCESS:
+    case PPU_SCROLL_ACCESS:
+    case PPU_ADDR_ACCESS:
+    default:
+      // Reading from a write only register simply yields the value on the bus.
+      break;
+  }
+
+  // The requested value should now be on the bus, so we return.
+  return ppu->bus;
 }
 
 /*

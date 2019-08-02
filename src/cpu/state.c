@@ -31,9 +31,9 @@
 // System state is managed by a fixed size queue of micro instructions
 typedef struct state_header {
   micro_t *queue;
-  int front;
-  int back;
-  int size;
+  size_t front;
+  size_t back;
+  size_t size;
 } state_t;
 
 /*
@@ -98,7 +98,7 @@ void state_add_cycle(micromem_t *mem, microdata_t *data, bool inc_pc) {
 
   // Add the microop to the queue.
   system_state->size++;
-  CONTRACT(system_state->size <= STATE_MAX_OPS && system_state->size >= 0);
+  CONTRACT(system_state->size <= STATE_MAX_OPS);
   system_state->back = (system_state->back + 1) % STATE_MAX_OPS;
 
   return;
@@ -115,7 +115,7 @@ void state_push_cycle(micromem_t *mem, microdata_t *data, bool inc_pc) {
 
   // Add the microop to the queue.
   system_state->size++;
-  CONTRACT(system_state->size <= STATE_MAX_OPS && system_state->size >= 0);
+  CONTRACT(system_state->size <= STATE_MAX_OPS);
   system_state->front = (system_state->front - 1) % STATE_MAX_OPS;
 
   // Fill the new microop with the given data.
@@ -175,7 +175,7 @@ micro_t *state_last_cycle(void) {
  */
 int state_get_size(void) {
   CONTRACT(system_state != NULL);
-  CONTRACT(system_state->size >= 0 && system_state->size <= STATE_MAX_OPS);
+  CONTRACT(system_state->size <= STATE_MAX_OPS);
   return system_state->size;
 }
 

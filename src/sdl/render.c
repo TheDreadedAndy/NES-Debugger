@@ -32,8 +32,8 @@ bool frame_output = false;
  *       Locking may not be needed at all.
  */
 void render_pixel(size_t row, size_t col, word_t pixel) {
-  CONTRACT(row < render->h);
-  CONTRACT(col < render->w);
+  CONTRACT(row < (size_t) render->h);
+  CONTRACT(col < (size_t) render->w);
 
   // Lock the surface so we can safely edit pixel data.
   SDL_LockSurface(render);

@@ -116,7 +116,7 @@ int main(int argc, char *argv[]) {
     // Executes the next cycle and prints the results.
     if (emutime_gt(&current_time, &emu_wait)) {
       run_emulation_cycle();
-      if (verbose) { regfile_print(0); }
+      if (verbose) { regfile_print(-1); }
     }
   }
   printf("Done!\n");

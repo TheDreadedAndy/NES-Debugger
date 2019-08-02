@@ -25,6 +25,8 @@
  * on each cycle of each instruction. The largest number of cycles an
  * instruction can take should be 8, but I put 16 to give some breathing
  * room.
+ *
+ * WARNING: Memory corruption will occur if this is not a power of 2!
  */
 #define STATE_MAX_OPS 16
 

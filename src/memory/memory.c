@@ -19,6 +19,7 @@
 #include "./uxrom.h"
 #include "../util/data.h"
 #include "../ppu/ppu.h"
+#include "../cpu/2A03.h"
 
 // RAM data constants.
 #define RAM_SIZE 0x800U
@@ -120,7 +121,8 @@ void memory_write(word_t val, word_t mem_lo, word_t mem_hi) {
     ppu_write(addr, val);
   } else if (addr < MAPPER_OFFSET) {
     // Access APU and IO registers.
-    // TODO.
+    // FIXME: This sucks. Doesnt fill the ppu latch, either.
+    if (addr == 0x4014U) { cpu_start_dma(val); }
   } else {
     system_memory->write(val, addr, system_memory->map);
   }

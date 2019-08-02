@@ -28,6 +28,10 @@
 #include "./state.h"
 #include "./micromem.h"
 #include "./microdata.h"
+#include "../ppu/ppu.h"
+
+// DMA transfers take at least 513 cycles.
+#define DMA_CYCLE_LENGTH 513
 
 /* Global Variables */
 
@@ -43,10 +47,16 @@ bool irq_level = false;
 // this flag acknowledges these cases.
 bool irq_ready = false;
 
+// Used for DMA transfer to OAM. The transfer adds a cycle on odd frames.
+bool cycle_even = false;
+size_t dma_cycles_remaining = 0;
+word_t dma_high = 0;
+
 /* Helper functions. */
 void cpu_run_mem(micro_t *micro);
 void cpu_run_data(micro_t *micro);
-bool cpu_can_poll();
+bool cpu_can_poll(void);
+void cpu_execute_dma(void);
 void cpu_decode_inst(word_t inst);
 void cpu_decode_izpx(microdata_t *micro_op);
 void cpu_decode_zp(microdata_t *micro_op);
@@ -98,7 +108,13 @@ void cpu_init(FILE *rom_file, header_t *header) {
  *
  * Assumes the cpu has been initialized.
  */
-void cpu_run_cycle() {
+void cpu_run_cycle(void) {
+  // Check if the CPU is suspended and executing a DMA.
+  if (dma_cycles_remaining > 0) {
+    cpu_execute_dma();
+    cycle_even = !cycle_even;
+  }
+
   // Poll the interrupt detectors, if it is time to do so.
   if (cpu_can_poll()) {
     // irq_ready should only be reset from a fetch call handling it
@@ -116,6 +132,9 @@ void cpu_run_cycle() {
   cpu_poll_nmi_line();
   cpu_poll_irq_line();
 
+  // Toggle the frame evenness.
+  cycle_even = !cycle_even;
+
   return;
 }
 
@@ -124,10 +143,51 @@ void cpu_run_cycle() {
  *
  * Assumes that the provided structures are valid.
  */
-bool cpu_can_poll() {
+bool cpu_can_poll(void) {
   // Interrupt polling (internal) happens when the cpu is about
   // to finish an instruction and said instruction is not an interrupt.
   return state_get_size() == 2 && R->inst != INST_BRK;
+}
+
+/*
+ * Starts an OAM DMA transfer at the given address.
+ *
+ * Assumes that the CPU has been initialized.
+ */
+void cpu_start_dma(word_t addr) {
+  // Starts the dma transfer by setting the high CPU memory byte and reseting
+  // the cycle counter.
+  dma_high = addr;
+  dma_cycles_remaining = DMA_CYCLE_LENGTH;
+
+  // If the CPU is on an odd cycle, the DMA takes one cycle longer.
+  if (!cycle_even) { dma_cycles_remaining++; }
+
+  return;
+}
+
+/*
+ * Executes a cycle of the DMA transfer.
+ *
+ * Assumes the CPU has been initialized.
+ */
+void cpu_execute_dma(void) {
+  // Current cpu memory address to read from (low byte, incremented every call
+  // wraps back to zero at the end of every call).
+  static word_t dma_low = 0;
+  static word_t dma_mdr = 0;
+
+  // The CPU is idle until there are <= 512 dma cycles remaining.
+  if ((dma_cycles_remaining < DMA_CYCLE_LENGTH) && (dma_cycles_remaining & 1)) {
+    // Odd cycle, so we write to OAM.
+    ppu_oam_dma(dma_mdr);
+  } else if (dma_cycles_remaining < DMA_CYCLE_LENGTH) {
+    // Even cycle, so we read from memory.
+    dma_mdr = memory_read(dma_low, dma_high);
+  }
+  dma_cycles_remaining--;
+
+  return;
 }
 
 /*

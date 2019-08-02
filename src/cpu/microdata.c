@@ -26,6 +26,7 @@
  */
 
 #include <stdlib.h>
+#include <stdio.h>
 #include "../util/data.h"
 #include "./2A03.h"
 #include "./regs.h"

@@ -113,6 +113,7 @@ void cpu_run_cycle(void) {
   if (dma_cycles_remaining > 0) {
     cpu_execute_dma();
     cycle_even = !cycle_even;
+    return;
   }
 
   // Poll the interrupt detectors, if it is time to do so.
@@ -635,7 +636,7 @@ void cpu_decode_inst(word_t inst) {
       state_add_cycle(&mem_nop, &data_branch, PC_NOP);
       break;
     case INST_BRK:
-      state_add_cycle(&mem_read_pc_nodest, &data_nop, PC_NOP);
+      state_add_cycle(&mem_read_pc_nodest, &data_nop, PC_INC);
       state_add_cycle(&mem_push_pch, &data_dec_s, PC_NOP);
       state_add_cycle(&mem_push_pcl, &data_dec_s, PC_NOP);
       state_add_cycle(&mem_brk, &data_dec_s, PC_NOP);
@@ -797,8 +798,8 @@ void cpu_decode_izp_y(microdata_t *micro_op) {
  */
 void cpu_decode_zpx(microdata_t *micro_op) {
   state_add_cycle(&mem_read_pc_zp_addr, &data_nop, PC_INC);
-  state_add_cycle(&mem_read_pc_mdr, &data_add_addrl_x, PC_NOP);
-  state_add_cycle(&mem_read_pc_mdr, &data_nop, PC_NOP);
+  state_add_cycle(&mem_read_addr_mdr, &data_add_addrl_x, PC_NOP);
+  state_add_cycle(&mem_read_addr_mdr, &data_nop, PC_NOP);
   state_add_cycle(&mem_fetch, micro_op, PC_INC);
   return;
 }
@@ -808,8 +809,8 @@ void cpu_decode_zpx(microdata_t *micro_op) {
  */
 void cpu_decode_zpy(microdata_t *micro_op) {
   state_add_cycle(&mem_read_pc_zp_addr, &data_nop, PC_INC);
-  state_add_cycle(&mem_read_pc_mdr, &data_add_addrl_y, PC_NOP);
-  state_add_cycle(&mem_read_pc_mdr, &data_nop, PC_NOP);
+  state_add_cycle(&mem_read_addr_mdr, &data_add_addrl_y, PC_NOP);
+  state_add_cycle(&mem_read_addr_mdr, &data_nop, PC_NOP);
   state_add_cycle(&mem_fetch, micro_op, PC_INC);
   return;
 }

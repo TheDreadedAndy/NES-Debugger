@@ -10,6 +10,7 @@
  */
 
 #include <stdlib.h>
+#include <stdio.h>
 #include "./micromem.h"
 #include "./microdata.h"
 #include "./2A03.h"
@@ -239,6 +240,7 @@ void mem_brk(void) {
     state_add_cycle(&mem_nmi_pch, &data_nop, PC_NOP);
     state_add_cycle(&mem_fetch, &data_nop, PC_INC);
   } else {
+    irq_ready = false;
     state_add_cycle(&mem_irq_pcl, &data_sei, PC_NOP);
     state_add_cycle(&mem_irq_pch, &data_nop, PC_NOP);
     state_add_cycle(&mem_fetch, &data_nop, PC_INC);

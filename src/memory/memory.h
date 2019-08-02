@@ -7,7 +7,7 @@
 #define _NES_MEM
 
 // Memory addressing constants.
-#define MEMORY_STACK_HIGH 0x10U
+#define MEMORY_STACK_HIGH 0x01U
 #define MEMORY_IRQ_LOW 0xFEU
 #define MEMORY_IRQ_HIGH 0xFFU
 #define MEMORY_RESET_LOW 0xFCU

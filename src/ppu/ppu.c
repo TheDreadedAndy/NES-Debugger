@@ -701,7 +701,7 @@ void ppu_write(dword_t reg_addr, word_t val) {
       ppu_mmio_addr_write(val);
       break;
     case PPU_DATA_ACCESS:
-      memory_vram_write(ppu->vram_addr, val);
+      memory_vram_write(val, ppu->vram_addr);
       ppu_mmio_vram_addr_inc();
       break;
   }

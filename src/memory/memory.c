@@ -43,6 +43,9 @@
 #define PALETTE_BG_ACCESS_MASK 0x0003U
 #define PALETTE_BG_MASK 0x000CU
 
+// VRAM can only address 14 bits.
+#define VRAM_ADDR_MASK 0x3FFFU
+
 /*
  * Holds the global memory structure. Unavailable outside this file.
  * Manages mappers, RAM, MMIO, and VRAM
@@ -137,6 +140,9 @@ void memory_write(word_t val, word_t mem_lo, word_t mem_hi) {
  * Assumes memory has been initialized.
  */
 word_t memory_vram_read(dword_t addr) {
+  // Mask out any extra bits.
+  addr &= VRAM_ADDR_MASK;
+
   // Check if the palette is being accessed.
   if ((addr & PALETTE_ACCESS_MASK) == PALETTE_ACCESS_MASK) {
     // Convert the address into an access to the palette data array.
@@ -156,6 +162,9 @@ word_t memory_vram_read(dword_t addr) {
  * Assumes memory has been initialized.
  */
 void memory_vram_write(word_t val, dword_t addr) {
+  // Mask out any extra bits.
+  addr &= VRAM_ADDR_MASK;
+
   // Check if the palette is being accessed.
   if ((addr & PALETTE_ACCESS_MASK) == PALETTE_ACCESS_MASK) {
     // Convert the address into an access to the palette data array.

@@ -236,6 +236,8 @@ void mem_brk(void) {
 
   // Allows an nmi to hijack the brk instruction.
   if (nmi_edge) {
+    nmi_edge = false;
+    irq_ready = false;
     state_add_cycle(&mem_nmi_pcl, &data_sei, PC_NOP);
     state_add_cycle(&mem_nmi_pch, &data_nop, PC_NOP);
     state_add_cycle(&mem_fetch, &data_nop, PC_INC);
@@ -258,6 +260,7 @@ void mem_irq(void) {
 
   // Allows an nmi to hijack an irq interrupt.
   if (nmi_edge) {
+    nmi_edge = false;
     state_add_cycle(&mem_nmi_pcl, &data_sei, PC_NOP);
     state_add_cycle(&mem_nmi_pch, &data_nop, PC_NOP);
     state_add_cycle(&mem_fetch, &data_nop, PC_INC);

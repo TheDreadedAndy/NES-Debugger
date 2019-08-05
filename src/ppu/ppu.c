@@ -27,7 +27,7 @@
 // Mask for determining which register a mmio access is trying to use.
 #define PPU_MMIO_MASK 0x0007U
 
-// Flags masks for the PPU status register.
+// Flag masks for the PPU status register.
 #define FLAG_VBLANK 0x80U
 #define FLAG_HIT 0x40U
 #define FLAG_OVERFLOW 0x20U
@@ -35,17 +35,35 @@
 // PPU status is a 3 bit register.
 #define PPU_STATUS_MASK 0xE0U
 
+// Flag masks for the PPU mask register.
+#define FLAG_FOCUS_BLUE 0x80U
+#define FLAG_FOCUS_GREEN 0x40U
+#define FLAG_FOCUS_RED 0x20U
+#define FLAG_RENDER_SPRITES 0x10U
+#define FLAG_RENDER_BG 0x08U
+#define FLAG_LEFT_SPRITES 0x04U
+#define FLAG_LEFT_BG 0x02U
+#define FLAG_GREYSCALE 0x01U
+
 // Flag masks for the PPU control register.
 #define FLAG_ENABLE_VBLANK 0x80U
 #define FLAG_SPRITE_SIZE 0x20U
+#define FLAG_BG_TABLE 0x10U
+#define FLAG_SPRITE_TABLE 0x08U
 #define FLAG_VRAM_VINC 0x04U
 #define FLAG_NAMETABLE 0x03U
 
 // Flag masks for sprite attribute data (in OEM).
 #define FLAG_SPRITE_VFLIP 0x80U
 #define FLAG_SPRITE_HFLIP 0x40U
+#define FLAG_SPRITE_PRIORITY 0x20U
+#define FLAG_SPRITE_PALETTE 0x03U
 
-// Used to form the pattern table address, for a sprite, from sprite memory.
+// Used to form a pattern table address for a tile byte.
+#define PATTERN_TABLE_LOW 0x0000U
+#define PATTERN_TABLE_HIGH 0x1000U
+
+// Used to form a pattern table address, for a sprite, from sprite memory.
 #define X16_INDEX_OFFSET 0x10U
 #define X16_PLANE_SHIFT 3
 #define X16_TILE_MASK 0xFEU
@@ -55,6 +73,24 @@
 #define X8_PLANE_SHIFT 3
 #define X8_TILE_SHIFT 4
 #define X8_TABLE_SHIFT 7
+
+/*
+ * Used, during rendering, to determine which piece of the tile should be
+ * loaded on a given cycle.
+ */
+#define REG_UPDATE_MASK 0x07U
+#define REG_FETCH_NT 1
+#define REG_FETCH_AT 3
+#define REG_FETCH_TILE_LOW 5
+#define REG_FETCH_TILE_HIGH 7
+
+// Used to calculate the attribute table address.
+#define ATTRIBUTE_BASE_ADDR 0x23C0U
+
+// Constants used during the rendering of pixels.
+#define PALETTE_BASE_ADDR 0x3F00U
+#define SPRITE_PALETTE_BASE 0x10U
+#define GREYSCALE_PIXEL_MASK 0x30U
 
 /*
  * The lower three bits of an mmio access to the ppu determine which register
@@ -75,6 +111,8 @@
 #define PPU_ADDR_LOW_MASK 0x00FFU
 #define VRAM_ADDR_MASK 0x3FFFU
 #define PPU_PALETTE_OFFSET 0x3F00U
+#define PPU_NT_OFFSET 0x2000U
+#define VRAM_NT_ADDR_MASK 0x0FFFU
 
 /*
  * Accesses to PPU scroll adjust the PPU address in non-standard ways.
@@ -86,6 +124,7 @@
 #define SCROLL_HNT_MASK 0x0400U
 #define SCROLL_NT_MASK (SCROLL_VNT_MASK | SCROLL_HNT_MASK)
 #define SCROLL_NT_SHIFT 10
+#define FINE_Y_MASK 0x7000U
 #define FINE_Y_SHIFT 12
 #define FINE_X_MASK 0x0007U
 #define COARSE_Y_SHIFT 2
@@ -102,7 +141,7 @@
 #define FINE_Y_CARRY_SHIFT 10
 #define COARSE_X_CARRY_MASK 0x0020U
 #define Y_INC_OVERFLOW 0x03A0U
-#define TOGGLE_HNT_SHIFT 4
+#define TOGGLE_HNT_SHIFT 5
 
 /*
  * Sprite evaluation may perform several different actions independent of the
@@ -141,10 +180,10 @@ typedef struct ppu {
   // Temporary storage used in rendering.
   word_t next_tile[BIT_PLANES];
   word_t queued_bits[BIT_PLANES];
-  word_t scrolling_bits[BIT_PLANES];
-  word_t tile_palette[BIT_PLANES];
-  word_t pattern_latch[BIT_PLANES];
-  word_t next_pattern[BIT_PLANES];
+  word_t tile_scroll[BIT_PLANES];
+  word_t palette_scroll[BIT_PLANES];
+  word_t palette_latch[BIT_PLANES];
+  word_t next_palette[BIT_PLANES];
 
   // Temporary storage used in sprite evaluation.
   word_t eval_buf;
@@ -174,13 +213,18 @@ ppu_t *ppu = NULL;
 /* Helper functions */
 void ppu_render(void);
 void ppu_render_visible(void);
-void ppu_render_pixels(bool output);
-word_t ppu_render_get_tile(word_t index, bool plane);
+void ppu_render_update_frame(bool output);
+void ppu_render_draw_pixel(void);
+void ppu_render_update_registers(void);
+void ppu_render_get_attribute(void);
+word_t ppu_render_get_tile(word_t index, bool plane_high);
 void ppu_render_update_hori(void);
 void ppu_render_prepare_sprites(void);
 word_t ppu_render_get_sprite(void);
 void ppu_render_prepare_bg(void);
 void ppu_render_dummy_nametable_access(void);
+void ppu_render_xinc(void);
+void ppu_render_yinc(void);
 void ppu_render_blank(void);
 void ppu_render_pre(void);
 void ppu_render_update_vert(void);
@@ -266,6 +310,13 @@ void ppu_render(void) {
  * Assumes the PPU has been initialized.
  */
 void ppu_render_visible(void) {
+  // When rendering is disabled, only the background should be drawn.
+  if (!((ppu->mask & FLAG_RENDER_BG) || (ppu->mask & FLAG_RENDER_SPRITES))
+      && (current_cycle > 0) && (current_cycle <= 256)) {
+    ppu_render_update_frame(true);
+    return;
+  }
+
   /*
    * Determine which phase of rendering the scanline is in.
    * The first cycle may finish a read, when coming from a pre-render
@@ -314,7 +365,7 @@ void ppu_render_update_frame(bool output) {
   if (current_cycle == 256) {
     // On cycle 256, the vertical vram position is incremented.
     ppu_render_yinc();
-  } else if ((current_cycle % 8) == 0)
+  } else if ((current_cycle % 8) == 0) {
     // Every 8 cycles (except on 256), the horizontal vram position is
     // incremented.
     ppu_render_xinc();
@@ -331,7 +382,88 @@ void ppu_render_update_frame(bool output) {
  * between 1 and 256 (inclusive) of a visible scanline.
  */
 void ppu_render_draw_pixel(void) {
-  // TODO
+  // Get the universal background color address and the screen position.
+  size_t screen_x = (current_cycle - 1) + ppu->fine_x;
+  size_t screen_y = current_scanline;
+  dword_t color_addr = PALETTE_BASE_ADDR;
+  // If rendering is off, the universal background color can be changed
+  // using the current vram address.
+  if (!(ppu->mask & FLAG_RENDER_SPRITES) && !(ppu->mask & FLAG_RENDER_BG)
+                                 && (ppu->vram_addr > PALETTE_BASE_ADDR)) {
+    color_addr = ppu->vram_addr;
+  }
+
+  // Get the background color pixel.
+  word_t pixel = memory_vram_read(color_addr);
+  word_t bg_pixel = 0;
+  word_t sprite_pixel = 0;
+
+  // Get the background tile pixel.
+  if (ppu->mask & FLAG_RENDER_BG) {
+    // Get the pattern of the background tile.
+    word_t bg_pattern = (((ppu->tile_scroll[0] << ppu->fine_x) >> 8) & 1)
+                      | (((ppu->tile_scroll[1] << ppu->fine_x) >> 7) & 2);
+
+    // Determine if the background tile pixel is transparent, and load the color
+    // if its not.
+    if (bg_pattern) {
+      // Get the palette of the background tile.
+      word_t bg_palette = (((ppu->palette_scroll[0] << ppu->fine_x) >> 8) & 1)
+                        | (((ppu->palette_scroll[1] << ppu->fine_x) >> 7) & 2);
+
+      // Get the address of the background tile color and read in the pixel.
+      word_t bg_address = PALETTE_BASE_ADDR | ((bg_palette * 4) + bg_pattern);
+      bg_pixel = memory_vram_read(bg_address);
+      pixel = bg_pixel;
+    }
+  }
+
+  // Get the sprite pixel.
+  if (ppu->mask & FLAG_RENDER_SPRITES) {
+    // Find the first visible sprite.
+    word_t sprite_index = 0;
+    for (; sprite_index < 8; sprite_index++) {
+      word_t sprite_x = ppu->sprite_memory[4 * sprite_index + 3];
+      if ((sprite_x <= screen_x) && (sprite_x > (screen_x - 8))) { break; }
+    }
+
+    // If a sprite was found, attempt to draw its pixel.
+    if (sprite_index < 8) {
+      word_t sprite_pattern = (((ppu->sprite_data[sprite_index][0]
+                            << ppu->fine_x) >> 8) & 1)
+                            | (((ppu->sprite_data[sprite_index][1]
+                            << ppu->fine_x) >> 7) & 2);
+
+      // Check if the pixel was transparent.
+      if (sprite_pattern) {
+        word_t sprite_palette = ppu->sprite_memory[4 * sprite_index + 2]
+                              & FLAG_SPRITE_PALETTE;
+        word_t sprite_address = PALETTE_BASE_ADDR | SPRITE_PALETTE_BASE
+                              | ((sprite_palette * 4) + sprite_pattern);
+        sprite_pixel = memory_vram_read(sprite_address);
+
+        // Check if the pixel should be rendered on top of the background.
+        if ((bg_pixel == 0) || !(ppu->mask & FLAG_SPRITE_PRIORITY)) {
+          pixel = sprite_pixel;
+        }
+
+        // Check if this counts as a sprite 0 hit.
+        if ((bg_pixel != 0) && (screen_x >= 8) && (screen_x != 255)
+                            && (sprite_pixel != 0)
+                            && (ppu->mask & FLAG_RENDER_BG)
+                            && (ppu->mask & FLAG_RENDER_SPRITES)) {
+          ppu->status |= FLAG_HIT;
+        }
+      }
+    }
+  }
+
+  // Apply a greyscall effect to the pixel, if needed.
+  if (ppu->mask & FLAG_GREYSCALE) { pixel &= GREYSCALE_PIXEL_MASK; }
+
+  // Render the pixel.
+  render_pixel(screen_y, screen_x, pixel);
+
   return;
 }
 
@@ -342,18 +474,105 @@ void ppu_render_draw_pixel(void) {
  * Assumes the PPU has been initialized.
  */
 void ppu_render_update_registers(void) {
-  // TODO
+  // Shift the tile registers.
+  ppu->tile_scroll[0] = (ppu->tile_scroll[0] << 1) | (ppu->queued_bits[0] >> 7);
+  ppu->queued_bits[0] <<= 1;
+  ppu->tile_scroll[1] = (ppu->tile_scroll[1] << 1) | (ppu->queued_bits[1] >> 7);
+  ppu->queued_bits[1] <<= 1;
+
+  // Shift the pattern registers.
+  ppu->palette_scroll[0] = (ppu->palette_scroll[0] << 1)
+                         | (ppu->palette_latch[0]);
+  ppu->palette_scroll[1] = (ppu->palette_scroll[1] << 1)
+                         | (ppu->palette_latch[1]);
+
+  // Reload the queued bits if the queue should now be empty.
+  if ((current_cycle % 8) == 1) {
+    ppu->queued_bits[0] = ppu->next_tile[0];
+    ppu->queued_bits[1] = ppu->next_tile[1];
+    ppu->palette_latch[0] = ppu->next_palette[0];
+    ppu->palette_latch[1] = ppu->next_palette[1];
+  }
+
+  // Determine which of the 8 cycles is being executed.
+  switch (current_cycle & REG_UPDATE_MASK) {
+    case REG_FETCH_NT:
+      ppu->mdr = memory_vram_read((ppu->vram_addr & VRAM_NT_ADDR_MASK)
+                                                  | PPU_NT_OFFSET);
+      break;
+    case REG_FETCH_AT:
+      ppu_render_get_attribute();
+      break;
+    case REG_FETCH_TILE_LOW:
+      ppu->next_tile[0] = ppu_render_get_tile(ppu->mdr, false);
+      break;
+    case REG_FETCH_TILE_HIGH:
+      ppu->next_tile[1] = ppu_render_get_tile(ppu->mdr, true);
+      break;
+    default:
+      break;
+  }
+
   return;
 }
 
 /*
- * TODO
+ * Uses the current vram address and cycle/scanline position to load
+ * attribute palette bits from the nametable into the next_palette variable.
+ *
+ * Assumes the PPU has been initialized.
  */
-word_t ppu_render_get_tile(word_t index, bool plane) {
-  // TODO
-  (void)index;
-  (void)plane;
-  return 0;
+void ppu_render_get_attribute(void) {
+  // Get the screen x and y from vram.
+  dword_t screen_x = ((ppu->vram_addr & COARSE_X_MASK) << COARSE_X_SHIFT)
+                   | ppu->fine_x;
+  dword_t screen_y = ((ppu->vram_addr & FINE_Y_MASK) >> FINE_Y_SHIFT)
+                   | ((ppu->vram_addr & COARSE_Y_MASK) >> COARSE_Y_SHIFT);
+
+  // Use the screen position to calculate the attribute table offset.
+  dword_t attribute_offset = (screen_x / 32) + (8 * (screen_y / 32));
+
+  // Use the offset to calculate the address of the attribute table byte.
+  dword_t attribute_addr = ATTRIBUTE_BASE_ADDR | attribute_offset
+                         | (ppu->vram_addr & SCROLL_NT_MASK);
+  word_t attribute = memory_vram_read(attribute_addr);
+
+  // Isolate the color bits for the current quadrent the screen is drawing to.
+  word_t attribute_shift = ((screen_x % 32) >= 16) ? 2 : 0;
+  attribute_shift += ((screen_y % 32) >= 16) ? 4 : 0;
+  attribute >>= attribute_shift;
+
+  // Update the color palette bits using the attribute.
+  ppu->next_palette[0] = attribute & 1;
+  ppu->next_palette[1] = (attribute >> 1) & 1;
+
+  return;
+}
+
+/*
+ * Uses the given index, and plane high toggle, to calculate the pattern table
+ * address of a tile from its nametable byte. Returns the byte at said pattern
+ * table address.
+ *
+ * Assumes the PPU has been initialized.
+ */
+word_t ppu_render_get_tile(word_t index, bool plane_high) {
+  // Get the value of fine Y, to be used as a tile offset.
+  dword_t tile_offset = (ppu->vram_addr & FINE_Y_MASK) >> FINE_Y_SHIFT;
+
+  // Use the plane toggle to get the plane bit in the vram address.
+  dword_t tile_plane = (plane_high) ? 0x08U : 0x00U;
+
+  // Get the index in the vram address from the provided index.
+  dword_t tile_index = ((dword_t) index) << 4;
+
+  // Get the side of the pattern table to be used from the control register.
+  dword_t tile_table = (ppu->ctrl & FLAG_BG_TABLE) ? PATTERN_TABLE_HIGH
+                                                   : PATTERN_TABLE_LOW;
+
+  // Calculate the vram address of the tile byte and return the tile byte.
+  dword_t tile_address = tile_table | tile_index | tile_plane | tile_offset;
+  return memory_vram_read(tile_address);
 }
 
 /*
@@ -419,8 +638,7 @@ word_t ppu_render_get_sprite(void) {
   // If the sprite is 8x16, and the bottom half is being rendered,
   // we need to move to the next tile. An offset is calculated to do this.
   dword_t index_offset = 0;
-  if ((ppu->ctrl & FLAG_SPRITE_SIZE) && (sprite_y >= 8U)
-                && (current_scanline > (sprite_y - 8U))) {
+  if ((ppu->ctrl & FLAG_SPRITE_SIZE) && (current_scanline >= (sprite_y + 8U))) {
     index_offset = X16_INDEX_OFFSET;
     sprite_y += 8;
   }
@@ -543,19 +761,28 @@ void ppu_render_blank(void) {
  * Assumes the PPU has been initialized.
  */
 void ppu_render_pre(void) {
+  // The status flags are reset at the begining of the pre-render scanline.
+  if (current_cycle == 1) { ppu->status = 0; }
+
+  // If rendering is disabled, then the PPU cant make any of the memory
+  // accesses that follow.
+  if (!((ppu->mask & FLAG_RENDER_BG) || (ppu->mask & FLAG_RENDER_SPRITES))) {
+    return;
+  }
+
   // Determine which phase of rendering the scanline is in.
   if (current_cycle > 0 && current_cycle <= 256) {
     // Accesses are made, but nothing is rendered.
-    ppu_render_pixels(false);
-
-    // The status flags are reset at the begining of the pre-render scanline.
-    ppu->status = 0;
+    ppu_render_update_frame(false);
+  } else if (current_cycle == 257) {
+    ppu_render_update_hori();
   } else if (current_cycle >= 280 && current_cycle <= 304) {
     // Update the vertical part of the vram address register.
     ppu_render_update_vert();
   } else if (current_cycle > 320 && current_cycle <= 336) {
-    // Fetch bg tile data.
-    ppu_render_prepare_bg();
+    // Fetch the background tile data for the next cycle.
+    ppu_render_update_registers();
+    if ((current_cycle % 8) == 0) { ppu_render_xinc(); }
   } else if (current_cycle > 336 && current_cycle <= 340) {
     // Unused NT byte fetches, mappers may clock this.
     ppu_render_dummy_nametable_access();
@@ -793,7 +1020,9 @@ void ppu_inc(void) {
 
   // Increment the scanline if it is time to wrap the cycle.
   if ((current_cycle > 340) || ((current_cycle > 339)
-          && frame_odd && (current_scanline >= 261))) {
+          && frame_odd && (current_scanline >= 261)
+          && ((ppu->mask & FLAG_RENDER_BG)
+          || (ppu->mask & FLAG_RENDER_SPRITES)))) {
     current_scanline++;
     current_cycle = 0;
   }

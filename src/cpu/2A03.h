@@ -12,7 +12,7 @@
 // Interrupt bools, which can be set by the PPU/APU
 extern bool irq_line, nmi_line;
 
-// Interrupt bools, which can be read (and should not be set) by the micro ops.
+// Interrupt bools, which can be used by the micro ops.
 extern bool nmi_edge, irq_ready;
 
 // Initializes the cpu, so that cycles may be executed.

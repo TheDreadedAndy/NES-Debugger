@@ -142,7 +142,9 @@ typedef struct ppu {
   word_t next_tile[BIT_PLANES];
   word_t queued_bits[BIT_PLANES];
   word_t scrolling_bits[BIT_PLANES];
-  word_t tile_palette;
+  word_t tile_palette[BIT_PLANES];
+  word_t pattern_latch[BIT_PLANES];
+  word_t next_pattern[BIT_PLANES];
 
   // Temporary storage used in sprite evaluation.
   word_t eval_buf;
@@ -178,7 +180,7 @@ void ppu_render_update_hori(void);
 void ppu_render_prepare_sprites(void);
 word_t ppu_render_get_sprite(void);
 void ppu_render_prepare_bg(void);
-void ppu_render_dummy_nametable(void);
+void ppu_render_dummy_nametable_access(void);
 void ppu_render_blank(void);
 void ppu_render_pre(void);
 void ppu_render_update_vert(void);
@@ -271,29 +273,76 @@ void ppu_render_visible(void) {
    */
   if (current_cycle == 0 && ppu->mdr_write) {
     // Finish the garbage nametable write that got skipped.
-    ppu_render_dummy_nametable();
+    ppu_render_dummy_nametable_access();
   } else if (current_cycle > 0 && current_cycle <= 256) {
     // Draw a pixel in the frame.
-    ppu_render_pixels(true);
+    ppu_render_update_frame(true);
   } else if (current_cycle > 256 && current_cycle <= 320) {
+    // On cycle 257, the horizontal vram position is loaded from the temp vram
+    // address register.
+    if (current_cycle == 257) { ppu_render_update_hori(); }
     // Fetch next sprite tile data.
     ppu_render_prepare_sprites();
   } else if (current_cycle > 320 && current_cycle <= 336) {
-    // Fetch bg tile data.
-    ppu_render_prepare_bg();
+    // Fetch the background tile data for the next cycle.
+    ppu_render_update_registers();
+    if ((current_cycle % 8) == 0) { ppu_render_xinc(); }
   } else if (current_cycle > 336 && current_cycle <= 340) {
     // Unused NT byte fetches, mappers may clock this.
-    ppu_render_dummy_nametable();
+    ppu_render_dummy_nametable_access();
   }
 
   return;
 }
 
 /*
- * TODO
+ * Runs a ppu cycle during the drawing phase of a visible scanline.
+ * This includes drawing a pixel to the screen, updating the shift registers,
+ * and possibly incrementing the vram address.
+ *
+ * Assumes the ppu has been initialized and is currently between cycles
+ * 1 and 256 (inclusive) of a visible scanline.
  */
-void ppu_render_pixels(bool output) {
-  (void)output;
+void ppu_render_update_frame(bool output) {
+  // Render the pixel.
+  if (output) { ppu_render_draw_pixel(); }
+
+  // Update the background registers.
+  ppu_render_update_registers();
+
+  // Update the vram address.
+  if (current_cycle == 256) {
+    // On cycle 256, the vertical vram position is incremented.
+    ppu_render_yinc();
+  } else if ((current_cycle % 8) == 0)
+    // Every 8 cycles (except on 256), the horizontal vram position is
+    // incremented.
+    ppu_render_xinc();
+  }
+
+  return;
+}
+
+/*
+ * Uses the shift registers and sprite memory to draw the current cycles
+ * pixel to the screen
+ *
+ * Assumes the PPU has been initialized and is currently running a cycle
+ * between 1 and 256 (inclusive) of a visible scanline.
+ */
+void ppu_render_draw_pixel(void) {
+  // TODO
+  return;
+}
+
+/*
+ * Updates the background tile data shift registers based on the current cycle.
+ * It takes 8 cycles to fully load in an 8x1 region for 1 tile.
+ *
+ * Assumes the PPU has been initialized.
+ */
+void ppu_render_update_registers(void) {
+  // TODO
   return;
 }
 
@@ -301,6 +350,7 @@ void ppu_render_pixels(bool output) {
  * TODO
  */
 word_t ppu_render_get_tile(word_t index, bool plane) {
+  // TODO
   (void)index;
   (void)plane;
   return 0;
@@ -412,18 +462,11 @@ word_t ppu_render_get_sprite(void) {
 }
 
 /*
- * TODO
- */
-void ppu_render_prepare_bg(void) {
-  return;
-}
-
-/*
  * Executes 2 dummy nametable fetches over 4 cycles.
  *
  * Assumes the PPU has been initialized.
  */
-void ppu_render_dummy_nametable(void) {
+void ppu_render_dummy_nametable_access(void) {
   // Determine which cycle of the fetch we are on.
   if (ppu->mdr_write) {
     // Second cycle, thrown away internally.
@@ -515,7 +558,7 @@ void ppu_render_pre(void) {
     ppu_render_prepare_bg();
   } else if (current_cycle > 336 && current_cycle <= 340) {
     // Unused NT byte fetches, mappers may clock this.
-    ppu_render_dummy_nametable();
+    ppu_render_dummy_nametable_access();
   }
 
   // The OAM addr is reset here to prepare for sprite evaluation on the next

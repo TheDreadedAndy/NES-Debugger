@@ -41,6 +41,21 @@
 #define FLAG_VRAM_VINC 0x04U
 #define FLAG_NAMETABLE 0x03U
 
+// Flag masks for sprite attribute data (in OEM).
+#define FLAG_SPRITE_VFLIP 0x80U
+#define FLAG_SPRITE_HFLIP 0x40U
+
+// Used to form the pattern table address, for a sprite, from sprite memory.
+#define X16_INDEX_OFFSET 0x10U
+#define X16_PLANE_SHIFT 3
+#define X16_TILE_MASK 0xFEU
+#define X16_TILE_SHIFT 4
+#define X16_TABLE_MASK 0x01U
+#define X16_TABLE_SHIFT 12
+#define X8_PLANE_SHIFT 3
+#define X8_TILE_SHIFT 4
+#define X8_TABLE_SHIFT 7
+
 /*
  * The lower three bits of an mmio access to the ppu determine which register
  * is used.
@@ -120,7 +135,8 @@ typedef struct ppu {
   word_t *primary_oam;
   word_t *secondary_oam;
   word_t *sprite_memory;
-  word_t sprite_data[BIT_PLANES][SPRITE_DATA_SIZE];
+  word_t sprite_data[SPRITE_DATA_SIZE][BIT_PLANES];
+  word_t sprite_count;
 
   // Temporary storage used in rendering.
   word_t next_tile[BIT_PLANES];
@@ -157,8 +173,10 @@ ppu_t *ppu = NULL;
 void ppu_render(void);
 void ppu_render_visible(void);
 void ppu_render_pixels(bool output);
+word_t ppu_render_get_tile(word_t index, bool plane);
 void ppu_render_update_hori(void);
 void ppu_render_prepare_sprites(void);
+word_t ppu_render_get_sprite(void);
 void ppu_render_prepare_bg(void);
 void ppu_render_dummy_nametable(void);
 void ppu_render_blank(void);
@@ -255,6 +273,7 @@ void ppu_render_visible(void) {
     // Finish the garbage nametable write that got skipped.
     ppu_render_dummy_nametable();
   } else if (current_cycle > 0 && current_cycle <= 256) {
+    // Draw a pixel in the frame.
     ppu_render_pixels(true);
   } else if (current_cycle > 256 && current_cycle <= 320) {
     // Fetch next sprite tile data.
@@ -276,6 +295,15 @@ void ppu_render_visible(void) {
 void ppu_render_pixels(bool output) {
   (void)output;
   return;
+}
+
+/*
+ * TODO
+ */
+word_t ppu_render_get_tile(word_t index, bool plane) {
+  (void)index;
+  (void)plane;
+  return 0;
 }
 
 /*
@@ -303,11 +331,84 @@ void ppu_render_prepare_sprites(void) {
   // Determine if rendering has control of memory accesses,
   // or if evaluation is using it; since they share during these cycles.
   if ((current_cycle - 1) & 0x04) {
-    // TODO: Need a way to determine how many sprites are on the scanline.
-    // Once I have this, pattern data can be safely copied.
+    // Determine which sprite's pattern is being fetched.
+    word_t sprite_index = (current_cycle - 257) / 8;
+    word_t pattern_plane = ((current_cycle - 1) >> 1) & 1;
+
+    // Check if we're on the first or second cycle of the read.
+    if (ppu->mdr_write) {
+      // Write to sprite data. If there are no more sprites, a transparent
+      // pattern is read (0).
+      ppu->sprite_data[sprite_index][pattern_plane] = ppu->mdr;
+    } else {
+      // Read the tile from the pattern table into the mdr.
+      ppu->mdr = ppu_render_get_sprite();
+    }
   }
 
   return;
+}
+
+/*
+ * Fetches the pattern byte for a sprite on the next scanline.
+ *
+ * Assumes the ppu has been initialized and is in the sprite preparation
+ * phase of a visible scanline.
+ */
+word_t ppu_render_get_sprite(void) {
+  // Get some basic information about the current sprite being prepared.
+  word_t sprite_index = (current_cycle - 257) / 8;
+  word_t sprite_y = ppu->sprite_memory[4 * sprite_index];
+
+  // If the data read did not actually belong to a sprite, we return an empty
+  // pattern.
+  if (sprite_index >= ppu->sprite_count) { return 0; }
+
+  // Calculate position and offset from the sprite.
+  dword_t tile_index = ppu->sprite_memory[4 * sprite_index + 1];
+  // If the sprite is 8x16, and the bottom half is being rendered,
+  // we need to move to the next tile. An offset is calculated to do this.
+  dword_t index_offset = 0;
+  if ((ppu->ctrl & FLAG_SPRITE_SIZE) && (sprite_y >= 8U)
+                && (current_scanline > (sprite_y - 8U))) {
+    index_offset = X16_INDEX_OFFSET;
+    sprite_y += 8;
+  }
+  // This tile offset deterines which of the 8 rows of the tile will be
+  // returned.
+  dword_t tile_offset = current_scanline - sprite_y; // TODO: Off by one?
+  CONTRACT(tile_offset < 8);
+  // Each tile has two planes, which are used to denote its color in a palette.
+  dword_t tile_plane = (current_cycle - 1) & 1;
+
+  // Check if the sprite is being flipped vertically.
+  if (ppu->sprite_memory[4 * sprite_index + 2] & FLAG_SPRITE_VFLIP) {
+    tile_offset = 7 - tile_offset;
+  }
+
+  // Determine which size of sprites are being used and then
+  // calculate the pattern address.
+  dword_t tile_pattern;
+  if (ppu->ctrl & FLAG_SPRITE_SIZE) {
+    tile_pattern = tile_offset | (tile_plane << X16_PLANE_SHIFT)
+                 | ((tile_index & X16_TILE_MASK) << X16_TILE_SHIFT)
+                 | ((tile_index & X16_TABLE_MASK) << X16_TABLE_SHIFT);
+    tile_pattern += index_offset;
+  } else {
+    tile_pattern = tile_offset | (tile_plane << X8_PLANE_SHIFT)
+                 | (tile_index << X8_TILE_SHIFT)
+                 | ((ppu->ctrl & FLAG_SPRITE_SIZE) << X8_TABLE_SHIFT);
+  }
+
+  // Use the calculated pattern address to get the tile byte.
+  word_t tile = memory_vram_read(tile_pattern);
+
+  // Check if the byte should be horizontally flipped.
+  if (ppu->sprite_memory[4 * sprite_index + 2] & FLAG_SPRITE_HFLIP) {
+    tile = reverse_word(tile);
+  }
+
+  return tile;
 }
 
 /*
@@ -495,6 +596,7 @@ void ppu_eval_sprites(void) {
   if (current_cycle == 65) {
     ppu->eval_state = SCAN;
     ppu->soam_addr = 0;
+    ppu->sprite_count = 0;
   }
 
   // On odd cycles, data is read from primary OAM.
@@ -517,6 +619,7 @@ void ppu_eval_sprites(void) {
         ppu->eval_state = COPY_TILE;
         ppu->oam_addr++;
         ppu->soam_addr++;
+        ppu->sprite_count++;
       } else {
         // Skip to next Y cord.
         ppu->oam_addr += 4;
@@ -701,6 +804,7 @@ void ppu_write(dword_t reg_addr, word_t val) {
       ppu_mmio_addr_write(val);
       break;
     case PPU_DATA_ACCESS:
+      // TODO: Writes can only happen during vblank?
       memory_vram_write(val, ppu->vram_addr);
       ppu_mmio_vram_addr_inc();
       break;

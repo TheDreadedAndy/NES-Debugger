@@ -426,7 +426,7 @@ void data_sbc_mdr_a(void) {
   // without issues in the carry out.
   dword_t res = ((dword_t) R->A) + ((dword_t) (~R->mdr))
                                  + ((dword_t) (R->P & 0x01));
-  word_t ovf = ((R->A & 0x80) == (R->mdr & 0x80))
+  word_t ovf = ((R->A & 0x80) == ((-R->mdr) & 0x80))
             && ((R->A & 0x80) != (res & 0x80));
   R->A = (word_t) res;
   R->P = (R->P & 0x3C) | (R->A & 0x80) | ((R->A == 0) << 1)
@@ -522,10 +522,11 @@ void data_branch(void) {
                      : ((R->P >> (7 - flag)) & 1);
   bool taken = (((bool) flag) == cond);
 
-  // Add the reletive address to pc_lo. Reletive addressing is signed,
-  // so we need to sign extend the mdr before we add it to pc_lo.
-  dword_t res = ((dword_t) R->pc_lo) + ((dword_t) (int16_t) (int8_t) R->mdr);
+  // Add the reletive address to pc_lo. Reletive addressing is signed.
+  dword_t res = ((dword_t) R->pc_lo) + ((dword_t) R->mdr);
   R->carry = (word_t)(res >> 8);
+  // Effectively sign extend the MDR in the carry out.
+  if (R->mdr & 0x80U) { R->carry += 0xFFU; }
 
   // Execute the proper cycles according to the above results.
   if (!taken) {

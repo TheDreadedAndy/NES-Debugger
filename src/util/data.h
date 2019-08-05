@@ -9,4 +9,7 @@ typedef uint16_t dword_t;
 // Converts two words into a double word.
 dword_t get_dword(word_t lo, word_t hi);
 
+// Reverses a word.
+word_t reverse_word(word_t word);
+
 #endif

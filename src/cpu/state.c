@@ -118,7 +118,8 @@ void state_push_cycle(micromem_t *mem, microdata_t *data, bool inc_pc) {
   // Add the microop to the queue.
   system_state->size++;
   CONTRACT(system_state->size <= STATE_MAX_OPS);
-  system_state->front = (system_state->front - 1) % STATE_MAX_OPS;
+  system_state->front = (system_state->front + (STATE_MAX_OPS - 1))
+                                             % STATE_MAX_OPS;
 
   // Fill the new microop with the given data.
   micro_t *micro = &(system_state->queue[system_state->front]);

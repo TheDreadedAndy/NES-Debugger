@@ -179,11 +179,11 @@ void cpu_execute_dma(void) {
   static word_t dma_mdr = 0;
 
   // The CPU is idle until there are <= 512 dma cycles remaining.
-  if ((dma_cycles_remaining < DMA_CYCLE_LENGTH) && cycle_even) {
-    // Even cycle, so we write to OAM.
+  if ((dma_cycles_remaining < DMA_CYCLE_LENGTH) && !cycle_even) {
+    // Odd cycle, so we write to OAM.
     ppu_oam_dma(dma_mdr);
   } else if (dma_cycles_remaining < DMA_CYCLE_LENGTH) {
-    // Odd cycle, so we read from memory.
+    // Even cycle, so we read from memory.
     dma_mdr = memory_read(dma_low, dma_high);
     dma_low++;
   }

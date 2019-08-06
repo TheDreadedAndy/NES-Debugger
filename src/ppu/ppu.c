@@ -4,7 +4,6 @@
 
 #include <stdlib.h>
 #include <stdbool.h>
-#include <assert.h>
 #include "../util/data.h"
 #include "../util/util.h"
 #include "../util/contracts.h"
@@ -19,7 +18,7 @@
 // Object Attribute Memory size.
 #define PRIMARY_OAM_SIZE 256U
 #define SECONDARY_OAM_SIZE 32U
-#define SPRITE_DATA_SIZE 16U
+#define SPRITE_DATA_SIZE 8U
 
 // The number of planes in a sprite or tile.
 #define BIT_PLANES 2U
@@ -140,7 +139,7 @@
 #define FINE_Y_CARRY_MASK 0x8000U
 #define FINE_Y_CARRY_SHIFT 10
 #define COARSE_X_CARRY_MASK 0x0020U
-#define Y_INC_OVERFLOW 0x03A0U
+#define Y_INC_OVERFLOW 0x03C0U
 #define TOGGLE_HNT_SHIFT 5
 
 /*
@@ -214,6 +213,7 @@ ppu_t *ppu = NULL;
 void ppu_render(void);
 void ppu_render_visible(void);
 void ppu_render_update_frame(bool output);
+bool ppu_render_disabled(void);
 void ppu_render_draw_pixel(void);
 word_t ppu_render_get_tile_pixel(void);
 word_t ppu_render_get_sprite_pixel(void);
@@ -313,8 +313,7 @@ void ppu_render(void) {
  */
 void ppu_render_visible(void) {
   // When rendering is disabled, only the background should be drawn.
-  if (!((ppu->mask & FLAG_RENDER_BG) || (ppu->mask & FLAG_RENDER_SPRITES))
-      && (current_cycle > 0) && (current_cycle <= 256)) {
+  if (ppu_render_disabled() && (current_cycle > 0) && (current_cycle <= 256)) {
     ppu_render_update_frame(true);
     return;
   }
@@ -346,6 +345,15 @@ void ppu_render_visible(void) {
   }
 
   return;
+}
+
+/*
+ * Returns true when rendering is disabled.
+ *
+ * Assumes the ppu has been initialized.
+ */
+bool ppu_render_disabled(void) {
+  return !(ppu->mask & FLAG_RENDER_BG) && !(ppu->mask & FLAG_RENDER_SPRITES);
 }
 
 /*
@@ -390,8 +398,8 @@ void ppu_render_draw_pixel(void) {
   dword_t color_addr = PALETTE_BASE_ADDR;
   // If rendering is off, the universal background color can be changed
   // using the current vram address.
-  if (!(ppu->mask & FLAG_RENDER_SPRITES) && !(ppu->mask & FLAG_RENDER_BG)
-                  && ((ppu->vram_addr & VRAM_ADDR_MASK) > PALETTE_BASE_ADDR)) {
+  if (ppu_render_disabled() && ((ppu->vram_addr & VRAM_ADDR_MASK)
+                                                > PALETTE_BASE_ADDR)) {
     color_addr = ppu->vram_addr;
   }
 
@@ -440,19 +448,19 @@ void ppu_render_draw_pixel(void) {
  */
 word_t ppu_render_get_tile_pixel(void) {
   // Get the pattern of the background tile.
-  word_t tile_pattern = (((ppu->tile_scroll[0] << ppu->fine_x) >> 8) & 1)
-                      | (((ppu->tile_scroll[1] << ppu->fine_x) >> 7) & 2);
+  word_t tile_pattern = (((ppu->tile_scroll[0] << ppu->fine_x) >> 7) & 1)
+                      | (((ppu->tile_scroll[1] << ppu->fine_x) >> 6) & 2);
 
   // Determine if the background tile pixel is transparent, and load the color
   // if its not.
   if (tile_pattern) {
     // Get the palette of the background tile.
-    word_t tile_palette = (((ppu->palette_scroll[0] << ppu->fine_x) >> 8) & 1)
-                        | (((ppu->palette_scroll[1] << ppu->fine_x) >> 7) & 2);
+    word_t tile_palette = (((ppu->palette_scroll[0] << ppu->fine_x) >> 7) & 1)
+                        | (((ppu->palette_scroll[1] << ppu->fine_x) >> 6) & 2);
 
     // Get the address of the background tile color and read in the pixel.
     word_t tile_address = PALETTE_BASE_ADDR
-                        | ((tile_palette * 4) + tile_pattern);
+                        | (tile_palette << 2) | tile_pattern;
     return memory_vram_read(tile_address);
   } else {
     return 0x00U;
@@ -476,9 +484,9 @@ word_t ppu_render_get_sprite_pixel(void) {
   // If a sprite was found, attempt to draw its pixel.
   if (sprite_index < 8) {
     word_t sprite_pattern = (((ppu->sprite_data[sprite_index][0]
-                          << ppu->fine_x) >> 8) & 1)
+                          << ppu->fine_x) >> 7) & 1)
                           | (((ppu->sprite_data[sprite_index][1]
-                          << ppu->fine_x) >> 7) & 2);
+                          << ppu->fine_x) >> 6) & 2);
 
     // Check if the pixel was transparent.
     if (sprite_pattern) {
@@ -761,6 +769,7 @@ void ppu_render_yinc(void) {
   // to 30.
   if ((ppu->vram_addr & SCROLL_Y_MASK) == Y_INC_OVERFLOW) {
     ppu->vram_addr ^= SCROLL_VNT_MASK;
+    ppu->vram_addr &= ~SCROLL_Y_MASK;
   }
 
   return;
@@ -964,16 +973,6 @@ void ppu_eval_sprites(void) {
 }
 
 /*
- * Reads a byte from primary OAM, accounting for the internal signal which may
- * force the value to 0xFF.
- *
- * Assumes the ppu has been initialized.
- */
-word_t ppu_oam_read(void) {
-  return ppu->primary_oam[ppu->oam_addr] & ppu->oam_mask;
-}
-
-/*
  * Performs a write to secondary OAM during sprite evaluation.
  *
  * Assumes the ppu has been initialized.
@@ -1103,8 +1102,11 @@ void ppu_write(dword_t reg_addr, word_t val) {
       ppu_mmio_addr_write(val);
       break;
     case PPU_DATA_ACCESS:
-      // TODO: Writes can only happen during vblank?
-      memory_vram_write(val, ppu->vram_addr);
+      // Writes can only happen during vblank.
+      if ((current_scanline >= 240 && current_scanline < 261)
+                                   || ppu_render_disabled()) {
+        memory_vram_write(val, ppu->vram_addr);
+      }
       ppu_mmio_vram_addr_inc();
       break;
   }
@@ -1120,17 +1122,17 @@ void ppu_write(dword_t reg_addr, word_t val) {
 void ppu_mmio_scroll_write(word_t val) {
   // Determine which write should be done.
   if (ppu->write_toggle) {
-    // Update scroll X.
-    ppu->fine_x = val & FINE_X_MASK;
-    ppu->temp_vram_addr = (ppu->temp_vram_addr & SCROLL_Y_MASK)
-                        | (ppu->temp_vram_addr & SCROLL_NT_MASK)
-                        | (val >> COARSE_X_SHIFT);
-  } else {
     // Update scroll Y.
     ppu->temp_vram_addr = (ppu->temp_vram_addr & SCROLL_X_MASK)
              | (ppu->temp_vram_addr & SCROLL_NT_MASK)
              | ((((dword_t) val) << COARSE_Y_SHIFT) & COARSE_Y_MASK)
              | (((dword_t) val) << FINE_Y_SHIFT);
+  } else {
+    // Update scroll X.
+    ppu->fine_x = val & FINE_X_MASK;
+    ppu->temp_vram_addr = (ppu->temp_vram_addr & SCROLL_Y_MASK)
+                        | (ppu->temp_vram_addr & SCROLL_NT_MASK)
+                        | (val >> COARSE_X_SHIFT);
   }
 
   // Toggle the write bit.
@@ -1200,7 +1202,7 @@ word_t ppu_read(dword_t reg_addr) {
       ppu->write_toggle = false;
       break;
     case OAM_DATA_ACCESS:
-      ppu->bus = ppu->primary_oam[ppu->oam_addr];
+      ppu->bus = ppu_oam_read();
       break;
     case PPU_DATA_ACCESS:
       // Reading from mappable VRAM (not the palette) returns the value to an
@@ -1210,6 +1212,7 @@ word_t ppu_read(dword_t reg_addr) {
         ppu->vram_bus = memory_vram_read(reg_addr);
       } else {
         ppu->bus = memory_vram_read(reg_addr);
+        // TODO Fill buffer with nametable byte (mirror).
       }
       break;
     case PPU_CTRL_ACCESS:
@@ -1235,6 +1238,16 @@ void ppu_oam_dma(word_t val) {
   ppu->primary_oam[ppu->oam_addr] = val;
   ppu->oam_addr++;
   return;
+}
+
+/*
+ * Reads a byte from primary OAM, accounting for the internal signal which may
+ * force the value to 0xFF.
+ *
+ * Assumes the ppu has been initialized.
+ */
+word_t ppu_oam_read(void) {
+  return ppu->primary_oam[ppu->oam_addr] & ppu->oam_mask;
 }
 
 /*

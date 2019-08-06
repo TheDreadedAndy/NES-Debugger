@@ -1,3 +1,5 @@
+#include <stdlib.h>
+#include <stdbool.h>
 #include "../util/data.h"
 
 #ifndef _NES_PPU

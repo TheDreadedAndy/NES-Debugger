@@ -87,11 +87,11 @@ void uxrom_new(FILE *rom_file, memory_t *M) {
   map->nametable[0] = xcalloc(sizeof(word_t), NAMETABLE_SIZE);
   map->nametable[3] = xcalloc(sizeof(word_t), NAMETABLE_SIZE);
   if (M->header->mirror) {
-    // Vertical mirroring.
+    // Vertical (horizontal arrangement) mirroring.
     map->nametable[1] = map->nametable[3];
     map->nametable[2] = map->nametable[0];
   } else {
-    // Horizontal mirroring.
+    // Horizontal (vertical arrangement) mirroring.
     map->nametable[1] = map->nametable[0];
     map->nametable[2] = map->nametable[3];
   }
@@ -150,7 +150,7 @@ void uxrom_load_chr(FILE *rom_file, memory_t *M) {
 
   // Otherwise, the rom uses chr-rom and the data needs to be copied
   // from the rom file.
-  map->pattern_table = xcalloc(sizeof(word_t), M->header->chr_rom_size);
+  map->pattern_table = xcalloc(sizeof(word_t), PATTERN_TABLE_SIZE);
   fseek(rom_file, HEADER_SIZE + M->header->prg_rom_size, SEEK_SET);
   for (size_t i = 0; i < M->header->chr_rom_size; i++) {
     map->pattern_table[i] = fgetc(rom_file);

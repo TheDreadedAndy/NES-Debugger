@@ -20,6 +20,7 @@
 #include "../util/data.h"
 #include "../ppu/ppu.h"
 #include "../cpu/2A03.h"
+#include "../io/controller.h"
 
 // RAM data constants.
 #define RAM_SIZE 0x800U
@@ -99,7 +100,13 @@ word_t memory_read(word_t mem_lo, word_t mem_hi) {
     return ppu_read(addr);
   } else if (addr < MAPPER_OFFSET) {
     // Access APU and IO registers.
-    return 0; // TODO.
+    if ((addr == 0x4016U) || (addr == 0x4017U)) {
+      // Read from controller register.
+      return controller_read(addr);
+    } else {
+      // TODO: Not implemented, dummy byte.
+      return 0x1FU;
+    }
   } else {
     // Access cartridge space using the mapper.
     return system_memory->read(addr, system_memory->map);
@@ -126,6 +133,7 @@ void memory_write(word_t val, word_t mem_lo, word_t mem_hi) {
     // Access APU and IO registers.
     // FIXME: This sucks. Doesnt fill the ppu latch, either.
     if (addr == 0x4014U) { cpu_start_dma(val); }
+    if (addr == 0x4016U) { controller_write(val, addr); }
   } else {
     system_memory->write(val, addr, system_memory->map);
   }

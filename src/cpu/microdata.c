@@ -515,11 +515,11 @@ void data_fix_pch(void) {
  */
 void data_branch(void) {
   // Calculate whether or not the branch was taken.
-  word_t flag = R->inst >> 6;
+  word_t flag = (R->inst >> 6U) & 3U;
   bool cond = (bool) ((R->inst >> 5) & 1);
   // Black magic that pulls the proper flag from the status reg.
-  flag = (flag >> 1) ? ((R->P >> (flag - 2)) & 1)
-                     : ((R->P >> (7 - flag)) & 1);
+  flag = (flag & 2U) ? ((R->P >> (flag & 1U)) & 1U)
+                     : ((R->P >> (7U - flag)) & 1U);
   bool taken = (((bool) flag) == cond);
 
   // Add the reletive address to pc_lo. Reletive addressing is signed.

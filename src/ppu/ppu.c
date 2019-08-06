@@ -108,7 +108,8 @@
 #define PPU_ADDR_HIGH_MASK 0x3F00U
 #define PPU_ADDR_HIGH_SHIFT 8
 #define PPU_ADDR_LOW_MASK 0x00FFU
-#define VRAM_ADDR_MASK 0x3FFFU
+#define VRAM_ADDR_MASK 0x7FFFU
+#define VRAM_BUS_MASK 0x3FFFU
 #define PPU_PALETTE_OFFSET 0x3F00U
 #define PPU_NT_OFFSET 0x2000U
 #define VRAM_NT_ADDR_MASK 0x0FFFU
@@ -398,7 +399,7 @@ void ppu_render_draw_pixel(void) {
   dword_t color_addr = PALETTE_BASE_ADDR;
   // If rendering is off, the universal background color can be changed
   // using the current vram address.
-  if (ppu_render_disabled() && ((ppu->vram_addr & VRAM_ADDR_MASK)
+  if (ppu_render_disabled() && ((ppu->vram_addr & VRAM_BUS_MASK)
                                                 > PALETTE_BASE_ADDR)) {
     color_addr = ppu->vram_addr;
   }

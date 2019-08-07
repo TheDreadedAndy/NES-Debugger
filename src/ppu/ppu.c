@@ -315,7 +315,7 @@ void ppu_render(void) {
 void ppu_render_visible(void) {
   // When rendering is disabled, only the background should be drawn.
   if (ppu_render_disabled() && (current_cycle > 0) && (current_cycle <= 256)) {
-    ppu_render_update_frame(true);
+    ppu_render_draw_pixel();
     return;
   }
 
@@ -449,19 +449,19 @@ void ppu_render_draw_pixel(void) {
  */
 word_t ppu_render_get_tile_pixel(void) {
   // Get the pattern of the background tile.
-  word_t tile_pattern = (((ppu->tile_scroll[0] << ppu->fine_x) >> 7) & 1)
-                      | (((ppu->tile_scroll[1] << ppu->fine_x) >> 6) & 2);
+  word_t tile_pattern = (((ppu->tile_scroll[0] << ppu->fine_x) >> 7U) & 1U)
+                      | (((ppu->tile_scroll[1] << ppu->fine_x) >> 6U) & 2U);
 
   // Determine if the background tile pixel is transparent, and load the color
   // if its not.
   if (tile_pattern) {
     // Get the palette of the background tile.
-    word_t tile_palette = (((ppu->palette_scroll[0] << ppu->fine_x) >> 7) & 1)
-                        | (((ppu->palette_scroll[1] << ppu->fine_x) >> 6) & 2);
+    word_t tile_palette = (((ppu->palette_scroll[0] << ppu->fine_x) >> 7U) & 1U)
+                      | (((ppu->palette_scroll[1] << ppu->fine_x) >> 6U) & 2U);
 
     // Get the address of the background tile color and read in the pixel.
-    word_t tile_address = PALETTE_BASE_ADDR
-                        | (tile_palette << 2) | tile_pattern;
+    dword_t tile_address = PALETTE_BASE_ADDR
+                        | (tile_palette << 2U) | tile_pattern;
     return memory_vram_read(tile_address);
   } else {
     return 0x00U;
@@ -566,7 +566,7 @@ void ppu_render_get_attribute(void) {
                    | ((ppu->vram_addr & COARSE_Y_MASK) >> COARSE_Y_SHIFT);
 
   // Use the screen position to calculate the attribute table offset.
-  dword_t attribute_offset = (screen_x / 32) + (8 * (screen_y / 32));
+  dword_t attribute_offset = (screen_x >> 5) | ((screen_y >> 5) << 3);
 
   // Use the offset to calculate the address of the attribute table byte.
   dword_t attribute_addr = ATTRIBUTE_BASE_ADDR | attribute_offset
@@ -574,13 +574,13 @@ void ppu_render_get_attribute(void) {
   word_t attribute = memory_vram_read(attribute_addr);
 
   // Isolate the color bits for the current quadrent the screen is drawing to.
-  word_t attribute_shift = ((screen_x % 32) >= 16) ? 2 : 0;
-  attribute_shift += ((screen_y % 32) >= 16) ? 4 : 0;
+  word_t attribute_shift = ((screen_x & 0x1FU) >= 16U) ? 2U : 0U;
+  attribute_shift += ((screen_y & 0x1FU) >= 16U) ? 4U : 0U;
   attribute >>= attribute_shift;
 
   // Update the color palette bits using the attribute.
-  ppu->next_palette[0] = attribute & 1;
-  ppu->next_palette[1] = (attribute >> 1) & 1;
+  ppu->next_palette[0] = attribute & 1U;
+  ppu->next_palette[1] = (attribute >> 1U) & 1U;
 
   return;
 }
@@ -1104,8 +1104,8 @@ void ppu_write(dword_t reg_addr, word_t val) {
       break;
     case PPU_DATA_ACCESS:
       // Writes can only happen during vblank.
-      if ((current_scanline >= 240 && current_scanline < 261)
-                                   || ppu_render_disabled()) {
+      if (((current_scanline >= 240) && (current_scanline < 261))
+                                     || ppu_render_disabled()) {
         memory_vram_write(val, ppu->vram_addr);
       }
       ppu_mmio_vram_addr_inc();

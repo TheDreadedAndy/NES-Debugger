@@ -53,7 +53,7 @@ bool palette_init(char *file) {
     red = (word_t) fgetc(pal_file);
     green = (word_t) fgetc(pal_file);
     blue = (word_t) fgetc(pal_file);
-    decoded_palette[i] = red << 16 | green << 8 | blue;
+    decoded_palette[i] = (red << 16) | (green << 8) | blue;
   }
 
   // Clean up and return success.

@@ -142,7 +142,7 @@ void mem_read_ptr_addrl(void) {
  * register.
  */
 void mem_read_ptr1_addrh(void) {
-  R->addr_hi = memory_read(R->ptr_lo + 1, R->ptr_hi);
+  R->addr_hi = memory_read(R->ptr_lo + 1U, R->ptr_hi);
   return;
 }
 
@@ -151,7 +151,7 @@ void mem_read_ptr1_addrh(void) {
  * register.
  */
 void mem_read_ptr1_pch(void) {
-  R->pc_hi = memory_read(R->ptr_lo + 1, R->ptr_hi);
+  R->pc_hi = memory_read(R->ptr_lo + 1U, R->ptr_hi);
   return;
 }
 
@@ -215,7 +215,7 @@ void mem_push_a(void) {
  * Writes the cpu state to the stack. Clears the B flag.
  */
 void mem_push_p(void) {
-  memory_write((R->P | 0x20), R->S, MEMORY_STACK_HIGH);
+  memory_write((R->P | 0x20U), R->S, MEMORY_STACK_HIGH);
   return;
 }
 
@@ -223,7 +223,7 @@ void mem_push_p(void) {
  * Writes the cpu state to the stack. Sets the B flag.
  */
 void mem_push_p_b(void) {
-  memory_write((R->P | 0x30), R->S, MEMORY_STACK_HIGH);
+  memory_write((R->P | 0x30U), R->S, MEMORY_STACK_HIGH);
   return;
 }
 
@@ -232,7 +232,7 @@ void mem_push_p_b(void) {
  * next cycles of the interrupt according to hijacking behavior.
  */
 void mem_brk(void) {
-  memory_write((R->P | 0x30), R->S, MEMORY_STACK_HIGH);
+  memory_write((R->P | 0x30U), R->S, MEMORY_STACK_HIGH);
 
   // Allows an nmi to hijack the brk instruction.
   if (nmi_edge) {
@@ -256,7 +256,7 @@ void mem_brk(void) {
  * the next cycles of the interrupt according to hijacking behavior.
  */
 void mem_irq(void) {
-  memory_write((R->P | 0x20), R->S, MEMORY_STACK_HIGH);
+  memory_write((R->P | 0x20U), R->S, MEMORY_STACK_HIGH);
 
   // Allows an nmi to hijack an irq interrupt.
   if (nmi_edge) {
@@ -301,7 +301,7 @@ void mem_pull_a(void) {
  * Pulls the cpu state from the stack. Zeros out the B flag.
  */
 void mem_pull_p(void) {
-  R->P = memory_read(R->S, MEMORY_STACK_HIGH) & 0xCF;
+  R->P = memory_read(R->S, MEMORY_STACK_HIGH) & 0xCFU;
   return;
 }
 
@@ -317,7 +317,7 @@ void mem_nmi_pcl(void) {
  * Reads from the nmi address (offset by 1) into the pch.
  */
 void mem_nmi_pch(void) {
-  R->pc_hi = memory_read(MEMORY_NMI_LOW + 1, MEMORY_NMI_HIGH);
+  R->pc_hi = memory_read(MEMORY_NMI_LOW + 1U, MEMORY_NMI_HIGH);
   return;
 }
 
@@ -333,7 +333,7 @@ void mem_reset_pcl(void) {
  * Reads from the reset address (offset by 1) into the pch.
  */
 void mem_reset_pch(void) {
-  R->pc_hi = memory_read(MEMORY_RESET_LOW + 1, MEMORY_RESET_HIGH);
+  R->pc_hi = memory_read(MEMORY_RESET_LOW + 1U, MEMORY_RESET_HIGH);
   return;
 }
 
@@ -349,6 +349,6 @@ void mem_irq_pcl(void) {
  * Reads from the irq address (offset by 1) into the pch.
  */
 void mem_irq_pch(void) {
-  R->pc_hi = memory_read(MEMORY_IRQ_LOW + 1, MEMORY_IRQ_HIGH);
+  R->pc_hi = memory_read(MEMORY_IRQ_LOW + 1U, MEMORY_IRQ_HIGH);
   return;
 }

@@ -31,7 +31,7 @@
 #include "../ppu/ppu.h"
 
 // DMA transfers take at least 513 cycles.
-#define DMA_CYCLE_LENGTH 513
+#define DMA_CYCLE_LENGTH 513U
 
 /* Global Variables */
 
@@ -173,8 +173,7 @@ void cpu_start_dma(word_t addr) {
  * Assumes the CPU has been initialized.
  */
 void cpu_execute_dma(void) {
-  // Current cpu memory address to read from (low byte, incremented every call
-  // wraps back to zero at the end of every call).
+  // Current cpu memory address to read from.
   static word_t dma_low = 0;
   static word_t dma_mdr = 0;
 
@@ -186,6 +185,9 @@ void cpu_execute_dma(void) {
     // Even cycle, so we read from memory.
     dma_mdr = memory_read(dma_low, dma_high);
     dma_low++;
+  } else {
+    dma_mdr = 0;
+    dma_low = 0;
   }
   dma_cycles_remaining--;
 

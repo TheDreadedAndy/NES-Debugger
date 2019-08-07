@@ -28,6 +28,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "../util/data.h"
+#include "../util/contracts.h"
 #include "./2A03.h"
 #include "./regs.h"
 #include "./micromem.h"
@@ -54,7 +55,7 @@ void data_inc_s(void) {
  */
 void data_inc_x(void) {
   R->X++;
-  R->P = (R->P & 0x7D) | (R->X & 0x80) | ((R->X == 0) << 1);
+  R->P = (R->P & 0x7DU) | (R->X & 0x80U) | ((R->X == 0U) << 1U);
   return;
 }
 
@@ -63,7 +64,7 @@ void data_inc_x(void) {
  */
 void data_inc_y(void) {
   R->Y++;
-  R->P = (R->P & 0x7D) | (R->Y & 0x80) | ((R->Y == 0) << 1);
+  R->P = (R->P & 0x7DU) | (R->Y & 0x80U) | ((R->Y == 0U) << 1U);
   return;
 }
 
@@ -72,7 +73,7 @@ void data_inc_y(void) {
  */
 void data_inc_mdr(void) {
   R->mdr++;
-  R->P = (R->P & 0x7D) | (R->mdr & 0x80) | ((R->mdr == 0) << 1);
+  R->P = (R->P & 0x7DU) | (R->mdr & 0x80U) | ((R->mdr == 0U) << 1U);
   return;
 }
 
@@ -89,7 +90,7 @@ void data_dec_s(void) {
  */
 void data_dec_x(void) {
   R->X--;
-  R->P = (R->P & 0x7D) | (R->X & 0x80) | ((R->X == 0) << 1);
+  R->P = (R->P & 0x7DU) | (R->X & 0x80U) | ((R->X == 0U) << 1U);
   return;
 }
 
@@ -98,7 +99,7 @@ void data_dec_x(void) {
  */
 void data_dec_y(void) {
   R->Y--;
-  R->P = (R->P & 0x7D) | (R->Y & 0x80) | ((R->Y == 0) << 1);
+  R->P = (R->P & 0x7DU) | (R->Y & 0x80U) | ((R->Y == 0U) << 1U);
   return;
 }
 
@@ -107,7 +108,7 @@ void data_dec_y(void) {
  */
 void data_dec_mdr(void) {
   R->mdr--;
-  R->P = (R->P & 0x7D) | (R->mdr & 0x80) | ((R->mdr == 0) << 1);
+  R->P = (R->P & 0x7DU) | (R->mdr & 0x80U) | ((R->mdr == 0U) << 1U);
   return;
 }
 
@@ -116,7 +117,7 @@ void data_dec_mdr(void) {
  */
 void data_mov_a_x(void) {
   R->X = R->A;
-  R->P = (R->P & 0x7D) | (R->X & 0x80) | ((R->X == 0) << 1);
+  R->P = (R->P & 0x7DU) | (R->X & 0x80U) | ((R->X == 0U) << 1U);
   return;
 }
 
@@ -125,7 +126,7 @@ void data_mov_a_x(void) {
  */
 void data_mov_a_y(void) {
   R->Y = R->A;
-  R->P = (R->P & 0x7D) | (R->Y & 0x80) | ((R->Y == 0) << 1);
+  R->P = (R->P & 0x7DU) | (R->Y & 0x80U) | ((R->Y == 0U) << 1U);
   return;
 }
 
@@ -134,7 +135,7 @@ void data_mov_a_y(void) {
  */
 void data_mov_s_x(void) {
   R->X = R->S;
-  R->P = (R->P & 0x7D) | (R->X & 0x80) | ((R->X == 0) << 1);
+  R->P = (R->P & 0x7DU) | (R->X & 0x80U) | ((R->X == 0U) << 1U);
   return;
 }
 
@@ -143,7 +144,7 @@ void data_mov_s_x(void) {
  */
 void data_mov_x_a(void) {
   R->A = R->X;
-  R->P = (R->P & 0x7D) | (R->A & 0x80) | ((R->A == 0) << 1);
+  R->P = (R->P & 0x7DU) | (R->A & 0x80U) | ((R->A == 0U) << 1U);
   return;
 }
 
@@ -160,7 +161,7 @@ void data_mov_x_s(void) {
  */
 void data_mov_y_a(void) {
   R->A = R->Y;
-  R->P = (R->P & 0x7D) | (R->A & 0x80) | ((R->A == 0) << 1);
+  R->P = (R->P & 0x7DU) | (R->A & 0x80U) | ((R->A == 0U) << 1U);
   return;
 }
 
@@ -177,7 +178,7 @@ void data_mov_mdr_pcl(void) {
  */
 void data_mov_mdr_a(void) {
   R->A = R->mdr;
-  R->P = (R->P & 0x7D) | (R->A & 0x80) | ((R->A == 0) << 1);
+  R->P = (R->P & 0x7DU) | (R->A & 0x80U) | ((R->A == 0U) << 1U);
   return;
 }
 
@@ -186,7 +187,7 @@ void data_mov_mdr_a(void) {
  */
 void data_mov_mdr_x(void) {
   R->X = R->mdr;
-  R->P = (R->P & 0x7D) | (R->X & 0x80) | ((R->X == 0) << 1);
+  R->P = (R->P & 0x7DU) | (R->X & 0x80U) | ((R->X == 0U) << 1U);
   return;
 }
 
@@ -195,7 +196,7 @@ void data_mov_mdr_x(void) {
  */
 void data_mov_mdr_y(void) {
   R->Y = R->mdr;
-  R->P = (R->P & 0x7D) | (R->Y & 0x80) | ((R->Y == 0) << 1);
+  R->P = (R->P & 0x7DU) | (R->Y & 0x80U) | ((R->Y == 0U) << 1U);
   return;
 }
 
@@ -203,7 +204,7 @@ void data_mov_mdr_y(void) {
  * Clears the carry flag.
  */
 void data_clc(void) {
-  R->P = R->P & 0xFE;
+  R->P = R->P & 0xFEU;
   return;
 }
 
@@ -211,7 +212,7 @@ void data_clc(void) {
  * Clears the decimal flag.
  */
 void data_cld(void) {
-  R->P = R->P & 0xF7;
+  R->P = R->P & 0xF7U;
   return;
 }
 
@@ -219,7 +220,7 @@ void data_cld(void) {
  * Clears the interrupt flag.
  */
 void data_cli(void) {
-  R->P = R->P & 0xFB;
+  R->P = R->P & 0xFBU;
   return;
 }
 
@@ -227,7 +228,7 @@ void data_cli(void) {
  * Clears the overflow flag.
  */
 void data_clv(void) {
-  R->P = R->P & 0xBF;
+  R->P = R->P & 0xBFU;
   return;
 }
 
@@ -235,7 +236,7 @@ void data_clv(void) {
  * Sets the carry flag.
  */
 void data_sec(void) {
-  R->P = R->P | 0x01;
+  R->P = R->P | 0x01U;
   return;
 }
 
@@ -243,7 +244,7 @@ void data_sec(void) {
  * Sets the decimal flag.
  */
 void data_sed(void) {
-  R->P = R->P | 0x08;
+  R->P = R->P | 0x08U;
   return;
 }
 
@@ -251,7 +252,7 @@ void data_sed(void) {
  * Sets the interrupt flag.
  */
 void data_sei(void) {
-  R->P = R->P | 0x04;
+  R->P = R->P | 0x04U;
   return;
 }
 
@@ -263,7 +264,7 @@ void data_cmp_mdr_a(void) {
   // The carry flag is unsigned overflow. We use a double word to hold
   // the extra bit.
   dword_t res = ((dword_t) R->A) + ((dword_t) (-R->mdr));
-  R->P = (R->P & 0x7C) | (res & 0x80) | (res >> 8) | ((res == 0) << 1);
+  R->P = (R->P & 0x7CU) | (res & 0x80U) | (res >> 8U) | ((res == 0U) << 1U);
   return;
 }
 
@@ -273,7 +274,7 @@ void data_cmp_mdr_a(void) {
  */
 void data_cmp_mdr_x(void) {
   dword_t res = ((dword_t) R->X) + ((dword_t) (-R->mdr));
-  R->P = (R->P & 0x7C) | (res & 0x80) | (res >> 8) | ((res == 0) << 1);
+  R->P = (R->P & 0x7CU) | (res & 0x80U) | (res >> 8U) | ((res == 0U) << 1U);
   return;
 }
 
@@ -283,7 +284,7 @@ void data_cmp_mdr_x(void) {
  */
 void data_cmp_mdr_y(void) {
   dword_t res = ((dword_t) R->Y) + ((dword_t) (-R->mdr));
-  R->P = (R->P & 0x7C) | (res & 0x80) | (res >> 8) | ((res == 0) << 1);
+  R->P = (R->P & 0x7CU) | (res & 0x80U) | (res >> 8U) | ((res == 0U) << 1U);
   return;
 }
 
@@ -292,9 +293,9 @@ void data_cmp_mdr_y(void) {
  * N and Z flags.
  */
 void data_asl_mdr(void) {
-  word_t carry = R->mdr >> 7;
-  R->mdr = R->mdr << 1;
-  R->P = (R->P & 0x7C) | (R->mdr & 0x80) | ((R->mdr == 0) << 1) | carry;
+  word_t carry = R->mdr >> 7U;
+  R->mdr = R->mdr << 1U;
+  R->P = (R->P & 0x7CU) | (R->mdr & 0x80U) | ((R->mdr == 0U) << 1U) | carry;
   return;
 }
 
@@ -303,9 +304,9 @@ void data_asl_mdr(void) {
  * N and Z flags.
  */
 void data_asl_a(void) {
-  word_t carry = R->A >> 7;
-  R->A = R->A << 1;
-  R->P = (R->P & 0x7C) | (R->A & 0x80) | ((R->A == 0) << 1) | carry;
+  word_t carry = R->A >> 7U;
+  R->A = R->A << 1U;
+  R->P = (R->P & 0x7CU) | (R->A & 0x80U) | ((R->A == 0U) << 1U) | carry;
   return;
 }
 
@@ -314,9 +315,9 @@ void data_asl_a(void) {
  * N and Z flags.
  */
 void data_lsr_mdr(void) {
-  word_t carry = R->mdr & 0x01;
-  R->mdr = R->mdr >> 1;
-  R->P = (R->P & 0x7C) | (R->mdr & 0x80) | ((R->mdr == 0) << 1) | carry;
+  word_t carry = R->mdr & 0x01U;
+  R->mdr = R->mdr >> 1U;
+  R->P = (R->P & 0x7CU) | (R->mdr & 0x80U) | ((R->mdr == 0U) << 1U) | carry;
   return;
 }
 
@@ -325,9 +326,9 @@ void data_lsr_mdr(void) {
  * N and Z flags.
  */
 void data_lsr_a(void) {
-  word_t carry = R->A & 0x01;
-  R->A = R->A >> 1;
-  R->P = (R->P & 0x7C) | (R->A & 0x80) | ((R->A == 0) << 1) | carry;
+  word_t carry = R->A & 0x01U;
+  R->A = R->A >> 1U;
+  R->P = (R->P & 0x7CU) | (R->A & 0x80U) | ((R->A == 0U) << 1U) | carry;
   return;
 }
 
@@ -336,9 +337,9 @@ void data_lsr_a(void) {
  * sets the N and Z flags.
  */
 void data_rol_mdr(void) {
-  word_t carry = R->mdr >> 7;
-  R->mdr = (R->mdr << 1) | (R->P & 0x01);
-  R->P = (R->P & 0x7C) | (R->mdr & 0x80) | ((R->mdr == 0) << 1) | carry;
+  word_t carry = R->mdr >> 7U;
+  R->mdr = (R->mdr << 1U) | (R->P & 0x01U);
+  R->P = (R->P & 0x7CU) | (R->mdr & 0x80U) | ((R->mdr == 0U) << 1U) | carry;
   return;
 }
 
@@ -347,9 +348,9 @@ void data_rol_mdr(void) {
  * the N and Z flags.
  */
 void data_rol_a(void) {
-  word_t carry = R->A >> 7;
-  R->A = (R->A << 1) | (R->P & 0x01);
-  R->P = (R->P & 0x7C) | (R->A & 0x80) | ((R->A == 0) << 1) | carry;
+  word_t carry = R->A >> 7U;
+  R->A = (R->A << 1U) | (R->P & 0x01U);
+  R->P = (R->P & 0x7CU) | (R->A & 0x80U) | ((R->A == 0U) << 1U) | carry;
   return;
 }
 
@@ -358,9 +359,9 @@ void data_rol_a(void) {
  * sets the N and Z flags.
  */
 void data_ror_mdr(void) {
-  word_t carry = R->mdr & 0x01;
-  R->mdr = (R->mdr >> 1) | (R->P << 7);
-  R->P = (R->P & 0x7C) | (R->mdr & 0x80) | ((R->mdr == 0) << 1) | carry;
+  word_t carry = R->mdr & 0x01U;
+  R->mdr = (R->mdr >> 1U) | (R->P << 7U);
+  R->P = (R->P & 0x7CU) | (R->mdr & 0x80U) | ((R->mdr == 0U) << 1U) | carry;
   return;
 }
 
@@ -369,9 +370,9 @@ void data_ror_mdr(void) {
  * sets the N and Z flags.
  */
 void data_ror_a(void) {
-  word_t carry = R->A & 0x01;
-  R->A = (R->A >> 1) | (R->P << 7);
-  R->P = (R->P & 0x7C) | (R->A & 0x80) | ((R->A == 0) << 1) | carry;
+  word_t carry = R->A & 0x01U;
+  R->A = (R->A >> 1U) | (R->P << 7U);
+  R->P = (R->P & 0x7CU) | (R->A & 0x80U) | ((R->A == 0U) << 1U) | carry;
   return;
 }
 
@@ -380,7 +381,7 @@ void data_ror_a(void) {
  */
 void data_eor_mdr_a(void) {
   R->A = R->A ^ R->mdr;
-  R->P = (R->P & 0x7D) | (R->A & 0x80) | ((R->A == 0) << 1);
+  R->P = (R->P & 0x7DU) | (R->A & 0x80U) | ((R->A == 0U) << 1U);
   return;
 }
 
@@ -389,7 +390,7 @@ void data_eor_mdr_a(void) {
  */
 void data_and_mdr_a(void) {
   R->A = R->A & R->mdr;
-  R->P = (R->P & 0x7D) | (R->A & 0x80) | ((R->A == 0) << 1);
+  R->P = (R->P & 0x7DU) | (R->A & 0x80U) | ((R->A == 0U) << 1U);
   return;
 }
 
@@ -398,7 +399,7 @@ void data_and_mdr_a(void) {
  */
 void data_ora_mdr_a(void) {
   R->A = R->A | R->mdr;
-  R->P = (R->P & 0x7D) | (R->A & 0x80) | ((R->A == 0) << 1);
+  R->P = (R->P & 0x7DU) | (R->A & 0x80U) | ((R->A == 0U) << 1U);
   return;
 }
 
@@ -408,12 +409,12 @@ void data_ora_mdr_a(void) {
  */
 void data_adc_mdr_a(void) {
   dword_t res = ((dword_t) R->A) + ((dword_t) R->mdr)
-                                 + ((dword_t) (R->P & 0x01));
-  word_t ovf = ((R->A & 0x80) == (R->mdr & 0x80))
-            && ((R->A & 0x80) != (res & 0x80));
+                                 + ((dword_t) (R->P & 0x01U));
+  word_t ovf = ((R->A & 0x80U) == (R->mdr & 0x80U))
+            && ((R->A & 0x80U) != (res & 0x80U));
   R->A = (word_t) res;
-  R->P = (R->P & 0x3C) | (R->A & 0x80) | ((R->A == 0) << 1)
-                       | (ovf << 6) | (res >> 8);
+  R->P = (R->P & 0x3CU) | (R->A & 0x80U) | ((R->A == 0U) << 1U)
+                       | (ovf << 6U) | (res >> 8U);
   return;
 }
 
@@ -426,11 +427,11 @@ void data_sbc_mdr_a(void) {
   // without issues in the carry out.
   dword_t res = ((dword_t) R->A) + ((dword_t) (~R->mdr))
                                  + ((dword_t) (R->P & 0x01));
-  word_t ovf = ((R->A & 0x80) == ((-R->mdr) & 0x80))
-            && ((R->A & 0x80) != (res & 0x80));
+  word_t ovf = ((R->A & 0x80U) == ((-R->mdr) & 0x80U))
+            && ((R->A & 0x80U) != (res & 0x80U));
   R->A = (word_t) res;
-  R->P = (R->P & 0x3C) | (R->A & 0x80) | ((R->A == 0) << 1)
-                       | (ovf << 6) | (res >> 8);
+  R->P = (R->P & 0x3CU) | (R->A & 0x80U) | ((R->A == 0U) << 1U)
+                        | (ovf << 6U) | (res >> 8U);
   return;
 }
 
@@ -439,7 +440,7 @@ void data_sbc_mdr_a(void) {
  * Sets the zero flag according to A AND MDR.
  */
 void data_bit_mdr_a(void) {
-  R->P = (R->P & 0x3D) | (R->mdr & 0xC0) | (((R->A & R->mdr) == 0) << 1);
+  R->P = (R->P & 0x3DU) | (R->mdr & 0xC0U) | (((R->A & R->mdr) == 0U) << 1U);
   return;
 }
 
@@ -450,7 +451,7 @@ void data_bit_mdr_a(void) {
 void data_add_addrl_x(void) {
   dword_t res = ((dword_t) R->addr_lo) + ((dword_t) R->X);
   R->addr_lo = (word_t) res;
-  R->carry = res >> 8;
+  R->carry = res >> 8U;
   return;
 }
 
@@ -461,7 +462,7 @@ void data_add_addrl_x(void) {
 void data_add_addrl_y(void) {
   dword_t res = ((dword_t) R->addr_lo) + ((dword_t) R->Y);
   R->addr_lo = (word_t) res;
-  R->carry = res >> 8;
+  R->carry = res >> 8U;
   return;
 }
 
@@ -516,7 +517,7 @@ void data_fix_pch(void) {
 void data_branch(void) {
   // Calculate whether or not the branch was taken.
   word_t flag = (R->inst >> 6U) & 3U;
-  bool cond = (bool) ((R->inst >> 5) & 1);
+  bool cond = (bool) ((R->inst >> 5U) & 1U);
   // Black magic that pulls the proper flag from the status reg.
   flag = (flag & 2U) ? ((R->P >> (flag & 1U)) & 1U)
                      : ((R->P >> (7U - flag)) & 1U);
@@ -524,7 +525,7 @@ void data_branch(void) {
 
   // Add the reletive address to pc_lo. Reletive addressing is signed.
   dword_t res = ((dword_t) R->pc_lo) + ((dword_t) R->mdr);
-  R->carry = (word_t)(res >> 8);
+  R->carry = (word_t)(res >> 8U);
   // Effectively sign extend the MDR in the carry out.
   if (R->mdr & 0x80U) { R->carry += 0xFFU; }
 

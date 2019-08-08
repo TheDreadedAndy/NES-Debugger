@@ -24,26 +24,14 @@ bool frame_output = false;
  *
  * Assumes the render surface has been initialized.
  * Assumes the row and column are in range of the surface size.
- *
- * TODO: Consider using only a basic array access with the surface.
- *       If locking is messing with threads, it may slow things down.
- *
- *       It seems that you need only lock RLE accelerated surfaces.
- *       Locking may not be needed at all.
  */
 void render_pixel(size_t row, size_t col, word_t pixel) {
   CONTRACT(row < (size_t) render->h);
   CONTRACT(col < (size_t) render->w);
 
-  // Lock the surface so we can safely edit pixel data.
-  SDL_LockSurface(render);
-
   // Write the given pixel to the given location.
   uint32_t *pixels = (uint32_t*) render->pixels;
   pixels[row * render->w + col] = palette_decode(pixel);
-
-  // Unlock the surface.
-  SDL_UnlockSurface(render);
 
   return;
 }

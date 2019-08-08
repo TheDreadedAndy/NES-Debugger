@@ -271,6 +271,8 @@ void input_press(SDL_Keycode key) {
       dpad_priority_left = false;
       input_status |= FLAG_RIGHT;
       break;
+    default:
+      break;
   }
 
   return;
@@ -320,6 +322,8 @@ void input_release(SDL_Keycode key) {
     case MAP_RIGHT:
       dpad_priority_left = true;
       input_status &= ~FLAG_RIGHT;
+      break;
+    default:
       break;
   }
 

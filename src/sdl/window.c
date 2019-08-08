@@ -73,6 +73,9 @@ bool window_init(void) {
     return false;
   }
 
+  // Disable RLE acceleration on the render surface.
+  SDL_SetSurfaceRLE(render, 0);
+
   // Return success.
   return true;
 }

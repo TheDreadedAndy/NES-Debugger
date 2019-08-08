@@ -40,8 +40,8 @@
 #define FLAG_FOCUS_RED 0x20U
 #define FLAG_RENDER_SPRITES 0x10U
 #define FLAG_RENDER_BG 0x08U
-#define FLAG_LEFT_SPRITES 0x04U
-#define FLAG_LEFT_BG 0x02U
+#define FLAG_SHOW_SPRITES 0x04U
+#define FLAG_SHOW_BG 0x02U
 #define FLAG_GREYSCALE 0x01U
 
 // Flag masks for the PPU control register.
@@ -402,7 +402,7 @@ void ppu_render_draw_pixel(void) {
   // using the current vram address.
   if (ppu_render_disabled() && ((ppu->vram_addr & VRAM_BUS_MASK)
                                                 > PALETTE_BASE_ADDR)) {
-    color_addr = ppu->vram_addr;
+    color_addr = ppu->vram_addr & VRAM_BUS_MASK;
   }
 
   // Get the background color pixel.
@@ -420,6 +420,7 @@ void ppu_render_draw_pixel(void) {
   if (ppu->mask & FLAG_RENDER_SPRITES) {
     sprite_pixel = ppu_render_get_sprite_pixel();
     word_t sprite_index = ppu_render_get_sprite_index();
+    // FIXME: Possible out of range access.
     word_t sprite_attribute = ppu->sprite_memory[4 * sprite_index + 2];
 
     // Check if the pixel should be rendered on top of the background.
@@ -429,7 +430,9 @@ void ppu_render_draw_pixel(void) {
     }
 
     // Check if this counts as a sprite 0 hit.
-    if ((sprite_index == 0) && (bg_pixel != 0) && (screen_x >= 8)
+    if ((sprite_index == 0) && (bg_pixel != 0) && ((screen_x >= 8)
+                      || ((ppu->mask & FLAG_SHOW_BG)
+                      && (ppu->mask & FLAG_SHOW_SPRITES)))
                       && (screen_x != 255) && (sprite_pixel != 0)
                       && (ppu->mask & FLAG_RENDER_BG)
                       && (ppu->mask & FLAG_RENDER_SPRITES)) {
@@ -453,14 +456,14 @@ void ppu_render_draw_pixel(void) {
  */
 word_t ppu_render_get_tile_pixel(void) {
   // Get the pattern of the background tile.
-  dword_t tile_pattern = (((ppu->tile_scroll[0] << ppu->fine_x) >> 7U) & 1U)
+  word_t tile_pattern = (((ppu->tile_scroll[0] << ppu->fine_x) >> 7U) & 1U)
                       | (((ppu->tile_scroll[1] << ppu->fine_x) >> 6U) & 2U);
 
   // Determine if the background tile pixel is transparent, and load the color
   // if its not.
   if (tile_pattern) {
     // Get the palette of the background tile.
-    dword_t tile_palette = (((ppu->palette_scroll[0] << ppu->fine_x) >> 7U) & 1U)
+    word_t tile_palette = (((ppu->palette_scroll[0] << ppu->fine_x) >> 7U) & 1U)
                       | (((ppu->palette_scroll[1] << ppu->fine_x) >> 6U) & 2U);
 
     // Get the address of the background tile color and read in the pixel.
@@ -478,18 +481,23 @@ word_t ppu_render_get_tile_pixel(void) {
  * Assumes the PPU has been initialized.
  */
 word_t ppu_render_get_sprite_pixel(void) {
-  // If a sprite was found, attempt to draw its pixel.
+  // Determine which pixel of the sprite is to be rendered from its x position.
+  size_t screen_x = current_cycle - 1;
   word_t sprite_index = ppu_render_get_sprite_index();
+  word_t sprite_x = ppu->sprite_memory[(sprite_index << 2) + 3];
+  word_t sprite_dx = screen_x - sprite_x;
+
+  // If a sprite was found, attempt to draw its pixel.
   if (sprite_index < 8) {
-    dword_t sprite_pattern = (((ppu->sprite_data[sprite_index][0]
-                          << ppu->fine_x) >> 7) & 1)
+    word_t sprite_pattern = (((ppu->sprite_data[sprite_index][0]
+                          << sprite_dx) >> 7U) & 1U)
                           | (((ppu->sprite_data[sprite_index][1]
-                          << ppu->fine_x) >> 6) & 2);
+                          << sprite_dx) >> 6U) & 2U);
 
     // Check if the pixel was transparent.
     if (sprite_pattern) {
-      dword_t sprite_palette = ppu->sprite_memory[(sprite_index << 2U) + 2U]
-                             & FLAG_SPRITE_PALETTE;
+      word_t sprite_palette = ppu->sprite_memory[(sprite_index << 2U) + 2U]
+                            & FLAG_SPRITE_PALETTE;
       dword_t sprite_address = PALETTE_BASE_ADDR | SPRITE_PALETTE_BASE
                              | (sprite_palette << 2U) | sprite_pattern;
       return memory_vram_read(sprite_address);
@@ -511,7 +519,7 @@ word_t ppu_render_get_sprite_index(void) {
   dword_t screen_x = current_cycle - 1;
   for (; sprite_index < 8; sprite_index++) {
     dword_t sprite_x = ppu->sprite_memory[4 * sprite_index + 3];
-    if ((sprite_x <= screen_x) && (sprite_x > (screen_x - 8))) { break; }
+    if ((sprite_x <= screen_x) && ((sprite_x + 8) > screen_x)) { break; }
   }
   return sprite_index;
 }
@@ -656,9 +664,11 @@ void ppu_render_prepare_sprites(void) {
       // Write to sprite data. If there are no more sprites, a transparent
       // pattern is read (0).
       ppu->sprite_data[sprite_index][pattern_plane] = ppu->mdr;
+      ppu->mdr_write = false;
     } else {
       // Read the tile from the pattern table into the mdr.
       ppu->mdr = ppu_render_get_sprite();
+      ppu->mdr_write = true;
     }
   }
 
@@ -694,7 +704,7 @@ word_t ppu_render_get_sprite(void) {
   dword_t tile_offset = current_scanline - sprite_y; // TODO: Off by one?
   CONTRACT(tile_offset < 8);
   // Each tile has two planes, which are used to denote its color in a palette.
-  dword_t tile_plane = (current_cycle - 1) & 1;
+  dword_t tile_plane = ((current_cycle - 1) >> 1) & 1;
 
   // Check if the sprite is being flipped vertically.
   if (ppu->sprite_memory[4 * sprite_index + 2] & FLAG_SPRITE_VFLIP) {
@@ -814,7 +824,7 @@ void ppu_render_pre(void) {
 
   // If rendering is disabled, then the PPU cant make any of the memory
   // accesses that follow.
-  if (!((ppu->mask & FLAG_RENDER_BG) || (ppu->mask & FLAG_RENDER_SPRITES))) {
+  if (ppu_render_disabled()) {
     return;
   }
 
@@ -894,8 +904,8 @@ void ppu_eval_clear_soam(void) {
   // The clear operation should consecutively write to secondary OAM every
   // even cycle.
   if ((current_cycle % 2) == 0) {
-    word_t oam_addr = (current_cycle >> 1) & 0x1F;
-    ppu->secondary_oam[oam_addr] = 0xFF;
+    ppu->soam_addr = (current_cycle >> 1) & 0x1F;
+    ppu->secondary_oam[ppu->soam_addr] = 0xFF;
   }
 
   return;
@@ -1102,9 +1112,7 @@ void ppu_write(dword_t reg_addr, word_t val) {
       ppu->oam_addr = val;
       break;
     case OAM_DATA_ACCESS:
-      ppu->primary_oam[ppu->oam_addr] = val;
-      // TODO: OAM write increments should be wrong during rendering.
-      ppu->oam_addr++;
+      ppu_oam_dma(val);
       break;
     case PPU_SCROLL_ACCESS:
       ppu_mmio_scroll_write(val);
@@ -1116,7 +1124,7 @@ void ppu_write(dword_t reg_addr, word_t val) {
       // Writes can only happen during vblank.
       if (((current_scanline >= 240) && (current_scanline < 261))
                                      || ppu_render_disabled()) {
-        memory_vram_write(val, ppu->vram_addr);
+        memory_vram_write(val, ppu->vram_addr & VRAM_ADDR_MASK);
       }
       ppu_mmio_vram_addr_inc();
       break;
@@ -1226,6 +1234,7 @@ word_t ppu_read(dword_t reg_addr) {
         ppu->vram_bus = memory_vram_read((reg_addr & VRAM_NT_ADDR_MASK)
                                                    | PPU_NT_OFFSET);
       }
+      ppu_mmio_vram_addr_inc();
       break;
     case PPU_CTRL_ACCESS:
     case PPU_MASK_ACCESS:
@@ -1247,8 +1256,13 @@ word_t ppu_read(dword_t reg_addr) {
  * Assumes the ppu has been initialized.
  */
 void ppu_oam_dma(word_t val) {
-  ppu->primary_oam[ppu->oam_addr] = val;
-  ppu->oam_addr++;
+  if (current_scanline >= 240 && current_scanline <= 260) {
+    ppu->primary_oam[ppu->oam_addr] = val;
+    ppu->oam_addr++;
+  } else {
+    // Writes during rendering cause a bad increment and ignore the write.
+    ppu->oam_addr += 4;
+  }
   return;
 }
 
@@ -1259,7 +1273,7 @@ void ppu_oam_dma(word_t val) {
  * Assumes the ppu has been initialized.
  */
 word_t ppu_oam_read(void) {
-  return ppu->primary_oam[ppu->oam_addr] & ppu->oam_mask;
+  return ppu->primary_oam[ppu->oam_addr] | ppu->oam_mask;
 }
 
 /*

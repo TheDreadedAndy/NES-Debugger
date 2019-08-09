@@ -28,7 +28,7 @@
  *
  * WARNING: Memory corruption will occur if this is not a power of 2!
  */
-#define STATE_MAX_OPS 16
+#define STATE_MAX_OPS 8
 
 // System state is managed by a fixed size queue of micro instructions
 typedef struct state_header {

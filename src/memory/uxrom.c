@@ -21,6 +21,7 @@
 #define MAX_BANKS 16U
 #define BANK_SIZE ((size_t)(1 << 14))
 #define BANK_OFFSET 0x8000U
+#define BANK_ADDR_MASK 0x3FFFU
 #define UOROM_BANK_MASK 0x0FU
 #define UNROM_BANK_MASK 0x07U
 #define MAX_UNROM_BANKS 8
@@ -171,15 +172,15 @@ word_t uxrom_read(dword_t addr, void *map) {
   uxrom_t *M = (uxrom_t*) map;
 
   // Detect where in memory we need to access and do so.
-  if (addr < 0x6000) {
+  if (addr < 0x6000U) {
     fprintf(stderr, "FATAL: Memory not implemented.\n");
     abort();
-  } else if (addr < 0x8000) {
+  } else if (addr < 0x8000U) {
     return M->bat[addr - BAT_OFFSET];
-  } else if (addr < 0xC000) {
-    return M->cart[M->current_bank][addr - BANK_OFFSET];
+  } else if (addr < 0xC000U) {
+    return M->cart[M->current_bank][addr & BANK_ADDR_MASK];
   } else {
-    return M->cart[M->fixed_bank][addr - FIXED_BANK_OFFSET];
+    return M->cart[M->fixed_bank][addr & BANK_ADDR_MASK];
   }
 }
 
@@ -195,10 +196,10 @@ void uxrom_write(word_t val, dword_t addr, void *map) {
   uxrom_t *M = (uxrom_t*) map;
 
   // Detect where in memory we need to access and do so.
-  if (addr < 0x6000) {
+  if (addr < 0x6000U) {
     fprintf(stderr, "FATAL: Memory not implemented.\n");
     abort();
-  } else if (addr < 0x8000) {
+  } else if (addr < 0x8000U) {
     M->bat[addr - BAT_OFFSET] = val;
   } else {
     // Writing to the cart area uses the low bits to select a bank.

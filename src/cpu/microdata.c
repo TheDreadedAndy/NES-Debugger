@@ -426,7 +426,7 @@ void data_sbc_mdr_a(void) {
   // See documentation for proof of this line. Gives the correct result
   // without issues in the carry out.
   dword_t res = ((dword_t) R->A) + (((dword_t) (~R->mdr)) & 0xFFU)
-                                 + ((dword_t) (R->P & 0x01));
+                                 + ((dword_t) (R->P & 0x01U));
   word_t ovf = ((R->A & 0x80U) == ((~R->mdr) & 0x80U))
             && ((R->A & 0x80U) != (res & 0x80U));
   R->A = (word_t) res;

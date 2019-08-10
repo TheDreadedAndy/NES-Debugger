@@ -5,6 +5,7 @@
 #include "./header.h"
 #include "../util/util.h"
 #include "../util/data.h"
+#include "../util/contracts.h"
 
 /* Defined constants */
 
@@ -30,16 +31,16 @@
 #define INES_TV_SYSTEM 9
 
 // The number of bytes each increment in the PRG-ROM field represents.
-#define PRG_ROM_CHUNKSIZE ((size_t) (1 << 14))
+#define PRG_ROM_CHUNKSIZE 0x4000U
 
 // The number of bytes each increment in the CHR-ROM field represents.
-#define CHR_ROM_CHUNKSIZE ((size_t) (1 << 13))
+#define CHR_ROM_CHUNKSIZE 0x2000U
 
 // The number of bytes each increment in the INES PRG-RAM field represents.
-#define INES_PRG_RAM_CHUNKSIZE ((size_t) (1 << 13))
+#define INES_PRG_RAM_CHUNKSIZE 0x2000U
 
 // The number of bytes CHR-RAM can be set to hold in the INES format.
-#define INES_CHR_RAM_SIZE ((size_t) (1 << 13))
+#define INES_CHR_RAM_SIZE 0x2000U
 
 /* Global constants */
 
@@ -104,6 +105,7 @@ header_t *decode_header(FILE *rom_file) {
 
   // Clean up and exit
   free(file_header);
+  CONTRACT((header->prg_rom_size + header->chr_rom_size + 16) == rom_size);
   return header;
 }
 

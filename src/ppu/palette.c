@@ -23,7 +23,7 @@ uint32_t *decoded_palette = NULL;
 #define COLOR_MASK 0x3FU
 
 // The number of different NES colors in a given palette.
-#define PALETTE_SIZE 64U
+#define PALETTE_SIZE 0x40U
 
 // The files size of an NES palette.
 #define PALETTE_FILE_SIZE 192U

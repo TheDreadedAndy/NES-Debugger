@@ -19,7 +19,7 @@
 
 // Constants used to size and access memory.
 #define MAX_BANKS 16U
-#define BANK_SIZE ((size_t)(1 << 14))
+#define BANK_SIZE 0x4000U
 #define BANK_OFFSET 0x8000U
 #define BANK_ADDR_MASK 0x3FFFU
 #define UOROM_BANK_MASK 0x0FU
@@ -28,10 +28,11 @@
 #define FIXED_BANK_OFFSET 0xC000U
 #define BAT_SIZE 0x2000U
 #define BAT_OFFSET 0x6000U
+#define BAT_MASK 0x1FFFU
 
 // Constants used to size and access VRAM.
-#define PATTERN_TABLE_SIZE ((size_t)(1 << 13))
-#define NAMETABLE_SIZE ((size_t)(1 << 10))
+#define PATTERN_TABLE_SIZE 0x2000U
+#define NAMETABLE_SIZE 0x0400U
 #define MAX_SCREENS 4U
 #define NAMETABLE_ACCESS_BIT 0x2000U
 #define NAMETABLE_SELECT_MASK 0x0C00U
@@ -145,13 +146,14 @@ void uxrom_load_chr(FILE *rom_file, memory_t *M) {
   if (M->header->chr_ram_size > 0) {
     map->is_chr_ram = true;
     // chr-ram should always be 8K for this mapper.
-    map->pattern_table = xcalloc(sizeof(word_t), PATTERN_TABLE_SIZE);
+    map->pattern_table = xcalloc(sizeof(word_t), M->header->chr_ram_size);
     return;
   }
 
   // Otherwise, the rom uses chr-rom and the data needs to be copied
   // from the rom file.
-  map->pattern_table = xcalloc(sizeof(word_t), PATTERN_TABLE_SIZE);
+  map->is_chr_ram = false;
+  map->pattern_table = xcalloc(sizeof(word_t), M->header->chr_rom_size);
   fseek(rom_file, HEADER_SIZE + M->header->prg_rom_size, SEEK_SET);
   for (size_t i = 0; i < M->header->chr_rom_size; i++) {
     map->pattern_table[i] = fgetc(rom_file);
@@ -172,12 +174,12 @@ word_t uxrom_read(dword_t addr, void *map) {
   uxrom_t *M = (uxrom_t*) map;
 
   // Detect where in memory we need to access and do so.
-  if (addr < 0x6000U) {
+  if (addr < BAT_OFFSET) {
     fprintf(stderr, "FATAL: Memory not implemented.\n");
     abort();
-  } else if (addr < 0x8000U) {
-    return M->bat[addr - BAT_OFFSET];
-  } else if (addr < 0xC000U) {
+  } else if (addr < BANK_OFFSET) {
+    return M->bat[addr & BAT_MASK];
+  } else if (addr < FIXED_BANK_OFFSET) {
     return M->cart[M->current_bank][addr & BANK_ADDR_MASK];
   } else {
     return M->cart[M->fixed_bank][addr & BANK_ADDR_MASK];
@@ -196,11 +198,11 @@ void uxrom_write(word_t val, dword_t addr, void *map) {
   uxrom_t *M = (uxrom_t*) map;
 
   // Detect where in memory we need to access and do so.
-  if (addr < 0x6000U) {
+  if (addr < BAT_OFFSET) {
     fprintf(stderr, "FATAL: Memory not implemented.\n");
     abort();
-  } else if (addr < 0x8000U) {
-    M->bat[addr - BAT_OFFSET] = val;
+  } else if (addr < BANK_OFFSET) {
+    M->bat[addr & BAT_MASK] = val;
   } else {
     // Writing to the cart area uses the low bits to select a bank.
     M->current_bank = val & M->bank_mask;

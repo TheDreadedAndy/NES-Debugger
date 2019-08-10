@@ -28,7 +28,8 @@
  *
  * WARNING: Memory corruption will occur if this is not a power of 2!
  */
-#define STATE_MAX_OPS 8
+#define STATE_MAX_OPS 16
+#define STATE_MASK 0x0FU
 
 // System state is managed by a fixed size queue of micro instructions
 typedef struct state_header {
@@ -101,7 +102,7 @@ void state_add_cycle(micromem_t *mem, microdata_t *data, bool inc_pc) {
   // Add the microop to the queue.
   system_state->size++;
   CONTRACT(system_state->size <= STATE_MAX_OPS);
-  system_state->back = (system_state->back + 1) % STATE_MAX_OPS;
+  system_state->back = (system_state->back + 1) & STATE_MASK;
 
   return;
 }
@@ -118,8 +119,7 @@ void state_push_cycle(micromem_t *mem, microdata_t *data, bool inc_pc) {
   // Add the microop to the queue.
   system_state->size++;
   CONTRACT(system_state->size <= STATE_MAX_OPS);
-  system_state->front = (system_state->front + (STATE_MAX_OPS - 1))
-                                             % STATE_MAX_OPS;
+  system_state->front = (system_state->front - 1) & STATE_MASK;
 
   // Fill the new microop with the given data.
   micro_t *micro = &(system_state->queue[system_state->front]);
@@ -152,7 +152,7 @@ micro_t *state_next_cycle(void) {
   last_micro->inc_pc = micro->inc_pc;
 
   // Remove it from the queue.
-  system_state->front = (system_state->front + 1) % STATE_MAX_OPS;
+  system_state->front = (system_state->front + 1) & STATE_MASK;
   system_state->size--;
 
   return last_micro;

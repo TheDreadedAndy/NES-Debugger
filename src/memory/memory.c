@@ -105,7 +105,7 @@ word_t memory_read(word_t mem_lo, word_t mem_hi) {
       return controller_read(addr);
     } else {
       // TODO: Not implemented, dummy byte.
-      return 0;//0x1FU;
+      return 0x1FU;
     }
   } else {
     // Access cartridge space using the mapper.

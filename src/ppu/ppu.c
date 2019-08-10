@@ -206,7 +206,7 @@ typedef struct ppu {
  */
 size_t current_scanline = 261;
 size_t current_cycle = 0;
-size_t frame_odd = false;
+bool frame_odd = false;
 
 /*
  * Global ppu structure. Cannot be accessed outside this file.
@@ -830,9 +830,7 @@ void ppu_render_pre(void) {
 
   // If rendering is disabled, then the PPU cant make any of the memory
   // accesses that follow.
-  if (ppu_render_disabled()) {
-    return;
-  }
+  if (ppu_render_disabled()) { return; }
 
   // Determine which phase of rendering the scanline is in.
   if (current_cycle > 0 && current_cycle <= 256) {
@@ -1029,7 +1027,7 @@ bool ppu_eval_in_range(void) {
 
   // Check if the sprite is visible on this scanline.
   bool in_range = (sprite_y <= current_scanline) && (sprite_y < 240)
-                      && (current_scanline < sprite_y + sprite_size);
+                      && (current_scanline < (sprite_y + sprite_size));
   return in_range;
 }
 

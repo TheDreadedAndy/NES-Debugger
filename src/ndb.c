@@ -20,9 +20,9 @@
 #include "./memory/header.h"
 #include "./ppu/ppu.h"
 
-// The number of 6502 cycles that will be emulated per emulation cycle.
-// Setting a low number will greatly decrease emulation speed.
-// Setting a high number will cause timing issues.
+// The number of CPU cycles that will be emulated per emulation cycle.
+// Setting this too low will cause speed issues.
+// Setting this too high will cause timing issues.
 #define EMU_CYCLE_SIZE 3000
 
 // Global running variable. Available to other files through ndb.h.

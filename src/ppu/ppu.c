@@ -71,7 +71,7 @@
 #define X16_TABLE_SHIFT 12
 #define X8_PLANE_SHIFT 3
 #define X8_TILE_SHIFT 4
-#define X8_TABLE_SHIFT 7
+#define X8_TABLE_SHIFT 9
 
 /*
  * Used, during rendering, to determine which piece of the tile should be
@@ -701,12 +701,11 @@ word_t ppu_render_get_sprite(void) {
   // If the sprite is 8x16, and the bottom half is being rendered,
   // we need to move to the next tile. An offset is calculated to do this.
   dword_t index_offset = 0;
-  // FIXME: Does not correctly flip 8x16 sprites.
   if ((ppu->ctrl & FLAG_SPRITE_SIZE) && (current_scanline >= (sprite_y + 8U))) {
     index_offset = X16_INDEX_OFFSET;
     sprite_y += 8;
   }
-  // This tile offset deterines which of the 8 rows of the tile will be
+  // This tile offset determines which of the 8 rows of the tile will be
   // returned.
   dword_t tile_offset = current_scanline - sprite_y; // TODO: Off by one?
   CONTRACT(tile_offset < 8);
@@ -716,6 +715,7 @@ word_t ppu_render_get_sprite(void) {
   // Check if the sprite is being flipped vertically.
   if (ppu->sprite_memory[4 * sprite_index + 2] & FLAG_SPRITE_VFLIP) {
     tile_offset = 7 - tile_offset;
+    if (ppu->ctrl & FLAG_SPRITE_SIZE) { index_offset ^= X16_INDEX_OFFSET; }
   }
 
   // Determine which size of sprites are being used and then
@@ -729,7 +729,7 @@ word_t ppu_render_get_sprite(void) {
   } else {
     tile_pattern = tile_offset | (tile_plane << X8_PLANE_SHIFT)
                  | (tile_index << X8_TILE_SHIFT)
-                 | ((ppu->ctrl & FLAG_SPRITE_SIZE) << X8_TABLE_SHIFT);
+                 | ((ppu->ctrl & FLAG_SPRITE_TABLE) << X8_TABLE_SHIFT);
   }
 
   // Use the calculated pattern address to get the tile byte.

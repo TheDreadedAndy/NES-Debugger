@@ -122,7 +122,7 @@
 #define SCROLL_Y_MASK 0x73E0U
 #define SCROLL_VNT_MASK 0x0800U
 #define SCROLL_HNT_MASK 0x0400U
-#define SCROLL_NT_MASK (SCROLL_VNT_MASK | SCROLL_HNT_MASK)
+#define SCROLL_NT_MASK 0x0C00U
 #define SCROLL_NT_SHIFT 10
 #define FINE_Y_MASK 0x7000U
 #define FINE_Y_SHIFT 12
@@ -319,8 +319,10 @@ void ppu_render(void) {
  */
 void ppu_render_visible(void) {
   // When rendering is disabled, only the background should be drawn.
-  if (ppu_render_disabled() && (current_cycle > 0) && (current_cycle <= 256)) {
-    ppu_render_draw_pixel();
+  if (ppu_render_disabled()) {
+    if ((current_cycle > 0) && (current_cycle <= 256)) {
+      ppu_render_draw_pixel();
+    }
     return;
   }
 

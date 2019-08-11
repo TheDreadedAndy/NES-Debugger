@@ -264,7 +264,8 @@ void data_cmp_mdr_a(void) {
   // The carry flag is unsigned overflow. We use a double word to hold
   // the extra bit.
   dword_t res = ((dword_t) R->A) + (((dword_t) (-R->mdr)) & 0xFFU);
-  R->P = (R->P & 0x7CU) | (res & 0x80U) | (res >> 8U) | ((res == 0U) << 1U);
+  R->P = (R->P & 0x7CU) | (res & 0x80U) | (res >> 8U)
+                        | (((res & 0xFF) == 0U) << 1U);
   return;
 }
 
@@ -274,7 +275,8 @@ void data_cmp_mdr_a(void) {
  */
 void data_cmp_mdr_x(void) {
   dword_t res = ((dword_t) R->X) + (((dword_t) (-R->mdr)) & 0xFFU);
-  R->P = (R->P & 0x7CU) | (res & 0x80U) | (res >> 8U) | ((res == 0U) << 1U);
+  R->P = (R->P & 0x7CU) | (res & 0x80U) | (res >> 8U)
+                        | (((res & 0xFF) == 0U) << 1U);
   return;
 }
 
@@ -284,7 +286,8 @@ void data_cmp_mdr_x(void) {
  */
 void data_cmp_mdr_y(void) {
   dword_t res = ((dword_t) R->Y) + (((dword_t) (-R->mdr)) & 0xFFU);
-  R->P = (R->P & 0x7CU) | (res & 0x80U) | (res >> 8U) | ((res == 0U) << 1U);
+  R->P = (R->P & 0x7CU) | (res & 0x80U) | (res >> 8U)
+                        | (((res & 0xFF) == 0U) << 1U);
   return;
 }
 

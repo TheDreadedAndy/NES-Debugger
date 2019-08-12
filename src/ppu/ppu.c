@@ -237,7 +237,6 @@ void ppu_render_yinc(void);
 void ppu_render_blank(void);
 void ppu_render_pre(void);
 void ppu_render_update_vert(void);
-void ppu_eval(void);
 void ppu_eval_clear_soam(void);
 void ppu_eval_sprites(void);
 word_t ppu_oam_read(void);
@@ -286,8 +285,6 @@ void ppu_run_cycle(void) {
   } else {
     // Render video using the current scanline/cycle.
     ppu_render();
-    // Run sprite evaluation using the current scanline/cycle.
-    ppu_eval();
   }
 
   // Pull the NMI line high if one should be generated.
@@ -357,24 +354,38 @@ void ppu_render(void) {
  * Assumes the PPU has been initialized.
  */
 void ppu_render_visible(void) {
+  // Sprite evaluation can raise an internal signal that forces OAM reads
+  // to return 0xFF. In the emulation, this signal is reset each cycle and
+  // set by ppu_eval_clear_soam() when it needs to be raised.
+  ppu->oam_mask = 0x00;
+
   /*
    * Determine which phase of rendering the scanline is in.
-   * The first cycle may finish a read, when coming from a pre-render
-   * line on an odd frame.
+   * The first cycle may finish a read, when coming from a pre-render scanline
+   * on an odd frame.
    */
-  if (current_cycle == 0 && ppu->mdr_write) {
+  if (current_cycle == 0) {
     // Finish the garbage nametable write that got skipped.
-    ppu_render_dummy_nametable_access();
-  } else if (current_cycle > 0 && current_cycle <= 256) {
+    if (ppu->mdr_write) { ppu_render_dummy_nametable_access(); }
+  } else if (current_cycle <= 64) {
     // Draw a pixel in the frame.
     ppu_render_update_frame(true);
-  } else if (current_cycle > 256 && current_cycle <= 320) {
+    // Clear SOAM for sprite evaluation.
+    ppu_eval_clear_soam();
+  } else if (current_cycle <= 256) {
+    // Draw a pixel in the frame.
+    ppu_render_update_frame(true);
+    // Evaluate the sprites on the next scanline.
+    ppu_eval_sprites();
+  } else if (current_cycle <= 320) {
     // On cycle 257, the horizontal vram position is loaded from the temp vram
     // address register.
     if (current_cycle == 257) { ppu_render_update_hori(); }
+    // Fetch the sprite data for the next scanline.
+    ppu_eval_fetch_sprites();
     // Fetch next sprite tile data.
     ppu_render_prepare_sprites();
-  } else if (current_cycle > 320 && current_cycle <= 336) {
+  } else if (current_cycle <= 336) {
     // Fetch the background tile data for the next cycle.
     ppu_render_update_registers();
     if ((current_cycle % 8) == 0) { ppu_render_xinc(); }
@@ -402,13 +413,11 @@ void ppu_render_update_frame(bool output) {
   ppu_render_update_registers();
 
   // Update the vram address.
-  if (current_cycle == 256) {
-    // On cycle 256, the vertical vram position is incremented.
-    ppu_render_yinc();
-  } else if ((current_cycle % 8) == 0) {
-    // Every 8 cycles (except on 256), the horizontal vram position is
-    // incremented.
+  if ((current_cycle % 8) == 0) {
+    // Every 8 cycles, the horizontal vram position is incremented.
     ppu_render_xinc();
+    // On cycle 256, the vertical vram position is incremented.
+    if (current_cycle == 256) { ppu_render_yinc(); }
   }
 
   return;
@@ -467,7 +476,7 @@ void ppu_render_draw_pixel(void) {
     }
   }
 
-  // Apply a greyscall effect to the pixel, if needed.
+  // Apply a greyscale effect to the pixel, if needed.
   if (ppu->mask & FLAG_GREYSCALE) { pixel &= GREYSCALE_PIXEL_MASK; }
 
   // Render the pixel.
@@ -890,31 +899,6 @@ void ppu_render_update_vert(void) {
 }
 
 /*
- * Runs the sprite evaluation action for the given cycle/scanline.
- *
- * Assumes the PPU has been initialized.
- */
-void ppu_eval(void) {
-  // Sprite evaluation can activate an internal signal which sets all bits in
-  // an OAM read.
-  ppu->oam_mask = 0x00;
-
-  // Sprite evaluation occurs only on visible scanlines.
-  if (current_scanline >= 240) { return; }
-
-  // Runs the sprite evaluation action for the given cycle.
-  if (1 <= current_cycle && current_cycle <= 64) {
-    ppu_eval_clear_soam();
-  } else if (65 <= current_cycle && current_cycle <= 256) {
-    ppu_eval_sprites();
-  } else if (257 <= current_cycle && current_cycle <= 320) {
-    ppu_eval_fetch_sprites();
-  }
-
-  return;
-}
-
-/*
  * Sets every value in secondary OAM to 0xFF over the course of
  * 64 cycles. Used in sprite evaluation.
  *
@@ -954,8 +938,8 @@ void ppu_eval_sprites(void) {
   }
 
   // On odd cycles, data is read from primary OAM.
-  if ((current_cycle % 2) == 1) {
-    ppu->eval_buf = ppu->primary_oam[ppu->oam_addr];
+  if (current_cycle & 1U) {
+    ppu->eval_buf = ppu_oam_read();
     return;
   }
 
@@ -1288,7 +1272,8 @@ word_t ppu_read(dword_t reg_addr) {
  * Assumes the ppu has been initialized.
  */
 void ppu_oam_dma(word_t val) {
-  if (current_scanline >= 240 && current_scanline <= 260) {
+  if (ppu_is_disabled() || (current_scanline >= 240
+                        && current_scanline <= 260)) {
     ppu->primary_oam[ppu->oam_addr] = val;
     ppu->oam_addr++;
   } else {

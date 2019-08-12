@@ -1,16 +1,26 @@
 /*
- * TODO: Update this.
+ * This file contains the interpreter for the emulation of the NES's 2A03 6502
+ * CPU.
  *
- * The microinstructions of the 6502 are handled by the state_t structure.
- * With the exception of brk, branch, and interrupt instructions, interrupt
- * polling happens before each fetch cycle. The plan is to handle these
- * special cases in cpu_run_cycle.
+ * Instructions are run using a state queue, found in state.c, which is filled
+ * by the fetch phase of an instruction. The queue contains micro instructions
+ * for data and memory operations, which are executed in pairs of memory and
+ * data each cycle.
  *
- * More information on the CPU cycles can be found in nesdev.com//6502_cpu.txt
  * The microinstructions are an abstraction, the real cpu used a cycle counter
  * and an RLC to determine how the datapath should be controlled. It seemed
  * silly to reimplement that in code, as going that low level wouldn't be
  * helpful to accuracy.
+ *
+ * The data and memory micro instructions can be found in microdata.c and
+ * micromem.c, respectively.
+ *
+ * Interrupts are polled for at the end of each cycle, and checked during the
+ * last micro instruction of an instruction. Interrupts are generated using
+ * the NMI and IRQ lines, which can be set by other files.
+ *
+ * The CPU can be suspended by executing an object attribute memory DMA,
+ * which is started through a memory access to $4014.
  *
  * References to the APU, PPU, and IO are not found in this file, as they
  * are handled by MMIO and, thus, part of memory.c.

@@ -215,10 +215,11 @@ bool frame_odd = false;
 ppu_t *ppu = NULL;
 
 /* Helper functions */
+bool ppu_is_disabled(void);
+void ppu_disabled(void);
 void ppu_render(void);
 void ppu_render_visible(void);
 void ppu_render_update_frame(bool output);
-bool ppu_render_disabled(void);
 void ppu_render_draw_pixel(void);
 word_t ppu_render_get_tile_pixel(void);
 word_t ppu_render_get_sprite_pixel(void);
@@ -279,17 +280,55 @@ bool ppu_init(char *file) {
  * Assumes the ppu and memory have been initialized.
  */
 void ppu_run_cycle(void) {
-  // Render video using the current scanline/cycle.
-  ppu_render();
-
-  // Run sprite evaluation using the current scanline/cycle.
-  ppu_eval();
+  // Check if rendering has been disabled by the software.
+  if (ppu_is_disabled()) {
+    ppu_disabled();
+  } else {
+    // Render video using the current scanline/cycle.
+    ppu_render();
+    // Run sprite evaluation using the current scanline/cycle.
+    ppu_eval();
+  }
 
   // Pull the NMI line high if one should be generated.
   ppu_signal();
 
   // Increment the cycle/scanline counters.
   ppu_inc();
+
+  return;
+}
+
+/*
+ * Returns true when rendering is disabled.
+ *
+ * Assumes the ppu has been initialized.
+ */
+bool ppu_is_disabled(void) {
+  return !(ppu->mask & FLAG_RENDER_BG) && !(ppu->mask & FLAG_RENDER_SPRITES);
+}
+
+/*
+ * Performs any PPU actions which cannot be disabled.
+ *
+ * Assumes the PPU has been initialized.
+ */
+void ppu_disabled(void) {
+  // The OAM mask should not be active when rendering is disabled.
+  ppu->oam_mask = 0;
+
+  // Determine which action should be performed.
+  if ((current_scanline < 240) && (current_cycle > 0)
+                               && (current_cycle <= 256)) {
+    // Draws the background color to the screen when rendering is disabled.
+    ppu_render_draw_pixel();
+  } else if (current_scanline < 261) {
+    // Signals the start of vblanks.
+    ppu_render_blank();
+  } else if (current_cycle == 1) {
+    // Resets the status register during the pre-render scanline.
+    ppu->status = 0;
+  }
 
   return;
 }
@@ -318,14 +357,6 @@ void ppu_render(void) {
  * Assumes the PPU has been initialized.
  */
 void ppu_render_visible(void) {
-  // When rendering is disabled, only the background should be drawn.
-  if (ppu_render_disabled()) {
-    if ((current_cycle > 0) && (current_cycle <= 256)) {
-      ppu_render_draw_pixel();
-    }
-    return;
-  }
-
   /*
    * Determine which phase of rendering the scanline is in.
    * The first cycle may finish a read, when coming from a pre-render
@@ -353,15 +384,6 @@ void ppu_render_visible(void) {
   }
 
   return;
-}
-
-/*
- * Returns true when rendering is disabled.
- *
- * Assumes the ppu has been initialized.
- */
-bool ppu_render_disabled(void) {
-  return !(ppu->mask & FLAG_RENDER_BG) && !(ppu->mask & FLAG_RENDER_SPRITES);
 }
 
 /*
@@ -406,7 +428,7 @@ void ppu_render_draw_pixel(void) {
   dword_t color_addr = PALETTE_BASE_ADDR;
   // If rendering is off, the universal background color can be changed
   // using the current vram address.
-  if (ppu_render_disabled() && ((ppu->vram_addr & VRAM_BUS_MASK)
+  if (ppu_is_disabled() && ((ppu->vram_addr & VRAM_BUS_MASK)
                                                 > PALETTE_BASE_ADDR)) {
     color_addr = ppu->vram_addr & VRAM_BUS_MASK;
   }
@@ -830,10 +852,6 @@ void ppu_render_pre(void) {
   // The status flags are reset at the begining of the pre-render scanline.
   if (current_cycle == 1) { ppu->status = 0; }
 
-  // If rendering is disabled, then the PPU cant make any of the memory
-  // accesses that follow.
-  if (ppu_render_disabled()) { return; }
-
   // Determine which phase of rendering the scanline is in.
   if (current_cycle > 0 && current_cycle <= 256) {
     // Accesses are made, but nothing is rendered.
@@ -1202,7 +1220,7 @@ void ppu_mmio_addr_write(word_t val) {
  */
 void ppu_mmio_vram_addr_inc(void) {
   // Determine how the increment should work.
-  if (ppu_render_disabled() || (current_scanline >= 240
+  if (ppu_is_disabled() || (current_scanline >= 240
                             && current_scanline <= 260)) {
     // When the PPU is inactive, vram is incremented correctly.
     ppu->vram_addr += (ppu->ctrl & FLAG_VRAM_VINC) ? 32 : 1;

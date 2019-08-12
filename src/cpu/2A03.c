@@ -741,7 +741,8 @@ void cpu_decode_inst(word_t inst) {
 }
 
 /*
- * TODO
+ * Queues an indexed indirect zero page read instruction using the given
+ * micro operation.
  */
 void cpu_decode_izpx(microdata_t *micro_op) {
   state_add_cycle(&mem_read_pc_zp_ptr, &data_nop, PC_INC);
@@ -754,7 +755,7 @@ void cpu_decode_izpx(microdata_t *micro_op) {
 }
 
 /*
- * TODO
+ * Queues a zero page read instruction using the given micro operation.
  */
 void cpu_decode_zp(microdata_t *micro_op) {
   state_add_cycle(&mem_read_pc_zp_addr, &data_nop, PC_INC);
@@ -764,7 +765,7 @@ void cpu_decode_zp(microdata_t *micro_op) {
 }
 
 /*
- * TODO
+ * Queues a read immediate instruction using the given micro operation.
  */
 void cpu_decode_imm(microdata_t *micro_op) {
   state_add_cycle(&mem_read_pc_mdr, &data_nop, PC_INC);
@@ -773,7 +774,8 @@ void cpu_decode_imm(microdata_t *micro_op) {
 }
 
 /*
- * TODO
+ * Queues an absolute addressed read instruction using the given micro
+ * operation.
  */
 void cpu_decode_abs(microdata_t *micro_op) {
   state_add_cycle(&mem_read_pc_addrl, &data_nop, PC_INC);
@@ -784,7 +786,8 @@ void cpu_decode_abs(microdata_t *micro_op) {
 }
 
 /*
- * TODO
+ * Queues an indirect indexed zero page read instruction using the given micro
+ * operation.
  */
 void cpu_decode_izp_y(microdata_t *micro_op) {
   state_add_cycle(&mem_read_pc_zp_ptr, &data_nop, PC_INC);
@@ -796,7 +799,8 @@ void cpu_decode_izp_y(microdata_t *micro_op) {
 }
 
 /*
- * TODO
+ * Queues a zero page X indexed read instruction using the given micro
+ * operation.
  */
 void cpu_decode_zpx(microdata_t *micro_op) {
   state_add_cycle(&mem_read_pc_zp_addr, &data_nop, PC_INC);
@@ -807,7 +811,8 @@ void cpu_decode_zpx(microdata_t *micro_op) {
 }
 
 /*
- * TODO
+ * Queues a zero page Y indexed read instruction using the given micro
+ * operation.
  */
 void cpu_decode_zpy(microdata_t *micro_op) {
   state_add_cycle(&mem_read_pc_zp_addr, &data_nop, PC_INC);
@@ -818,7 +823,8 @@ void cpu_decode_zpy(microdata_t *micro_op) {
 }
 
 /*
- * TODO
+ * Queues an absolute addressed Y indexed read instruction using the given
+ * micro operation.
  */
 void cpu_decode_aby(microdata_t *micro_op) {
   state_add_cycle(&mem_read_pc_addrl, &data_nop, PC_INC);
@@ -829,7 +835,8 @@ void cpu_decode_aby(microdata_t *micro_op) {
 }
 
 /*
- * TODO
+ * Queues an absolute addressed X indexed read instruction using the given
+ * micro operation.
  */
 void cpu_decode_abx(microdata_t *micro_op) {
   state_add_cycle(&mem_read_pc_addrl, &data_nop, PC_INC);
@@ -840,7 +847,8 @@ void cpu_decode_abx(microdata_t *micro_op) {
 }
 
 /*
- * TODO
+ * Queues an implied (no memory access) read instruction using the given
+ * micro operation.
  */
 void cpu_decode_nomem(microdata_t *micro_op) {
   state_add_cycle(&mem_read_pc_nodest, &data_nop, PC_NOP);
@@ -849,7 +857,7 @@ void cpu_decode_nomem(microdata_t *micro_op) {
 }
 
 /*
- * TODO
+ * Queues a zero page read-write instruction using the given micro operation.
  */
 void cpu_decode_rw_zp(microdata_t *micro_op) {
   state_add_cycle(&mem_read_pc_zp_addr, &data_nop, PC_INC);
@@ -861,7 +869,8 @@ void cpu_decode_rw_zp(microdata_t *micro_op) {
 }
 
 /*
- * TODO
+ * Queues an absolute addressed read-write instruction using the given micro
+ * operation.
  */
 void cpu_decode_rw_abs(microdata_t *micro_op) {
   state_add_cycle(&mem_read_pc_addrl, &data_nop, PC_INC);
@@ -874,7 +883,8 @@ void cpu_decode_rw_abs(microdata_t *micro_op) {
 }
 
 /*
- * TODO
+ * Queues a zero page X indexed read-write instruction using the given micro
+ * operation.
  */
 void cpu_decode_rw_zpx(microdata_t *micro_op) {
   state_add_cycle(&mem_read_pc_zp_addr, &data_nop, PC_INC);
@@ -887,7 +897,8 @@ void cpu_decode_rw_zpx(microdata_t *micro_op) {
 }
 
 /*
- * TODO
+ * Queues an absolute addressed X indexed read-write instruction using the
+ * given micro operation.
  */
 void cpu_decode_rw_abx(microdata_t *micro_op) {
   state_add_cycle(&mem_read_pc_addrl, &data_nop, PC_INC);
@@ -901,7 +912,8 @@ void cpu_decode_rw_abx(microdata_t *micro_op) {
 }
 
 /*
- * TODO
+ * Queues an X indexed indirect zero page write instruction using the given
+ * micro operation.
  */
 void cpu_decode_w_izpx(micromem_t *micro_op) {
   state_add_cycle(&mem_read_pc_zp_ptr, &data_nop, PC_INC);
@@ -914,7 +926,7 @@ void cpu_decode_w_izpx(micromem_t *micro_op) {
 }
 
 /*
- * TODO
+ * Queues a zero page write instruction using the given micro operation.
  */
 void cpu_decode_w_zp(micromem_t *micro_op) {
   state_add_cycle(&mem_read_pc_zp_addr, &data_nop, PC_INC);
@@ -924,7 +936,8 @@ void cpu_decode_w_zp(micromem_t *micro_op) {
 }
 
 /*
- * TODO
+ * Queues an absolute addressed write instruction using the given micro
+ * operation.
  */
 void cpu_decode_w_abs(micromem_t *micro_op) {
   state_add_cycle(&mem_read_pc_addrl, &data_nop, PC_INC);
@@ -935,7 +948,8 @@ void cpu_decode_w_abs(micromem_t *micro_op) {
 }
 
 /*
- * TODO
+ * Queues an indirect addressed Y indexed zero page write instruction using the
+ * given micro operation.
  */
 void cpu_decode_w_izp_y(micromem_t *micro_op) {
   state_add_cycle(&mem_read_pc_zp_ptr, &data_nop, PC_INC);
@@ -948,7 +962,8 @@ void cpu_decode_w_izp_y(micromem_t *micro_op) {
 }
 
 /*
- * TODO
+ * Queues an X indexed zero page write instruction using the given micro
+ * operation.
  */
 void cpu_decode_w_zpx(micromem_t *micro_op) {
   state_add_cycle(&mem_read_pc_zp_addr, &data_nop, PC_INC);
@@ -959,7 +974,8 @@ void cpu_decode_w_zpx(micromem_t *micro_op) {
 }
 
 /*
- * TODO
+ * Queues a Y indexed zero page write instruction using the given micro
+ * operation.
  */
 void cpu_decode_w_zpy(micromem_t *micro_op) {
   state_add_cycle(&mem_read_pc_zp_addr, &data_nop, PC_INC);
@@ -970,7 +986,8 @@ void cpu_decode_w_zpy(micromem_t *micro_op) {
 }
 
 /*
- * TODO
+ * Queues an absolute addressed Y indexed write instruction using the given
+ * micro operation.
  */
 void cpu_decode_w_aby(micromem_t *micro_op) {
   state_add_cycle(&mem_read_pc_addrl, &data_nop, PC_INC);
@@ -982,7 +999,8 @@ void cpu_decode_w_aby(micromem_t *micro_op) {
 }
 
 /*
- * TODO
+ * Queues an absolute addressed X indexed write instruction using the given
+ * micro operation.
  */
 void cpu_decode_w_abx(micromem_t *micro_op) {
   state_add_cycle(&mem_read_pc_addrl, &data_nop, PC_INC);
@@ -994,7 +1012,7 @@ void cpu_decode_w_abx(micromem_t *micro_op) {
 }
 
 /*
- * TODO
+ * Queues a stack push instruction using the given micro operation.
  */
 void cpu_decode_push(micromem_t *micro_op) {
   state_add_cycle(&mem_read_pc_nodest, &data_nop, PC_NOP);
@@ -1004,7 +1022,7 @@ void cpu_decode_push(micromem_t *micro_op) {
 }
 
 /*
- * TODO
+ * Queues a stack pull instruction using the given micro operation.
  */
 void cpu_decode_pull(micromem_t *micro_op) {
   state_add_cycle(&mem_read_pc_nodest, &data_nop, PC_NOP);

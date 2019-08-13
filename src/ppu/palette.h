@@ -10,6 +10,7 @@
 #define PALETTE_RMASK 0x00FF0000U
 #define PALETTE_GMASK 0x0000FF00U
 #define PALETTE_BMASK 0x000000FFU
+#define PIXEL_MASK 0x3FU
 
 // Loads in the palette file to be used for color decoding.
 bool palette_init(char *file);

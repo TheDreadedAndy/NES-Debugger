@@ -225,6 +225,7 @@ void ppu_render_draw_pixel(void);
 word_t ppu_render_get_tile_pixel(void);
 word_t ppu_render_get_sprite_pixel(void);
 word_t ppu_render_get_sprite_index(void);
+word_t ppu_render_get_sprite_pattern(word_t sprite_index);
 void ppu_render_update_registers(void);
 void ppu_render_get_attribute(void);
 word_t ppu_render_get_tile(word_t index, bool plane_high);
@@ -467,13 +468,13 @@ void ppu_render_draw_pixel(void) {
 
   // Get the background color pixel.
   word_t pixel = memory_vram_read(color_addr);
-  word_t bg_pixel = 0;
-  word_t sprite_pixel = 0;
+  word_t bg_pixel = 0xFFU;
+  word_t sprite_pixel = 0xFFU;
 
   // Get the background tile pixel.
   if (ppu->mask & FLAG_RENDER_BG) {
     bg_pixel = ppu_render_get_tile_pixel();
-    if (bg_pixel) { pixel = bg_pixel; }
+    if (bg_pixel != 0xFFU) { pixel = bg_pixel; }
   }
 
   // Get the sprite pixel.
@@ -483,16 +484,16 @@ void ppu_render_draw_pixel(void) {
     word_t sprite_attribute = ppu->sprite_memory[4 * sprite_index + 2];
 
     // Check if the pixel should be rendered on top of the background.
-    if ((sprite_pixel != 0) && ((bg_pixel == 0)
+    if ((sprite_pixel != 0xFFU) && ((bg_pixel == 0xFFU)
                             || !(sprite_attribute & FLAG_SPRITE_PRIORITY))) {
       pixel = sprite_pixel;
     }
 
     // Check if this counts as a sprite 0 hit.
-    if ((sprite_index == 0) && (ppu->zero_in_mem) && (bg_pixel != 0)
+    if ((sprite_index == 0) && (ppu->zero_in_soam) && (bg_pixel != 0xFFU)
                       && ((screen_x >= 8) || ((ppu->mask & FLAG_SHOW_BG)
                       && (ppu->mask & FLAG_SHOW_SPRITES)))
-                      && (screen_x != 255) && (sprite_pixel != 0)
+                      && (screen_x != 255) && (sprite_pixel != 0xFFU)
                       && (ppu->mask & FLAG_RENDER_BG)
                       && (ppu->mask & FLAG_RENDER_SPRITES)) {
       ppu->status |= FLAG_HIT;
@@ -510,6 +511,7 @@ void ppu_render_draw_pixel(void) {
 
 /*
  * Pulls the next background tile pixel from the shift registers.
+ * Returns -1 if the tile is transparent.
  *
  * Assumes the PPU has been initialized.
  */
@@ -528,30 +530,24 @@ word_t ppu_render_get_tile_pixel(void) {
     // Get the address of the background tile color and read in the pixel.
     dword_t tile_address = PALETTE_BASE_ADDR
                          | (tile_palette << 2U) | tile_pattern;
-    return memory_vram_read(tile_address);
+    return memory_vram_read(tile_address) & PIXEL_MASK;
   } else {
-    return 0x00U;
+    return 0xFFU;
   }
 }
 
 /*
  * Pulls the next sprite pixel from the shift registers.
+ * Returns -1 if the tile is transparent.
  *
  * Assumes the PPU has been initialized.
  * Assumes there is a visible sprite on the current pixel.
  */
 word_t ppu_render_get_sprite_pixel(void) {
-  // Determine which pixel of the sprite is to be rendered from its x position.
-  size_t screen_x = current_cycle - 1;
+  // Get the bit pattern of the current pixel for the sprite that is being
+  // rendered.
   word_t sprite_index = ppu_render_get_sprite_index();
-  word_t sprite_x = ppu->sprite_memory[(sprite_index << 2) + 3];
-  word_t sprite_dx = screen_x - sprite_x;
-
-  // Get the sprite pattern.
-  word_t sprite_pattern = (((ppu->sprite_data[sprite_index][0]
-                        << sprite_dx) >> 7U) & 1U)
-                        | (((ppu->sprite_data[sprite_index][1]
-                        << sprite_dx) >> 6U) & 2U);
+  word_t sprite_pattern = ppu_render_get_sprite_pattern(sprite_index);
 
   // Check if the pixel was transparent.
   if (sprite_pattern) {
@@ -559,11 +555,11 @@ word_t ppu_render_get_sprite_pixel(void) {
                           & FLAG_SPRITE_PALETTE;
     dword_t sprite_address = PALETTE_BASE_ADDR | SPRITE_PALETTE_BASE
                             | (sprite_palette << 2U) | sprite_pattern;
-    return memory_vram_read(sprite_address);
+    return memory_vram_read(sprite_address) & PIXEL_MASK;
   }
 
   // Since the sprite pixel was transparent, we return an empty pixel.
-  return 0x00U;
+  return 0xFFU;
 }
 
 /*
@@ -578,9 +574,34 @@ word_t ppu_render_get_sprite_index(void) {
   dword_t screen_x = current_cycle - 1;
   for (; sprite_index < ppu->sprite_count; sprite_index++) {
     dword_t sprite_x = ppu->sprite_memory[4 * sprite_index + 3];
-    if ((sprite_x <= screen_x) && ((sprite_x + 8) > screen_x)) { break; }
+    if ((sprite_x <= screen_x) && ((sprite_x + 8) > screen_x)
+              && ppu_render_get_sprite_pattern(sprite_index)) {
+      break;
+    }
   }
   return sprite_index;
+}
+
+/*
+ * Gets the bit pattern of the current pixel of a sprite, given its index
+ * in sprite memory.
+ *
+ * Assumes the ppu has been initialized.
+ * Assumes the current cycle is between 1 and 256 inclusive.
+ */
+word_t ppu_render_get_sprite_pattern(word_t sprite_index) {
+  // Determine which pixel of the sprite is to be rendered from its x position.
+  size_t screen_x = current_cycle - 1;
+  word_t sprite_x = ppu->sprite_memory[(sprite_index << 2) + 3];
+  word_t sprite_dx = screen_x - sprite_x;
+
+  // Get the sprite pattern.
+  word_t sprite_pattern = (((ppu->sprite_data[sprite_index][0]
+                        << sprite_dx) >> 7U) & 1U)
+                        | (((ppu->sprite_data[sprite_index][1]
+                        << sprite_dx) >> 6U) & 2U);
+
+  return sprite_pattern;
 }
 
 /*
@@ -744,6 +765,7 @@ void ppu_render_prepare_sprites(void) {
 word_t ppu_render_get_sprite(void) {
   // Get some basic information about the current sprite being prepared.
   word_t sprite_index = (current_cycle - 257) / 8;
+  word_t screen_y = current_scanline;
   word_t sprite_y = ppu->sprite_memory[4 * sprite_index];
 
   // If the data read did not actually belong to a sprite, we return an empty
@@ -755,13 +777,13 @@ word_t ppu_render_get_sprite(void) {
   // If the sprite is 8x16, and the bottom half is being rendered,
   // we need to move to the next tile. An offset is calculated to do this.
   dword_t index_offset = 0;
-  if ((ppu->ctrl & FLAG_SPRITE_SIZE) && (current_scanline >= (sprite_y + 8U))) {
+  if ((ppu->ctrl & FLAG_SPRITE_SIZE) && (screen_y >= (sprite_y + 8U))) {
     index_offset = X16_INDEX_OFFSET;
     sprite_y += 8;
   }
   // This tile offset determines which of the 8 rows of the tile will be
   // returned.
-  dword_t tile_offset = current_scanline - sprite_y; // TODO: Off by one?
+  dword_t tile_offset = screen_y - sprite_y; // TODO: Off by one?
   CONTRACT(tile_offset < 8);
   // Each tile has two planes, which are used to denote its color in a palette.
   dword_t tile_plane = ((current_cycle - 1) >> 1) & 1;
@@ -1050,11 +1072,12 @@ bool ppu_eval_in_range(void) {
   // Get the current size of sprites (8x8 or 8x16) from the control register
   // and the Y cord of the sprite from the eval buffer.
   word_t sprite_size = (ppu->ctrl & FLAG_SPRITE_SIZE) ? 16 : 8;
+  word_t screen_y = current_scanline;
   word_t sprite_y = ppu->eval_buf;
 
   // Check if the sprite is visible on this scanline.
-  bool in_range = (sprite_y <= current_scanline) && (sprite_y < 240)
-                      && (current_scanline < (sprite_y + sprite_size));
+  bool in_range = (sprite_y <= screen_y) && (sprite_y < 240)
+                      && (screen_y < (sprite_y + sprite_size));
   return in_range;
 }
 

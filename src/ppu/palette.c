@@ -19,9 +19,6 @@
 // Holds the decoded palette, which is used by palette_decode.
 uint32_t *decoded_palette = NULL;
 
-// Mask used to remove bits not used in NES colors.
-#define COLOR_MASK 0x3FU
-
 // The number of different NES colors in a given palette.
 #define PALETTE_SIZE 0x40U
 
@@ -75,7 +72,7 @@ bool palette_invalid(FILE *pal_file) {
  * Assumes the palette has been initialized.
  */
 uint32_t palette_decode(word_t color) {
-  return decoded_palette[color & COLOR_MASK];
+  return decoded_palette[color & PIXEL_MASK];
 }
 
 /*

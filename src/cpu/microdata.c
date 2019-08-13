@@ -263,9 +263,9 @@ void data_sei(void) {
 void data_cmp_mdr_a(void) {
   // The carry flag is unsigned overflow. We use a double word to hold
   // the extra bit.
-  dword_t res = ((dword_t) R->A) + (((dword_t) (-R->mdr)) & 0xFFU);
+  dword_t res = ((dword_t) R->A) + (((dword_t) (-R->mdr)) & WORD_MASK);
   R->P = (R->P & 0x7CU) | (res & 0x80U) | (res >> 8U)
-                        | (((res & 0xFFU) == 0U) << 1U);
+                        | (((res & WORD_MASK) == 0U) << 1U);
   return;
 }
 
@@ -274,9 +274,9 @@ void data_cmp_mdr_a(void) {
  * of the result.
  */
 void data_cmp_mdr_x(void) {
-  dword_t res = ((dword_t) R->X) + (((dword_t) (-R->mdr)) & 0xFFU);
+  dword_t res = ((dword_t) R->X) + (((dword_t) (-R->mdr)) & WORD_MASK);
   R->P = (R->P & 0x7CU) | (res & 0x80U) | (res >> 8U)
-                        | (((res & 0xFFU) == 0U) << 1U);
+                        | (((res & WORD_MASK) == 0U) << 1U);
   return;
 }
 
@@ -285,9 +285,9 @@ void data_cmp_mdr_x(void) {
  * of the result.
  */
 void data_cmp_mdr_y(void) {
-  dword_t res = ((dword_t) R->Y) + (((dword_t) (-R->mdr)) & 0xFFU);
+  dword_t res = ((dword_t) R->Y) + (((dword_t) (-R->mdr)) & WORD_MASK);
   R->P = (R->P & 0x7CU) | (res & 0x80U) | (res >> 8U)
-                        | (((res & 0xFFU) == 0U) << 1U);
+                        | (((res & WORD_MASK) == 0U) << 1U);
   return;
 }
 
@@ -347,7 +347,7 @@ void data_rol_mdr(void) {
 }
 
 /*
- * Shifts A left once, back filling with C. Stores teh lost bit in C, sets
+ * Shifts A left once, back filling with C. Stores the lost bit in C, sets
  * the N and Z flags.
  */
 void data_rol_a(void) {
@@ -417,7 +417,7 @@ void data_adc_mdr_a(void) {
             && ((R->A & 0x80U) != (res & 0x80U));
   R->A = (word_t) res;
   R->P = (R->P & 0x3CU) | (R->A & 0x80U) | ((R->A == 0U) << 1U)
-                       | (ovf << 6U) | (res >> 8U);
+                        | (ovf << 6U) | (res >> 8U);
   return;
 }
 
@@ -428,9 +428,9 @@ void data_adc_mdr_a(void) {
 void data_sbc_mdr_a(void) {
   // See documentation for proof of this line. Gives the correct result
   // without issues in the carry out.
-  dword_t res = ((dword_t) R->A) + (((dword_t) (~R->mdr)) & 0xFFU)
+  dword_t res = ((dword_t) R->A) + (((dword_t) (~R->mdr)) & WORD_MASK)
                                  + ((dword_t) (R->P & 0x01U));
-  word_t ovf = ((R->A & 0x80U) == ((-R->mdr) & 0x80U))
+  word_t ovf = ((R->A & 0x80U) == ((~R->mdr) & 0x80U))
             && ((R->A & 0x80U) != (res & 0x80U));
   R->A = (word_t) res;
   R->P = (R->P & 0x3CU) | (R->A & 0x80U) | ((R->A == 0U) << 1U)

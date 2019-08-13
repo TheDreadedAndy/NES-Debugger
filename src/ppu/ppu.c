@@ -217,6 +217,7 @@ ppu_t *ppu = NULL;
 /* Helper functions */
 bool ppu_is_disabled(void);
 void ppu_disabled(void);
+void ppu_draw_background(void);
 void ppu_render(void);
 void ppu_render_visible(void);
 void ppu_render_update_frame(bool output);
@@ -315,10 +316,9 @@ void ppu_disabled(void) {
   ppu->oam_mask = 0;
 
   // Determine which action should be performed.
-  if ((current_scanline < 240) && (current_cycle > 0)
-                               && (current_cycle <= 256)) {
+  if (current_scanline < 240) {
     // Draws the background color to the screen when rendering is disabled.
-    ppu_render_draw_pixel();
+    if ((current_cycle > 0) && (current_cycle < 257)) { ppu_draw_background(); }
   } else if (current_scanline < 261) {
     // Signals the start of vblanks.
     ppu_render_blank();
@@ -329,6 +329,35 @@ void ppu_disabled(void) {
 
   return;
 }
+
+/*
+ * Draws the background color to the screen when rendering is disabled.
+ *
+ * Assumes the PPU has been initialized and rendering is disabled.
+ */
+void ppu_draw_background(void) {
+  // Get the universal background color address and the screen position.
+  size_t screen_x = current_cycle - 1;
+  size_t screen_y = current_scanline;
+  dword_t color_addr = PALETTE_BASE_ADDR;
+  // The universal background color can be changed using the current vram
+  // address.
+  if ((ppu->vram_addr & VRAM_BUS_MASK) > PALETTE_BASE_ADDR) {
+    color_addr = ppu->vram_addr & VRAM_BUS_MASK;
+  }
+
+  // Get the background color pixel.
+  word_t pixel = memory_vram_read(color_addr);
+
+  // Apply a greyscale effect to the pixel, if needed.
+  if (ppu->mask & FLAG_GREYSCALE) { pixel &= GREYSCALE_PIXEL_MASK; }
+
+  // Render the pixel.
+  render_pixel(screen_y, screen_x, pixel);
+
+  return;
+}
+
 
 /*
  * Runs the rendering action for the given cycle/scanline.
@@ -435,12 +464,6 @@ void ppu_render_draw_pixel(void) {
   size_t screen_x = current_cycle - 1;
   size_t screen_y = current_scanline;
   dword_t color_addr = PALETTE_BASE_ADDR;
-  // If rendering is off, the universal background color can be changed
-  // using the current vram address.
-  if (ppu_is_disabled() && ((ppu->vram_addr & VRAM_BUS_MASK)
-                                                > PALETTE_BASE_ADDR)) {
-    color_addr = ppu->vram_addr & VRAM_BUS_MASK;
-  }
 
   // Get the background color pixel.
   word_t pixel = memory_vram_read(color_addr);
@@ -755,8 +778,8 @@ word_t ppu_render_get_sprite(void) {
   if (ppu->ctrl & FLAG_SPRITE_SIZE) {
     tile_pattern = tile_offset | (tile_plane << X16_PLANE_SHIFT)
                  | ((tile_index & X16_TILE_MASK) << X16_TILE_SHIFT)
-                 | ((tile_index & X16_TABLE_MASK) << X16_TABLE_SHIFT);
-    tile_pattern += index_offset;
+                 | ((tile_index & X16_TABLE_MASK) << X16_TABLE_SHIFT)
+                 | index_offset;
   } else {
     tile_pattern = tile_offset | (tile_plane << X8_PLANE_SHIFT)
                  | (tile_index << X8_TILE_SHIFT)

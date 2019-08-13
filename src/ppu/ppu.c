@@ -490,7 +490,7 @@ void ppu_render_draw_pixel(void) {
     }
 
     // Check if this counts as a sprite 0 hit.
-    if ((sprite_index == 0) && (ppu->zero_in_soam) && (bg_pixel != 0xFFU)
+    if ((sprite_index == 0) && (ppu->zero_in_mem) && (bg_pixel != 0xFFU)
                       && ((screen_x >= 8) || ((ppu->mask & FLAG_SHOW_BG)
                       && (ppu->mask & FLAG_SHOW_SPRITES)))
                       && (screen_x != 255) && (sprite_pixel != 0xFFU)
@@ -783,14 +783,14 @@ word_t ppu_render_get_sprite(void) {
   }
   // This tile offset determines which of the 8 rows of the tile will be
   // returned.
-  dword_t tile_offset = screen_y - sprite_y; // TODO: Off by one?
+  dword_t tile_offset = screen_y - sprite_y;
   CONTRACT(tile_offset < 8);
   // Each tile has two planes, which are used to denote its color in a palette.
   dword_t tile_plane = ((current_cycle - 1) >> 1) & 1;
 
   // Check if the sprite is being flipped vertically.
   if (ppu->sprite_memory[4 * sprite_index + 2] & FLAG_SPRITE_VFLIP) {
-    tile_offset = 7 - tile_offset;
+    tile_offset = (~tile_offset) & 0x07U;
     if (ppu->ctrl & FLAG_SPRITE_SIZE) { index_offset ^= X16_INDEX_OFFSET; }
   }
 
@@ -803,9 +803,10 @@ word_t ppu_render_get_sprite(void) {
                  | ((tile_index & X16_TABLE_MASK) << X16_TABLE_SHIFT)
                  | index_offset;
   } else {
+    word_t tile_table = (ppu->ctrl & FLAG_SPRITE_TABLE) ? PATTERN_TABLE_HIGH
+                                                        : PATTERN_TABLE_LOW;
     tile_pattern = tile_offset | (tile_plane << X8_PLANE_SHIFT)
-                 | (tile_index << X8_TILE_SHIFT)
-                 | ((ppu->ctrl & FLAG_SPRITE_TABLE) << X8_TABLE_SHIFT);
+                 | (tile_index << X8_TILE_SHIFT) | tile_table;
   }
 
   // Use the calculated pattern address to get the tile byte.

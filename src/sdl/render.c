@@ -108,7 +108,7 @@ void render_get_window_rect(SDL_Surface *window_surface,
     // Fill in width, pad in height.
     window_rect->w = NES_TRUE_WIDTH_RATIO * window_surface->w;
     window_rect->x = NES_WIDTH_PAD_OFFSET_RATIO * window_rect->w;
-    window_rect->h = NES_TRUE_H_TO_W * window_rect->w;
+    window_rect->h = NES_TRUE_H_TO_W * window_surface->w;
     window_rect->y = (window_surface->h / 2) - (window_rect->h / 2);
   }
 }

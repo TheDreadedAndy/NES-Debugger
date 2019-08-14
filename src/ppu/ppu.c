@@ -803,7 +803,7 @@ word_t ppu_render_get_sprite(void) {
                  | ((tile_index & X16_TABLE_MASK) << X16_TABLE_SHIFT)
                  | index_offset;
   } else {
-    word_t tile_table = (ppu->ctrl & FLAG_SPRITE_TABLE) ? PATTERN_TABLE_HIGH
+    dword_t tile_table = (ppu->ctrl & FLAG_SPRITE_TABLE) ? PATTERN_TABLE_HIGH
                                                         : PATTERN_TABLE_LOW;
     tile_pattern = tile_offset | (tile_plane << X8_PLANE_SHIFT)
                  | (tile_index << X8_TILE_SHIFT) | tile_table;

@@ -26,6 +26,8 @@
 // Window size constants
 #define NES_WIDTH 256
 #define NES_HEIGHT 240
+#define WINDOW_WIDTH 560
+#define WINDOW_HEIGHT 448
 #define MAX_TITLE_SIZE 256
 
 // The name displayed in the SDL window.
@@ -54,7 +56,7 @@ bool window_init(void) {
 
   // Create window.
   window = SDL_CreateWindow(window_name, SDL_WINDOWPOS_CENTERED,
-                            SDL_WINDOWPOS_CENTERED, NES_WIDTH, NES_HEIGHT,
+                            SDL_WINDOWPOS_CENTERED, WINDOW_WIDTH, WINDOW_HEIGHT,
                             SDL_WINDOW_RESIZABLE);
 
   // Check if the window was created successfully.

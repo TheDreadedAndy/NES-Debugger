@@ -13,11 +13,29 @@
 #include "../ppu/palette.h"
 
 /*
+ * The NES draws a 256x240 pictures, which is padded to 280x240. Most tvs
+ * display this picture as 280x224. These constants are used to scale the
+ * SDL rendering surface to the appropriate size on the SDL window, given
+ * this information about the NES.
+ */
+#define NES_WIDTH_OFFSET 0
+#define NES_WIDTH 256
+#define NES_HEIGHT_OFFSET 8
+#define NES_TRUE_HEIGHT 224
+#define NES_TRUE_WIDTH_RATIO (256.0 / 280.0)
+#define NES_WIDTH_PAD_OFFSET_RATIO (12.0 / 280.0)
+#define NES_W_TO_H (256.0 / 224.0)
+#define NES_TRUE_H_TO_W (224.0 / 280.0)
+
+/*
  * Set whenever the ppu draws a frame (which happens at vblank).
  * Reset whenever render_has_drawn() is called.
  * Used to track the frame rate of the emulator and, thus, throttle it.
  */
 bool frame_output = false;
+
+/* Helper functions */
+void render_get_window_rect(SDL_Surface *window_surface, SDL_Rect *window_rect);
 
 /*
  * Draws a pixel to the render surface.
@@ -48,8 +66,19 @@ void render_frame(void) {
   // Get the window surface.
   SDL_Surface *window_surface = SDL_GetWindowSurface(window);
 
+  // Get the regions of the surfaces to be copied.
+  SDL_Rect render_rect, window_rect;
+  render_rect.x = NES_WIDTH_OFFSET;
+  render_rect.y = NES_HEIGHT_OFFSET;
+  render_rect.w = NES_WIDTH;
+  render_rect.h = NES_TRUE_HEIGHT;
+  render_get_window_rect(window_surface, &window_rect);
+
+  // Clear the window surface before displaying the new image.
+  SDL_FillRect(window_surface, NULL, 0);
+
   // Copy the render surface to the window surface.
-  SDL_BlitScaled(render, NULL, window_surface, NULL);
+  SDL_BlitScaled(render, &render_rect, window_surface, &window_rect);
 
   // Update the window.
   SDL_UpdateWindowSurface(window);
@@ -58,6 +87,30 @@ void render_frame(void) {
   frame_output = true;
 
   return;
+}
+
+/*
+ * Determines what the size of the window rect should be in order to
+ * properly scale the NES picture to the window.
+ *
+ * Assumes the given surface and rect are non-null.
+ */
+void render_get_window_rect(SDL_Surface *window_surface,
+                            SDL_Rect *window_rect) {
+  // Determine which dimension the destination window should be padded in.
+  if ((NES_TRUE_H_TO_W * window_surface->w) > window_surface->h) {
+    // Fill in height, pad in width.
+    window_rect->h = window_surface->h;
+    window_rect->y = 0;
+    window_rect->w = NES_W_TO_H * window_rect->h;
+    window_rect->x = (window_surface->w / 2) - (window_rect->w / 2);
+  } else {
+    // Fill in width, pad in height.
+    window_rect->w = NES_TRUE_WIDTH_RATIO * window_surface->w;
+    window_rect->x = NES_WIDTH_PAD_OFFSET_RATIO * window_rect->w;
+    window_rect->h = NES_TRUE_H_TO_W * window_rect->w;
+    window_rect->y = (window_surface->h / 2) - (window_rect->h / 2);
+  }
 }
 
 /*

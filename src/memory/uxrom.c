@@ -79,7 +79,7 @@ void uxrom_new(FILE *rom_file, memory_t *M) {
   M->free = &uxrom_free;
 
   // Set up the cart ram space.
-  map->bat = xcalloc(BAT_SIZE, sizeof(word_t));
+  map->bat = rand_alloc(BAT_SIZE * sizeof(word_t));
 
   // Load the rom data into memory.
   uxrom_load_prg(rom_file, M);

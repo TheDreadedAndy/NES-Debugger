@@ -23,7 +23,7 @@
 // The number of CPU cycles that will be emulated per emulation cycle.
 // Setting this too low will cause speed issues.
 // Setting this too high will cause timing issues.
-#define EMU_CYCLE_SIZE 3000
+#define EMU_CYCLE_SIZE 9944
 
 // Global running variable. Available to other files through ndb.h.
 // Setting this value to false closes the program.
@@ -47,13 +47,9 @@ int main(int argc, char *argv[]) {
   char *rom_file = NULL;
   char *pal_file = NULL;
   signed char opt;
-  bool verbose = false;
 
-  while ((opt = getopt(argc, argv, "hvf:p:")) != -1) {
+  while ((opt = getopt(argc, argv, "hf:p:")) != -1) {
     switch (opt) {
-      case 'v':
-        verbose = true;
-        break;
       case 'f':
         rom_file = optarg;
         break;
@@ -61,7 +57,7 @@ int main(int argc, char *argv[]) {
         pal_file = optarg;
         break;
       default:
-        printf("usage: ndb -f <FILE>\n");
+        printf("usage: ndb -f <FILE> -p <PALETTE FILE>\n");
         exit(0);
         break;
     }
@@ -87,7 +83,6 @@ int main(int argc, char *argv[]) {
   double frames_drawn = 0;
 
   // Main emulation loop.
-  printf("Starting emulation...\n");
   while (ndb_running) {
     // Get the clock time for this loop.
     emutime_get(&current_time);
@@ -113,13 +108,9 @@ int main(int argc, char *argv[]) {
       frames_drawn++;
     }
 
-    // Executes the next cycle and prints the results.
-    if (emutime_gt(&current_time, &emu_wait)) {
-      run_emulation_cycle();
-      if (verbose) { regfile_print(-1); }
-    }
+    // Executes the next cycle.
+    if (emutime_gt(&current_time, &emu_wait)) { run_emulation_cycle(); }
   }
-  printf("Done!\n");
 
   // Clean up any allocated memory.
   cpu_free();

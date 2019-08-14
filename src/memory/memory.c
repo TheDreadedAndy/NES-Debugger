@@ -63,8 +63,8 @@ memory_t *system_memory = NULL;
 bool memory_init(FILE *rom_file, header_t *header) {
   // Allocate the generic memory structure.
   system_memory = xcalloc(1, sizeof(memory_t));
-  system_memory->ram = xcalloc(sizeof(word_t), RAM_SIZE);
-  system_memory->palette_data = xcalloc(sizeof(word_t), PALETTE_SIZE);
+  system_memory->ram = rand_alloc(sizeof(word_t) * RAM_SIZE);
+  system_memory->palette_data = rand_alloc(sizeof(word_t) * PALETTE_SIZE);
   system_memory->header = header;
 
   // Use the decoded header to decide which memory structure should be created.

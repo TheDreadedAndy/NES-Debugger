@@ -86,8 +86,8 @@ void uxrom_new(FILE *rom_file, memory_t *M) {
   uxrom_load_chr(rom_file, M);
 
   // Setup the nametable in vram.
-  map->nametable[0] = xcalloc(sizeof(word_t), NAMETABLE_SIZE);
-  map->nametable[3] = xcalloc(sizeof(word_t), NAMETABLE_SIZE);
+  map->nametable[0] = rand_alloc(sizeof(word_t) * NAMETABLE_SIZE);
+  map->nametable[3] = rand_alloc(sizeof(word_t) * NAMETABLE_SIZE);
   if (M->header->mirror) {
     // Vertical (horizontal arrangement) mirroring.
     map->nametable[1] = map->nametable[3];
@@ -146,14 +146,14 @@ void uxrom_load_chr(FILE *rom_file, memory_t *M) {
   if (M->header->chr_ram_size > 0) {
     map->is_chr_ram = true;
     // chr-ram should always be 8K for this mapper.
-    map->pattern_table = xcalloc(sizeof(word_t), M->header->chr_ram_size);
+    map->pattern_table = rand_alloc(sizeof(word_t) * M->header->chr_ram_size);
     return;
   }
 
   // Otherwise, the rom uses chr-rom and the data needs to be copied
   // from the rom file.
   map->is_chr_ram = false;
-  map->pattern_table = xcalloc(sizeof(word_t), M->header->chr_rom_size);
+  map->pattern_table = xmalloc(sizeof(word_t) * M->header->chr_rom_size);
   fseek(rom_file, HEADER_SIZE + M->header->prg_rom_size, SEEK_SET);
   for (size_t i = 0; i < M->header->chr_rom_size; i++) {
     map->pattern_table[i] = fgetc(rom_file);

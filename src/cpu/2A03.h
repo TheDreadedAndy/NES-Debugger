@@ -9,6 +9,9 @@
 #ifndef _NES_2A03
 #define _NES_2A03
 
+// The CPU has a memory mapped register to start a DMA to OAM at this address.
+#define CPU_DMA_ADDR 0x4014U
+
 // Interrupt bools, which can be set by the PPU/APU
 extern bool irq_line, nmi_line;
 

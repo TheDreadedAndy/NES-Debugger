@@ -21,6 +21,7 @@
 #include "../ppu/ppu.h"
 #include "../cpu/2A03.h"
 #include "../io/controller.h"
+#include "../apu/apu.h"
 
 // RAM data constants.
 #define RAM_SIZE 0x800U
@@ -100,12 +101,12 @@ word_t memory_read(word_t mem_lo, word_t mem_hi) {
     return ppu_read(addr);
   } else if (addr < MAPPER_OFFSET) {
     // Access APU and IO registers.
-    if ((addr == 0x4016U) || (addr == 0x4017U)) {
+    if ((addr == IO_JOY1_ADDR) || (addr == IO_JOY2_ADDR)) {
       // Read from controller register.
       return controller_read(addr);
     } else {
-      // TODO: Not implemented, dummy byte.
-      return 0x1FU;
+      // Read from APU register.
+      return apu_read(addr);
     }
   } else {
     // Access cartridge space using the mapper.
@@ -131,9 +132,13 @@ void memory_write(word_t val, word_t mem_lo, word_t mem_hi) {
     ppu_write(addr, val);
   } else if (addr < MAPPER_OFFSET) {
     // Access APU and IO registers.
-    // FIXME: This sucks. Doesnt fill the ppu latch, either.
-    if (addr == 0x4014U) { cpu_start_dma(val); }
-    if (addr == 0x4016U) { controller_write(val, addr); }
+    if (addr == CPU_DMA_ADDR) {
+      cpu_start_dma(val);
+    } else if (addr == IO_JOY1_ADDR) {
+      controller_write(val, addr);
+    } else {
+      apu_write(addr, val);
+    }
   } else {
     system_memory->write(val, addr, system_memory->map);
   }

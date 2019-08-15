@@ -19,11 +19,12 @@
 #include "./memory/memory.h"
 #include "./memory/header.h"
 #include "./ppu/ppu.h"
+#include "./apu/apu.h"
 
-// The number of CPU cycles that will be emulated per emulation cycle.
+// The number of APU cycles that will be emulated per emulation cycle.
 // Setting this too low will cause speed issues.
 // Setting this too high will cause timing issues.
-#define EMU_CYCLE_SIZE 9944
+#define EMU_CYCLE_SIZE 4972
 
 // Global running variable. Available to other files through ndb.h.
 // Setting this value to false closes the program.
@@ -115,6 +116,7 @@ int main(int argc, char *argv[]) {
   // Clean up any allocated memory.
   cpu_free();
   ppu_free();
+  apu_free();
   window_close();
 
   return 0;
@@ -137,6 +139,7 @@ void start_emulation(char *rom, char *pal) {
   // Initializes the hardware emulation.
   cpu_init(rom_file, header);
   ppu_init(pal);
+  apu_init();
 
   // Clean up and exit.
   fclose(rom_file);
@@ -150,10 +153,17 @@ void start_emulation(char *rom, char *pal) {
  */
 void run_emulation_cycle(void) {
   for (size_t i = 0; i < EMU_CYCLE_SIZE; i++) {
+    // The PPU is clocked at 3x the rate of the CPU, the APU is clocked
+    // at 1/2 the rate of the CPU.
     ppu_run_cycle();
     ppu_run_cycle();
     ppu_run_cycle();
     cpu_run_cycle();
+    ppu_run_cycle();
+    ppu_run_cycle();
+    ppu_run_cycle();
+    cpu_run_cycle();
+    apu_run_cycle();
   }
   return;
 }

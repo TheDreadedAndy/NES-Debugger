@@ -1327,6 +1327,9 @@ void ppu_oam_dma(word_t val) {
     // Writes during rendering cause a bad increment and ignore the write.
     ppu->oam_addr += 4;
   }
+
+  // The PPU bus is filled with the value, incase we are coming from a CPU  DMA.
+  ppu->bus = val;
   return;
 }
 

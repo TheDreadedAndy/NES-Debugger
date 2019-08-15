@@ -46,7 +46,8 @@
 /* Global Variables */
 
 // Global interrupt lines, accessable from outside this file.
-bool irq_line = false;
+// Since multiple sources can assert an IRQ, its line is a counter of sources.
+word_t irq_line = 0;
 bool nmi_line = false;
 
 // Internal interrupt lines, used only in CPU emulation.
@@ -1062,7 +1063,7 @@ void cpu_poll_nmi_line(void) {
  */
 void cpu_poll_irq_line(void) {
   // The internal irq signal is a level detector that update every cycle.
-  irq_level = irq_line;
+  irq_level = (bool) irq_line;
   return;
 }
 

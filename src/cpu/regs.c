@@ -22,6 +22,8 @@ regfile_t *R = NULL;
  */
 void regfile_init(void) {
   R = xcalloc(1, sizeof(regfile_t));
+  // IRQ's are disabled on power up.
+  R->P = 0x04U;
   return;
 }
 

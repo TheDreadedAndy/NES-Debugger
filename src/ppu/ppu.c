@@ -765,6 +765,7 @@ void ppu_render_prepare_sprites(void) {
 word_t ppu_render_get_sprite(void) {
   // Get some basic information about the current sprite being prepared.
   word_t sprite_index = (current_cycle - 257) / 8;
+  CONTRACT(sprite_index < 8);
   word_t screen_y = current_scanline;
   word_t sprite_y = ppu->sprite_memory[4 * sprite_index];
 
@@ -1096,6 +1097,7 @@ void ppu_eval_fetch_sprites(void) {
     ppu->soam_addr = 0;
     ppu->zero_in_mem = ppu->zero_in_soam;
     ppu->sprite_count = ppu->next_sprite_count;
+    CONTRACT(ppu->sprite_count <= 8);
   }
 
   // Sprite evaluation and rendering alternate access to sprite data every 4

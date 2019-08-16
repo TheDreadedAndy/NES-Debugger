@@ -175,8 +175,8 @@ word_t uxrom_read(dword_t addr, void *map) {
 
   // Detect where in memory we need to access and do so.
   if (addr < BAT_OFFSET) {
-    fprintf(stderr, "FATAL: Memory not implemented.\n");
-    abort();
+    fprintf(stderr, "WARNING: Memory not implemented.\n");
+    return 0;
   } else if (addr < BANK_OFFSET) {
     return M->bat[addr & BAT_MASK];
   } else if (addr < FIXED_BANK_OFFSET) {
@@ -199,8 +199,7 @@ void uxrom_write(word_t val, dword_t addr, void *map) {
 
   // Detect where in memory we need to access and do so.
   if (addr < BAT_OFFSET) {
-    fprintf(stderr, "FATAL: Memory not implemented.\n");
-    abort();
+    fprintf(stderr, "WARNING: Memory not implemented.\n");
   } else if (addr < BANK_OFFSET) {
     M->bat[addr & BAT_MASK] = val;
   } else {

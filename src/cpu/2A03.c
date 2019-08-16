@@ -52,16 +52,16 @@ bool nmi_line = false;
 
 // Internal interrupt lines, used only in CPU emulation.
 bool nmi_edge = false;
-bool irq_level = false;
+static bool irq_level = false;
 
 // Some instructions need to be able to poll on one cycle and interrupt later,
 // this flag acknowledges these cases.
 bool irq_ready = false;
 
 // Used for DMA transfer to OAM. The transfer adds a cycle on odd frames.
-bool cycle_even = false;
-size_t dma_cycles_remaining = 0;
-word_t dma_high = 0;
+static bool cycle_even = false;
+static size_t dma_cycles_remaining = 0;
+static word_t dma_high = 0;
 
 /* Helper functions. */
 void cpu_run_mem(micro_t *micro);
@@ -153,7 +153,7 @@ void cpu_run_cycle(void) {
 /*
  * Checks if the cpu should poll for interrupts on this cycle.
  *
- * Assumes that the provided structures are valid.
+ * Assumes the CPU has been initialized.
  */
 bool cpu_can_poll(void) {
   // Interrupt polling (internal) happens when the cpu is about

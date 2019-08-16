@@ -190,6 +190,8 @@ void apu_init(void) {
  * Assumes CPU memory has been initialized.
  */
 void apu_run_cycle(void) {
+  // TODO Timing may be super wrong.
+
   // If we're on the start of a frame step, run the frame counters action
   // for that step.
   if (frame_clock == 0) { apu_run_frame_step(); }
@@ -326,7 +328,6 @@ void apu_update_dmc(void) {
     word_t addr_lo = (word_t) dmc->current_addr;
     word_t addr_hi = (word_t) (dmc->current_addr >> 8);
     dmc->sample_buffer = memory_read(addr_lo, addr_hi);
-    dmc->bits_remaining = 8;
     dmc->current_addr = (dmc->current_addr + 1) | DMC_CURRENT_ADDR_BASE;
     dmc->bytes_remaining--;
 
@@ -350,7 +351,7 @@ void apu_update_dmc(void) {
   }
 
   // Use the sample buffer to update the dmc level.
-  dmc->bits_remaining = (dmc->bits_remaining) ? dmc->bits_remaining - 1 : 8;
+  dmc->bits_remaining = (dmc->bits_remaining > 0) ? dmc->bits_remaining - 1 : 8;
   if (!(dmc->silent)) {
     if ((dmc->sample_buffer & 1) && (dmc->level <= (DMC_LEVEL_MAX - 2))) {
       dmc->level += 2;
@@ -359,7 +360,6 @@ void apu_update_dmc(void) {
     }
     dmc->sample_buffer >>= 1;
   }
-  dmc->bits_remaining--;
 
   return;
 }

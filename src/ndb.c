@@ -21,10 +21,10 @@
 #include "./ppu/ppu.h"
 #include "./apu/apu.h"
 
-// The number of APU cycles that will be emulated per emulation cycle.
+// The number of cpu cycles that will be emulated per emulation cycle.
 // Setting this too low will cause speed issues.
 // Setting this too high will cause timing issues.
-#define EMU_CYCLE_SIZE 4972
+#define EMU_CYCLE_SIZE 9944
 
 // Global running variable. Available to other files through ndb.h.
 // Setting this value to false closes the program.
@@ -155,10 +155,6 @@ void run_emulation_cycle(void) {
   for (size_t i = 0; i < EMU_CYCLE_SIZE; i++) {
     // The PPU is clocked at 3x the rate of the CPU, the APU is clocked
     // at 1/2 the rate of the CPU.
-    ppu_run_cycle();
-    ppu_run_cycle();
-    ppu_run_cycle();
-    cpu_run_cycle();
     ppu_run_cycle();
     ppu_run_cycle();
     ppu_run_cycle();

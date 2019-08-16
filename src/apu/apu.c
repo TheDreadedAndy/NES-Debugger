@@ -118,6 +118,7 @@ typedef struct dmc {
   dword_t bytes_remaining;
   word_t bits_remaining;
   word_t sample_buffer;
+  word_t output;
   bool silent;
 
   // The DMC updates whenever this value is greater than the corresponding
@@ -160,6 +161,9 @@ static bool frame_irq = false;
 static size_t frame_clock = 0;
 static size_t frame_step = 0;
 
+// Most functions only update every other cycle. This flag tracks that.
+bool cycle_even = false;
+
 /* Helper functions. */
 void apu_run_frame_step(void);
 void apu_inc_frame(void);
@@ -190,7 +194,12 @@ void apu_init(void) {
  * Assumes CPU memory has been initialized.
  */
 void apu_run_cycle(void) {
-  // TODO Timing may be super wrong.
+  // Only the triangle wave updates on odd cycles.
+  if (!cycle_even) {
+    apu_update_triangle();
+    cycle_even = !cycle_even;
+    return;
+  }
 
   // If we're on the start of a frame step, run the frame counters action
   // for that step.
@@ -205,6 +214,9 @@ void apu_run_cycle(void) {
   apu_update_triangle();
   apu_update_noise();
   apu_update_dmc();
+
+  // Toggle the cycle evenness.
+  cycle_even = !cycle_even;
 
   return;
 }
@@ -316,9 +328,9 @@ void apu_update_dmc(void) {
   // Check if it is time for the DMC channel to update.
   if (dmc->clock >= dmc_rates[dmc->rate]) {
     dmc->clock = 0;
+    dmc->output = dmc->level;
   } else {
     dmc->clock++;
-    return;
   }
 
   // Refill the sample buffer if it is empty.

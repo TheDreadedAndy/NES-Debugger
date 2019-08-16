@@ -8,6 +8,70 @@
 #include "../util/util.h"
 #include "../util/data.h"
 #include "../cpu/2A03.h"
+#include "../memory/memory.h"
+
+// These flags can be used to access the APU status.
+#define FLAG_DMC_IRQ 0x80U
+#define FLAG_FRAME_IRQ 0x40U
+#define FLAG_DMC_ACTIVE 0x10U
+#define FLAG_NOISE_ACTIVE 0x08U
+#define FLAG_TRI_ACTIVE 0x04U
+#define FLAG_PULSE_B_ACTIVE 0x02U
+#define FLAG_PULSE_A_ACTIVE 0x01U
+
+// These flags can be used to access the APU frame control register.
+#define FLAG_MODE 0x80U
+#define FLAG_IRQ_DISABLE 0x40U
+
+// These flags can be used to control the individual channels.
+#define FLAG_PULSE_HALT 0x20U
+#define FLAG_TRI_HALT 0x80U
+#define FLAG_NOISE_HALT 0x20U
+#define FLAG_DMC_LOOP 0x40U
+
+// There are 3729 APU clock cycles per APU frame step.
+#define FRAME_STEP_LENGTH 3729U
+
+// Some registers are mapped in the CPU memory space. These are their addresses.
+#define PULSE_A_CONTROL_ADDR 0x4000U
+#define PULSE_A_SWEEP_ADDR 0x4001U
+#define PULSE_A_TIMERL_ADDR 0x4002U
+#define PULSE_A_LENGTH_ADDR 0x4003U
+#define PULSE_B_CONTROL_ADDR 0x4004U
+#define PULSE_B_SWEEP_ADDR 0x4005U
+#define PULSE_B_TIMERL_ADDR 0x4006U
+#define PULSE_B_LENGTH_ADDR 0x4007U
+#define TRI_CONTROL_ADDR 0x4008U
+#define TRI_TIMERL_ADDR 0x400AU
+#define TRI_LENGTH_ADDR 0x400BU
+#define NOISE_CONTROL_ADDR 0x400CU
+#define NOISE_PERIOD_ADDR 0x400EU
+#define NOISE_LENGTH_ADDR 0x400FU
+#define DMC_CONTROL_ADDR 0x4010U
+#define DMC_COUNTER_ADDR 0x4011U
+#define DMC_ADDRESS_ADDR 0x4012U
+#define DMC_LENGTH_ADDR 0x4013U
+#define APU_STATUS_ADDR 0x4015U
+#define FRAME_COUNTER_ADDR 0x4017U
+
+// MMIO writes may change multiple values using different bits. These masks
+// allow for this.
+#define LENGTH_MASK 0xF8U
+#define LENGTH_SHIFT 3U
+#define TIMER_HIGH_MASK 0x07U
+#define TIMER_HIGH_SHIFT 8U
+#define TIMER_LOW_MASK 0xFFU
+#define DMC_CONTROL_MASK 0xC0U
+#define DMC_RATE_MASK 0x0FU
+#define DMC_LEVEL_MASK 0x7FU
+#define DMC_ADDR_SHIFT 6U
+#define DMC_ADDR_BASE 0xC000U
+#define DMC_LENGTH_SHIFT 4U
+#define DMC_LENGTH_BASE 0x0001U
+
+// These constants are used to properly update the DMC channel.
+#define DMC_CURRENT_ADDR_BASE 0x8000U
+#define DMC_LEVEL_MAX 127U
 
 /*
  * Contains the data related to the operation of an APU pulse channel.
@@ -54,58 +118,20 @@ typedef struct dmc {
   dword_t bytes_remaining;
   word_t bits_remaining;
   word_t sample_buffer;
+  bool silent;
+
+  // The DMC updates whenever this value is greater than the corresponding
+  // rate value.
+  size_t clock;
 } dmc_t;
 
-// These flags can be used to access the APU status.
-#define FLAG_DMC_IRQ 0x80U
-#define FLAG_FRAME_IRQ 0x40U
-#define FLAG_DMC_ACTIVE 0x10U
-#define FLAG_NOISE_ACTIVE 0x08U
-#define FLAG_TRI_ACTIVE 0x04U
-#define FLAG_PULSE_B_ACTIVE 0x02U
-#define FLAG_PULSE_A_ACTIVE 0x01U
-
-// These flags can be used to access the APU frame control register.
-#define FLAG_MODE 0x80U
-#define FLAG_IRQ_DISABLE 0x40U
-
-// These flags can be used to control the individual channels.
-#define FLAG_PULSE_HALT 0x20U
-#define FLAG_TRI_HALT 0x80U
-#define FLAG_NOISE_HALT 0x20U
-
-// There are 3729 APU clock cycles per APU frame step.
-#define FRAME_STEP_LENGTH 3729U
-
-// Some registers are mapped in the CPU memory space. These are their addresses.
-#define PULSE_A_CONTROL_ADDR 0x4000U
-#define PULSE_A_SWEEP_ADDR 0x4001U
-#define PULSE_A_TIMERL_ADDR 0x4002U
-#define PULSE_A_LENGTH_ADDR 0x4003U
-#define PULSE_B_CONTROL_ADDR 0x4004U
-#define PULSE_B_SWEEP_ADDR 0x4005U
-#define PULSE_B_TIMERL_ADDR 0x4006U
-#define PULSE_B_LENGTH_ADDR 0x4007U
-#define TRI_CONTROL_ADDR 0x4008U
-#define TRI_TIMERL_ADDR 0x400AU
-#define TRI_LENGTH_ADDR 0x400BU
-#define NOISE_CONTROL_ADDR 0x400CU
-#define NOISE_PERIOD_ADDR 0x400EU
-#define NOISE_LENGTH_ADDR 0x400FU
-#define DMC_CONTROL_ADDR 0x4010U
-#define DMC_COUNTER_ADDR 0x4011U
-#define DMC_ADDRESS_ADDR 0x4012U
-#define DMC_LENGTH_ADDR 0x4013U
-#define APU_STATUS_ADDR 0x4015U
-#define FRAME_COUNTER_ADDR 0x4017U
-
-// MMIO writes may change multiple values using different bits. These masks
-// allow for this.
-#define LENGTH_MASK 0xF8U
-#define LENGTH_SHIFT 3U
-#define TIMER_HIGH_MASK 0x07U
-#define TIMER_HIGH_SHIFT 8U
-#define TIMER_LOW_MASK 0xFFU
+/*
+ * The rate value in the DMC channel maps to a number of APU cycles to wait
+ * between updates, which corresponds to a given frequency. These wait
+ * times are stored in this array.
+ */
+static size_t dmc_rates[] = { 214, 190, 170, 160, 143, 127, 113, 107,
+                              95, 80, 71, 64, 53, 42, 36, 27 };
 
 /*
  * These global variables control the different channels of the APU.
@@ -142,6 +168,7 @@ void apu_update_pulse_b(void);
 void apu_update_triangle(void);
 void apu_update_noise(void);
 void apu_update_dmc(void);
+void apu_status_write(word_t val);
 
 /*
  * Initializes the APU structures.
@@ -160,6 +187,7 @@ void apu_init(void) {
  * Runs a cycle of the APU emulation.
  *
  * Assumes the APU has been initialized.
+ * Assumes CPU memory has been initialized.
  */
 void apu_run_cycle(void) {
   // If we're on the start of a frame step, run the frame counters action
@@ -276,9 +304,63 @@ void apu_update_noise(void) {
 }
 
 /*
- * TODO
+ * Updates the DMC channel, filling the buffer and updating the level as
+ * necessary. May optionally generate an IRQ when a sample finishes.
+ *
+ * Assumes the APU has been initialized.
+ * Assumes CPU memory has been initialized.
  */
 void apu_update_dmc(void) {
+  // Check if it is time for the DMC channel to update.
+  if (dmc->clock >= dmc_rates[dmc->rate]) {
+    dmc->clock = 0;
+  } else {
+    dmc->clock++;
+    return;
+  }
+
+  // Refill the sample buffer if it is empty.
+  if ((dmc->bits_remaining == 0) && (dmc->bytes_remaining > 0)) {
+    // TODO: Stall CPU.
+    // Load the next word into the sample buffer.
+    word_t addr_lo = (word_t) dmc->current_addr;
+    word_t addr_hi = (word_t) (dmc->current_addr >> 8);
+    dmc->sample_buffer = memory_read(addr_lo, addr_hi);
+    dmc->bits_remaining = 8;
+    dmc->current_addr = (dmc->current_addr + 1) | DMC_CURRENT_ADDR_BASE;
+    dmc->bytes_remaining--;
+
+    // If the sample is now over, send out an IRQ and loop it if either
+    // is enabled.
+    if (dmc->bytes_remaining == 0) {
+      if ((dmc->control & FLAG_DMC_IRQ) && !dmc_irq) {
+        dmc_irq = true;
+        irq_line++;
+      }
+
+      if (dmc->control & FLAG_DMC_LOOP) {
+        dmc->current_addr = dmc->addr;
+        dmc->bytes_remaining = dmc->length;
+      } else {
+        dmc->silent = true;
+      }
+    } else {
+      dmc->silent = false;
+    }
+  }
+
+  // Use the sample buffer to update the dmc level.
+  dmc->bits_remaining = (dmc->bits_remaining) ? dmc->bits_remaining - 1 : 8;
+  if (!(dmc->silent)) {
+    if ((dmc->sample_buffer & 1) && (dmc->level <= (DMC_LEVEL_MAX - 2))) {
+      dmc->level += 2;
+    } else if (!(dmc->sample_buffer & 1) && (dmc->level >= 2)) {
+      dmc->level -= 2;
+    }
+    dmc->sample_buffer >>= 1;
+  }
+  dmc->bits_remaining--;
+
   return;
 }
 
@@ -300,9 +382,11 @@ void apu_write(dword_t reg_addr, word_t val) {
       break;
     case PULSE_A_SWEEP_ADDR:
     case PULSE_B_SWEEP_ADDR:
+      // TODO
       break;
     case PULSE_A_TIMERL_ADDR:
     case PULSE_B_TIMERL_ADDR:
+      // TODO
       break;
     case PULSE_A_LENGTH_ADDR:
     case PULSE_B_LENGTH_ADDR:
@@ -317,6 +401,7 @@ void apu_write(dword_t reg_addr, word_t val) {
       // TODO: Other effects.
       break;
     case TRI_TIMERL_ADDR:
+      // TODO
       break;
     case TRI_LENGTH_ADDR:
       // Update the triangle length and timer high.
@@ -328,20 +413,32 @@ void apu_write(dword_t reg_addr, word_t val) {
       noise->control = val;
       break;
     case NOISE_PERIOD_ADDR:
+      // TODO
       break;
     case NOISE_LENGTH_ADDR:
       // Update the noise length counter.
       noise->length = (val & LENGTH_MASK) >> LENGTH_SHIFT;
       break;
     case DMC_CONTROL_ADDR:
+      // Update the control bits and rate of the DMC channel.
+      dmc->control = val & DMC_CONTROL_MASK;
+      dmc->rate = val & DMC_RATE_MASK;
+      dmc->clock = 0;
       break;
     case DMC_COUNTER_ADDR:
+      // Update the PCM output level of the DMC channel.
+      dmc->level = val & DMC_LEVEL_MASK;
       break;
     case DMC_ADDRESS_ADDR:
+      // Update the base sample address of the DMC channel.
+      dmc->addr = (((dword_t) val) << DMC_ADDR_SHIFT) | DMC_ADDR_BASE;
       break;
     case DMC_LENGTH_ADDR:
+      // Update the sample length of the DMC channel.
+      dmc->length = (((dword_t) val) << DMC_LENGTH_SHIFT) | DMC_LENGTH_BASE;
       break;
     case APU_STATUS_ADDR:
+      apu_status_write(val);
       break;
     case FRAME_COUNTER_ADDR:
       // TODO: Add reset delay.
@@ -358,6 +455,37 @@ void apu_write(dword_t reg_addr, word_t val) {
     default:
       // If the address is invalid, nothing happens.
       break;
+  }
+
+  return;
+}
+
+/*
+ * Write to the APU status register, reseting the channels and clearing
+ * the DMC IRQ as necessary.
+ *
+ * Assumes the APU has been initialized.
+ */
+void apu_status_write(word_t val) {
+  // Clear each channel whose bit was not set.
+  if (!(val & FLAG_NOISE_ACTIVE)) { noise->length = 0; }
+  if (!(val & FLAG_TRI_ACTIVE)) { triangle->length = 0; }
+  if (!(val & FLAG_PULSE_B_ACTIVE)) { pulse_b->length = 0; }
+  if (!(val & FLAG_PULSE_A_ACTIVE)) { pulse_a->length = 0; }
+  if (!(val & FLAG_DMC_ACTIVE)) {
+    dmc->bytes_remaining = 0;
+  } else if (dmc->bytes_remaining > 0) {
+    // If the DMC bit was set, the channel should be reset without changing
+    // the contents of the delta buffer; but only when there are no bytes
+    // remaining in the sample.
+    dmc->current_addr = dmc->addr;
+    dmc->bytes_remaining = dmc->length;
+  }
+
+  // Clear the DMC interrupt, if it is active.
+  if (dmc_irq) {
+    dmc_irq = false;
+    irq_line--;
   }
 
   return;

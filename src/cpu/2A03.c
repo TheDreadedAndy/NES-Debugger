@@ -1063,7 +1063,7 @@ void cpu_poll_nmi_line(void) {
  */
 void cpu_poll_irq_line(void) {
   // The internal irq signal is a level detector that update every cycle.
-  irq_level = (bool) irq_line;
+  irq_level = (irq_line > 0);
   return;
 }
 

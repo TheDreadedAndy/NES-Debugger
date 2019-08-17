@@ -12,6 +12,7 @@
 #include "./emulation/emutime.h"
 #include "./sdl/window.h"
 #include "./sdl/render.h"
+#include "./sdl/audio.h"
 #include "./sdl/input.h"
 #include "./util/util.h"
 #include "./cpu/2A03.h"
@@ -72,6 +73,7 @@ int main(int argc, char *argv[]) {
 
   // Prepares the NES emulation for execution.
   window_init();
+  audio_init();
   input_load(NULL);
   start_emulation(rom_file, pal_file);
 
@@ -107,6 +109,8 @@ int main(int argc, char *argv[]) {
     if (render_has_drawn()) {
       emutime_update(&current_time, &emu_wait, FRAME_LENGTH);
       frames_drawn++;
+      // TODO: move this.
+      audio_play_frame();
     }
 
     // Executes the next cycle.
@@ -117,6 +121,7 @@ int main(int argc, char *argv[]) {
   cpu_free();
   ppu_free();
   apu_free();
+  audio_close();
   window_close();
 
   return 0;

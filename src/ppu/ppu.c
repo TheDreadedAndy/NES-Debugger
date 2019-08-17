@@ -316,6 +316,14 @@ void ppu_disabled(void) {
   // The OAM mask should not be active when rendering is disabled.
   ppu->oam_mask = 0;
 
+  // Prevents the PPU from making out of range SOAM accesses (and other issues)
+  // if the PPU gets enabled in the middle of a frame.
+  ppu->eval_state = SCAN;
+  ppu->soam_addr = 0;
+  ppu->zero_index = 0;
+  ppu->zero_in_soam = false;
+  ppu->next_sprite_count = 0;
+
   // Determine which action should be performed.
   if (current_scanline < 240) {
     // Draws the background color to the screen when rendering is disabled.

@@ -49,7 +49,7 @@ void window_process_window_event(SDL_Event *event);
  */
 bool window_init(void) {
   // Init SDL's video system.
-  if (SDL_Init(SDL_INIT_VIDEO) != 0) {
+  if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) != 0) {
     fprintf(stderr, "Failed to initialize SDL.\n");
     return false;
   }

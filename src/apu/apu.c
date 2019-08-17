@@ -563,21 +563,20 @@ void apu_update_pulse(pulse_t *pulse) {
  * Assumes the APU has been initialized.
  */
 void apu_update_triangle(void) {
-  // Check if the triangle channel should output sound on this cycle.
-  if ((triangle->linear > 0) && (triangle->length > 0)
-                             && ((triangle->timer > 1)
-                             || enable_high_freqs)) {
-    triangle->output = triangle_wave[triangle->pos];
-  } else {
-    triangle->output = 0;
-  }
+  // Update the triangle waves output for this cycle.
+  // The triangle wave cannot be silenced, it simply
+  // stops updating its position.
+  triangle->output = triangle_wave[triangle->pos];
 
   // Update the triangle clock and output wave form using the timer period.
   if (triangle->clock > 0) {
     triangle->clock--;
   } else {
     triangle->clock = triangle->timer;
-    if ((triangle->linear > 0) && (triangle->length > 0)) {
+    // Determine if the position should be updated.
+    if ((triangle->linear > 0) && (triangle->length > 0)
+                               && ((triangle->timer > 1)
+                               || enable_high_freqs)) {
       triangle->pos = (triangle->pos + 1) & 0x1FU;
     }
   }

@@ -109,8 +109,6 @@ int main(int argc, char *argv[]) {
     if (render_has_drawn()) {
       emutime_update(&current_time, &emu_wait, FRAME_LENGTH);
       frames_drawn++;
-      // TODO: move this.
-      audio_play_frame();
     }
 
     // Executes the next cycle.

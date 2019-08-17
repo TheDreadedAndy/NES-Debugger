@@ -101,7 +101,7 @@ typedef struct pulse {
   // Internal registers.
   word_t sweep_counter;
   word_t pos;
-  size_t clock;
+  dword_t clock;
   word_t output;
   word_t env_clock;
   word_t env_volume;
@@ -168,6 +168,14 @@ static size_t dmc_rates[] = { 214, 190, 170, 160, 143, 127, 113, 107,
 static word_t pulse_waves[] = { 0x40U, 0x60U, 0x78U, 0x9FU };
 
 /*
+ * The APU has a length lookup table, which it uses to translate the values
+ * written to the channel length counters into actual cycle lengths.
+ */
+static word_t length_table[] = { 10, 254, 20, 2, 40, 4, 80, 6, 160, 8, 60, 10,
+                                 14, 12, 26, 14, 12, 16, 24, 18, 48, 20, 96,
+                                 22, 192, 24, 72, 26, 16, 28, 32, 30 };
+
+/*
  * These global variables control the different channels of the APU.
  * They are accessed through MMIO, and otherwise unavailable outside
  * of this file.
@@ -178,6 +186,7 @@ static triangle_t *triangle = NULL;
 static noise_t *noise = NULL;
 static dmc_t *dmc = NULL;
 static word_t frame_control = 0;
+static word_t channel_status = 0;
 
 /*
  * Both the frame counter and the DMC unit can generate an IRQ.
@@ -362,7 +371,8 @@ void apu_update_sweep(pulse_t *pulse) {
   dword_t target_period = apu_get_pulse_target(pulse);
   if ((pulse->sweep_counter == 0) && (pulse->sweep & PULSE_SWEEP_ENABLE)
                                   && (pulse->timer >= 8)
-                                  && (target_period <= PULSE_TIMER_MASK)) {
+                                  && (target_period <= PULSE_TIMER_MASK)
+                                  && (pulse->sweep & PULSE_SWEEP_SHIFT_MASK)) {
     pulse->timer = target_period;
   }
 
@@ -430,15 +440,7 @@ void apu_inc_frame(void) {
  * Assumes the pulse channel is non-null.
  */
 void apu_update_pulse(pulse_t *pulse) {
-  // Check if it is time to update the pulse channel.
-  if (pulse->clock > 0) {
-    pulse->clock--;
-    return;
-  } else {
-    pulse->clock = pulse->timer;
-  }
-
-  // Determine if the pulse channel is outputting audio on this cycle.
+  // Determine what the pulse channel is outputting audio on this cycle.
   word_t sequence = (pulse_waves[(pulse->control & PULSE_DUTY_MASK)
                   >> PULSE_DUTY_SHIFT] << pulse->pos) & PULSE_SEQUENCE_MASK;
   dword_t target_period = apu_get_pulse_target(pulse);
@@ -451,8 +453,14 @@ void apu_update_pulse(pulse_t *pulse) {
     pulse->output = 0;
   }
 
-  // Increment the pulse sequence position.
-  pulse->pos = (pulse->pos >= 7) ? 0 : pulse->pos + 1;
+  // Check if it is time to update the pulse channel.
+  if (pulse->clock > 0) {
+    pulse->clock--;
+  } else {
+    pulse->clock = pulse->timer;
+    // Increment the pulse sequence position.
+    pulse->pos = (pulse->pos >= 7) ? 0 : pulse->pos + 1;
+  }
 
   return;
 }
@@ -544,10 +552,10 @@ void apu_play_sample(void) {
   }
 
   // Use NESDEV's formula to linearly approximate the output of the APU.
-  float output = 0.00752 * ((float) (pulse_a->output + pulse_b->output))
-               + 0.00851 * ((float) triangle->output)
-               + 0.00494 * ((float) noise->output)
-               + 0.00335 * ((float) dmc->level);
+  float output = (0.00752 * ((float) (pulse_a->output + pulse_b->output)))
+               + (0.00851 * ((float) triangle->output))
+               + (0.00494 * ((float) noise->output))
+               + (0.00335 * ((float) dmc->level));
 
   // Add the output to the sample buffer.
   audio_add_sample(output);
@@ -592,7 +600,10 @@ void apu_write(dword_t reg_addr, word_t val) {
     case PULSE_B_LENGTH_ADDR:
       // Update the pulse length and timer high.
       pulse = (reg_addr == PULSE_A_LENGTH_ADDR) ? pulse_a : pulse_b;
-      pulse->length = (val & LENGTH_MASK) >> LENGTH_SHIFT;
+      if (((channel_status & FLAG_PULSE_A_ACTIVE) && (pulse == pulse_a))
+         || ((channel_status & FLAG_PULSE_B_ACTIVE) && (pulse == pulse_b))) {
+        pulse->length = length_table[(val & LENGTH_MASK) >> LENGTH_SHIFT];
+      }
       pulse->timer = (pulse->timer & TIMER_LOW_MASK)
                    | ((((dword_t) val) & TIMER_HIGH_MASK)
                    << TIMER_HIGH_SHIFT);
@@ -612,7 +623,9 @@ void apu_write(dword_t reg_addr, word_t val) {
       break;
     case TRI_LENGTH_ADDR:
       // Update the triangle length and timer high.
-      triangle->length = (val & LENGTH_MASK) >> LENGTH_SHIFT;
+      if (channel_status & FLAG_TRI_ACTIVE) {
+        triangle->length = length_table[(val & LENGTH_MASK) >> LENGTH_SHIFT];
+      }
       // TODO: Other effects.
       break;
     case NOISE_CONTROL_ADDR:
@@ -625,7 +638,9 @@ void apu_write(dword_t reg_addr, word_t val) {
     case NOISE_LENGTH_ADDR:
       // Update the noise length counter.
       // TODO
-      noise->length = (val & LENGTH_MASK) >> LENGTH_SHIFT;
+      if (channel_status & FLAG_NOISE_ACTIVE) {
+        noise->length = length_table[(val & LENGTH_MASK) >> LENGTH_SHIFT];
+      }
       break;
     case DMC_CONTROL_ADDR:
       // Update the control bits and rate of the DMC channel.
@@ -678,6 +693,9 @@ void apu_write(dword_t reg_addr, word_t val) {
  * Assumes the APU has been initialized.
  */
 void apu_status_write(word_t val) {
+  // Store the enable status of each channel.
+  channel_status = val;
+
   // Clear each channel whose bit was not set.
   if (!(val & FLAG_NOISE_ACTIVE)) { noise->length = 0; }
   if (!(val & FLAG_TRI_ACTIVE)) { triangle->length = 0; }
@@ -719,11 +737,11 @@ word_t apu_read(dword_t reg_addr) {
       frame_irq = false;
       irq_line--;
     }
-    if (dmc->bytes_remaining) { status |= FLAG_DMC_ACTIVE; }
-    if (noise->length) { status |= FLAG_NOISE_ACTIVE; }
-    if (triangle->length) { status |= FLAG_TRI_ACTIVE; }
-    if (pulse_b->length) { status |= FLAG_PULSE_B_ACTIVE; }
-    if (pulse_a->length) { status |= FLAG_PULSE_A_ACTIVE; }
+    if (dmc->bytes_remaining > 0) { status |= FLAG_DMC_ACTIVE; }
+    if (noise->length > 0) { status |= FLAG_NOISE_ACTIVE; }
+    if (triangle->length > 0) { status |= FLAG_TRI_ACTIVE; }
+    if (pulse_b->length > 0) { status |= FLAG_PULSE_B_ACTIVE; }
+    if (pulse_a->length > 0) { status |= FLAG_PULSE_A_ACTIVE; }
     return status;
   } else {
     // Invalid register.

@@ -10,7 +10,8 @@
 #include "../util/util.h"
 
 // The max number of samples the buffer can hold.
-#define BUFFER_SIZE 735
+// Must be a power of 2.
+#define BUFFER_SIZE 512
 
 /*
  * Audio samples are stored in a buffer, which is queued when
@@ -36,7 +37,7 @@ bool audio_init(void) {
   want.freq = 44100;
   want.format = AUDIO_F32SYS;
   want.channels = 1;
-  want.samples = 1024;
+  want.samples = BUFFER_SIZE;
   // Samples are added by audio_play_frame().
   want.callback = NULL;
 
@@ -58,16 +59,18 @@ bool audio_init(void) {
 /*
  * Adds a sample to the audio buffer.
  *
- * Does nothing if the buffer is full or if audio has not been initialized.
+ * Does nothing if audio has not been initialized.
  */
 void audio_add_sample(float sample) {
-  // If the buffer is full, we do nothing.
-  // The buffer is emptied when audio_play_frame() is called.
-  if ((audio_device == 0) || (buffer_slot >= BUFFER_SIZE)) { return; }
+  // If audio is not ready, we do nothing.
+  if (audio_device == 0) { return; }
 
   // Otherwise, we add the sample to the buffer.
   audio_buffer[buffer_slot] = sample;
   buffer_slot++;
+
+  // If the buffer has filled, we queue it.
+  if (buffer_slot >= BUFFER_SIZE) { audio_play_frame(); }
   return;
 }
 

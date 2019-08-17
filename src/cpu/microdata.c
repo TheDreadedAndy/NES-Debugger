@@ -263,7 +263,7 @@ void data_sei(void) {
 void data_cmp_mdr_a(void) {
   // The carry flag is unsigned overflow. We use a double word to hold
   // the extra bit.
-  dword_t res = ((dword_t) R->A) + (((dword_t) (-R->mdr)) & WORD_MASK);
+  dword_t res = ((dword_t) R->A) + ((dword_t) ((~R->mdr) & WORD_MASK)) + 1U;
   R->P = (R->P & 0x7CU) | (res & 0x80U) | (res >> 8U)
                         | (((res & WORD_MASK) == 0U) << 1U);
   return;
@@ -274,7 +274,7 @@ void data_cmp_mdr_a(void) {
  * of the result.
  */
 void data_cmp_mdr_x(void) {
-  dword_t res = ((dword_t) R->X) + (((dword_t) (-R->mdr)) & WORD_MASK);
+  dword_t res = ((dword_t) R->X) + ((dword_t) ((~R->mdr) & WORD_MASK)) + 1U;
   R->P = (R->P & 0x7CU) | (res & 0x80U) | (res >> 8U)
                         | (((res & WORD_MASK) == 0U) << 1U);
   return;
@@ -285,7 +285,7 @@ void data_cmp_mdr_x(void) {
  * of the result.
  */
 void data_cmp_mdr_y(void) {
-  dword_t res = ((dword_t) R->Y) + (((dword_t) (-R->mdr)) & WORD_MASK);
+  dword_t res = ((dword_t) R->Y) + ((dword_t) ((~R->mdr) & WORD_MASK)) + 1U;
   R->P = (R->P & 0x7CU) | (res & 0x80U) | (res >> 8U)
                         | (((res & WORD_MASK) == 0U) << 1U);
   return;
@@ -296,7 +296,7 @@ void data_cmp_mdr_y(void) {
  * N and Z flags.
  */
 void data_asl_mdr(void) {
-  word_t carry = R->mdr >> 7U;
+  word_t carry = (R->mdr >> 7U) & 0x01U;
   R->mdr = R->mdr << 1U;
   R->P = (R->P & 0x7CU) | (R->mdr & 0x80U) | ((R->mdr == 0U) << 1U) | carry;
   return;
@@ -307,7 +307,7 @@ void data_asl_mdr(void) {
  * N and Z flags.
  */
 void data_asl_a(void) {
-  word_t carry = R->A >> 7U;
+  word_t carry = (R->A >> 7U) & 0x01U;
   R->A = R->A << 1U;
   R->P = (R->P & 0x7CU) | (R->A & 0x80U) | ((R->A == 0U) << 1U) | carry;
   return;
@@ -340,7 +340,7 @@ void data_lsr_a(void) {
  * sets the N and Z flags.
  */
 void data_rol_mdr(void) {
-  word_t carry = R->mdr >> 7U;
+  word_t carry = (R->mdr >> 7U) & 0x01U;
   R->mdr = (R->mdr << 1U) | (R->P & 0x01U);
   R->P = (R->P & 0x7CU) | (R->mdr & 0x80U) | ((R->mdr == 0U) << 1U) | carry;
   return;
@@ -351,7 +351,7 @@ void data_rol_mdr(void) {
  * the N and Z flags.
  */
 void data_rol_a(void) {
-  word_t carry = R->A >> 7U;
+  word_t carry = (R->A >> 7U) & 0x01U;
   R->A = (R->A << 1U) | (R->P & 0x01U);
   R->P = (R->P & 0x7CU) | (R->A & 0x80U) | ((R->A == 0U) << 1U) | carry;
   return;
@@ -428,7 +428,7 @@ void data_adc_mdr_a(void) {
 void data_sbc_mdr_a(void) {
   // See documentation for proof of this line. Gives the correct result
   // without issues in the carry out.
-  dword_t res = ((dword_t) R->A) + (((dword_t) (~R->mdr)) & WORD_MASK)
+  dword_t res = ((dword_t) R->A) + ((dword_t) ((~R->mdr) & WORD_MASK))
                                  + ((dword_t) (R->P & 0x01U));
   word_t ovf = ((R->A & 0x80U) == ((~R->mdr) & 0x80U))
             && ((R->A & 0x80U) != (res & 0x80U));
@@ -523,7 +523,7 @@ void data_branch(void) {
   bool cond = (bool) ((R->inst >> 5U) & 1U);
   // Black magic that pulls the proper flag from the status reg.
   flag = (flag & 2U) ? ((R->P >> (flag & 1U)) & 1U)
-                     : ((R->P >> (7U - flag)) & 1U);
+                     : ((R->P >> ((~flag) & 0x07U)) & 1U);
   bool taken = (((bool) flag) == cond);
 
   // Add the reletive address to pc_lo. Reletive addressing is signed.

@@ -158,7 +158,7 @@ void cpu_run_cycle(void) {
 bool cpu_can_poll(void) {
   // Interrupt polling (internal) happens when the cpu is about
   // to finish an instruction and said instruction is not an interrupt.
-  return state_get_size() == 2 && R->inst != INST_BRK;
+  return (state_get_size() == 2) && (R->inst != INST_BRK);
 }
 
 /*

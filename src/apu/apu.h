@@ -4,6 +4,10 @@
 #ifndef _NES_APU
 #define _NES_APU
 
+// Setting this flag enables the high triangle frequencies.
+// More accurate, but not pleasant sounding.
+extern bool enable_high_freqs;
+
 // Initializes the APU channels.
 void apu_init(void);
 

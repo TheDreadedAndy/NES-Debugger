@@ -26,10 +26,13 @@
 
 // These flags can be used to control the individual channels.
 #define FLAG_PULSE_HALT 0x20U
-#define FLAG_PULSE_ENV_LOOP 0x20U
+#define FLAG_ENV_LOOP 0x20U
 #define FLAG_TRI_HALT 0x80U
+#define FLAG_LINEAR_CONTROL 0x80U
 #define FLAG_NOISE_HALT 0x20U
+#define FLAG_NOISE_MODE 0x80U
 #define FLAG_DMC_LOOP 0x40U
+#define FLAG_CONST_VOL 0x10U
 
 // There are 3729 APU clock cycles per APU frame step.
 #define FRAME_STEP_LENGTH 3729U
@@ -63,6 +66,7 @@
 #define TIMER_HIGH_MASK 0x07U
 #define TIMER_HIGH_SHIFT 8U
 #define TIMER_LOW_MASK 0xFFU
+#define VOLUME_MASK 0x0FU
 #define DMC_CONTROL_MASK 0xC0U
 #define DMC_RATE_MASK 0x0FU
 #define DMC_LEVEL_MASK 0x7FU
@@ -74,14 +78,14 @@
 #define PULSE_DUTY_SHIFT 6U
 #define PULSE_SEQUENCE_MASK 0x80U
 #define PULSE_TIMER_MASK 0x07FFU
-#define PULSE_VOLUME_MASK 0x0FU
 #define PULSE_SWEEP_ENABLE 0x80U
 #define PULSE_SWEEP_COUNTER_MASK 0x70U
 #define PULSE_SWEEP_COUNTER_SHIFT 4U
 #define PULSE_SWEEP_SHIFT_MASK 0x07U
 #define PULSE_SWEEP_NEGATE_MASK 0x08U
-#define PULSE_CONST_VOL 0x10U
-#define PULSE_DECAY_START 15U
+#define NOISE_PERIOD_MASK 0x0FU
+#define ENV_DECAY_START 15U
+#define LINEAR_MASK 0x7FU
 
 // These constants are used to properly update the DMC channel.
 #define DMC_CURRENT_ADDR_BASE 0x8000U
@@ -111,20 +115,34 @@ typedef struct pulse {
  * Contains the data related to the operation of the APU triangle channel.
  */
 typedef struct triangle {
+  // Memory mapped registers.
   dword_t timer;
   word_t length;
-  word_t linear;
   word_t control;
+  bool linear_reload;
+
+  // Internal registers.
+  dword_t clock;
   word_t output;
+  word_t linear;
+  word_t pos;
 } triangle_t;
 
 /*
  * Contains the data related to the operation of the APU noise channel.
  */
 typedef struct noise {
+  // Memory mapped registers.
   word_t period;
   word_t length;
   word_t control;
+
+  // Internal registers.
+  dword_t shift;
+  dword_t timer;
+  dword_t clock;
+  word_t env_clock;
+  word_t env_volume;
   word_t output;
 } noise_t;
 
@@ -161,11 +179,26 @@ static size_t dmc_rates[] = { 214, 190, 170, 160, 143, 127, 113, 107,
                               95, 80, 71, 64, 53, 42, 36, 27 };
 
 /*
+ * The period value of the noise channel is determined using a lookup table
+ * of APU cycle wait timers. This table is given here.
+ */
+static dword_t noise_periods[] = { 2, 4, 8, 16, 32, 48, 64, 80, 101, 127, 190,
+                                  254, 381, 508, 1017, 2034 };
+
+/*
  * The pulse (square wave) channels have 4 duty cycle settings which change the
  * wave form output. Here these output settings are represented as bytes with
  * each 1 representing a cycle where the wave form is high.
  */
 static word_t pulse_waves[] = { 0x40U, 0x60U, 0x78U, 0x9FU };
+
+/*
+ * The triangle wave channel loops over a 32 step sequence, which is defined
+ * here.
+ */
+static word_t triangle_wave[] = { 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3,
+                                  2, 1, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
+                                  12, 13, 14, 15 };
 
 /*
  * The APU has a length lookup table, which it uses to translate the values
@@ -204,22 +237,31 @@ static size_t frame_clock = 0;
 static size_t frame_step = 0;
 
 // Most functions only update every other cycle. This flag tracks that.
-bool cycle_even = false;
+static bool cycle_even = false;
 
 // Tracks when a sample should be played to the audio system.
-word_t sample_clock;
-bool sample_even = false;
+static word_t sample_clock;
+static bool sample_even = false;
+
+/*
+ * The triangle channel can output at frequencies outside the human range of
+ * hearing, causing clicking. Setting this flag enables these outputs.
+ */
+bool enable_high_freqs = false;
 
 /* Helper functions. */
 void apu_run_frame_step(void);
 void apu_update_sweep(pulse_t *pulse);
 dword_t apu_get_pulse_target(pulse_t *pulse);
 void apu_update_pulse_envelope(pulse_t *pulse);
+void apu_update_noise_envelope(void);
+void apu_update_triangle_linear(void);
 void apu_update_length(void);
 void apu_inc_frame(void);
 void apu_update_pulse(pulse_t *pulse);
 void apu_update_triangle(void);
 void apu_update_noise(void);
+void apu_update_noise_shift(void);
 void apu_update_dmc(void);
 void apu_status_write(word_t val);
 void apu_play_sample(void);
@@ -234,6 +276,9 @@ void apu_init(void) {
   triangle = xcalloc(1, sizeof(triangle_t));
   noise = xcalloc(1, sizeof(noise_t));
   dmc = xcalloc(1, sizeof(dmc_t));
+
+  // On power-up, the noise shifter is seeded with the value 1.
+  noise->shift = 1;
   return;
 }
 
@@ -286,6 +331,8 @@ void apu_run_frame_step(void) {
   if (!((frame_step == 3) && (frame_control & FLAG_MODE))) {
     apu_update_pulse_envelope(pulse_a);
     apu_update_pulse_envelope(pulse_b);
+    apu_update_noise_envelope();
+    apu_update_triangle_linear();
   }
 
   // Clock length counters and pulse sweep.
@@ -316,16 +363,62 @@ void apu_update_pulse_envelope(pulse_t *pulse) {
   // Check if it is time to update the envelope.
   if (pulse->env_clock == 0) {
     // Reset the envelope clock.
-    pulse->env_clock = pulse->control & PULSE_VOLUME_MASK;
+    pulse->env_clock = pulse->control & VOLUME_MASK;
     // If the envelope has ended and should be looped, reset the volume.
-    if ((pulse->env_volume == 0) && (pulse->control & FLAG_PULSE_ENV_LOOP)) {
-      pulse->env_volume = PULSE_DECAY_START;
+    if ((pulse->env_volume == 0) && (pulse->control & FLAG_ENV_LOOP)) {
+      pulse->env_volume = ENV_DECAY_START;
     } else if (pulse->env_volume > 0) {
       // Otherwise, decay the volume.
       pulse->env_volume--;
     }
   } else {
     pulse->env_clock--;
+  }
+
+  return;
+}
+
+/*
+ * Updates the envelope counter of the noise channel.
+ *
+ * Assumes the APU has been initialized.
+ */
+void apu_update_noise_envelope(void) {
+  // Check if it is time to update the envelope.
+  if (noise->env_clock == 0) {
+    // Reset the envelope clock.
+    noise->env_clock = noise->control & VOLUME_MASK;
+    // If the envelope has ended and should be looped, reset the volume.
+    if ((noise->env_volume == 0) && (noise->control & FLAG_ENV_LOOP)) {
+      noise->env_volume = ENV_DECAY_START;
+    } else if (noise->env_volume > 0) {
+      // Otherwise, decay the volume.
+      noise->env_volume--;
+    }
+  } else {
+    noise->env_clock--;
+  }
+
+  return;
+}
+
+/*
+ * Updates the linear counter of the triangle channel.
+ *
+ * Assumes the APU has been initialized.
+ */
+void apu_update_triangle_linear(void) {
+  // Reload the linear counter if the flag has been set.
+  if (triangle->linear_reload) {
+    triangle->linear = triangle->control & LINEAR_MASK;
+  } else if (triangle->linear > 0) {
+    // Otherwise, decrement it until it reaches zero.
+    triangle->linear--;
+  }
+
+  // Clear the linear counter reload flag if the control bit is clear.
+  if (!(triangle->control & FLAG_LINEAR_CONTROL)) {
+    triangle->linear_reload = false;
   }
 
   return;
@@ -446,8 +539,8 @@ void apu_update_pulse(pulse_t *pulse) {
   dword_t target_period = apu_get_pulse_target(pulse);
   if (sequence && (pulse->length > 0) && (pulse->timer >= 8)
                && (target_period <= PULSE_TIMER_MASK)) {
-    pulse->output = (pulse->control & PULSE_CONST_VOL)
-                  ? pulse->control & PULSE_VOLUME_MASK
+    pulse->output = (pulse->control & FLAG_CONST_VOL)
+                  ? pulse->control & VOLUME_MASK
                   : pulse->env_volume;
   } else {
     pulse->output = 0;
@@ -459,23 +552,85 @@ void apu_update_pulse(pulse_t *pulse) {
   } else {
     pulse->clock = pulse->timer;
     // Increment the pulse sequence position.
-    pulse->pos = (pulse->pos >= 7) ? 0 : pulse->pos + 1;
+    pulse->pos = (pulse->pos + 1) & 0x07U;
   }
 
   return;
 }
 
 /*
- * TODO
+ * Updates the output of the triangle channel.
+ *
+ * Assumes the APU has been initialized.
  */
 void apu_update_triangle(void) {
+  // Check if the triangle channel should output sound on this cycle.
+  if ((triangle->linear > 0) && (triangle->length > 0)
+                             && ((triangle->timer > 1)
+                             || enable_high_freqs)) {
+    triangle->output = triangle_wave[triangle->pos];
+  } else {
+    triangle->output = 0;
+  }
+
+  // Update the triangle clock and output wave form using the timer period.
+  if (triangle->clock > 0) {
+    triangle->clock--;
+  } else {
+    triangle->clock = triangle->timer;
+    if ((triangle->linear > 0) && (triangle->length > 0)) {
+      triangle->pos = (triangle->pos + 1) & 0x1FU;
+    }
+  }
+
   return;
 }
 
 /*
- * TODO
+ * Updates the output of the noise channel.
+ *
+ * Assumes the APU has been initialized.
  */
 void apu_update_noise(void) {
+  // Determine what sound should be output this cycle.
+  if ((noise->length > 0) && !(noise->shift & 0x01U)) {
+    noise->output = (noise->control & FLAG_CONST_VOL)
+                  ? noise->control & VOLUME_MASK
+                  : noise->env_volume;
+  } else {
+    noise->output = 0;
+  }
+
+  // Check if it is time to update the noise channel.
+  if (noise->clock > 0) {
+    noise->clock--;
+  } else {
+    noise->clock = noise->timer;
+    apu_update_noise_shift();
+  }
+
+  return;
+}
+
+/*
+ * Updates the shift register of the noise channel.
+ *
+ * Assumes the APU has been initialized.
+ */
+void apu_update_noise_shift(void) {
+  // Calculate the new feedback bit of the noise channel using the noise mode.
+  dword_t feedback;
+  if (noise->period & FLAG_NOISE_MODE) {
+    // In mode 1, the new bit is bit 0 XOR bit 6.
+    feedback = (noise->shift & 0x01U) ^ ((noise->shift >> 6U) & 0x01U);
+  } else {
+    // In mode 0, the new bit is bit 0 XOR bit 1.
+    feedback = (noise->shift & 0x01U) ^ ((noise->shift >> 1U) & 0x01U);
+  }
+
+  // Shift the noise shifter and backfill with the feedback bit.
+  noise->shift = (feedback << 14U) | (noise->shift >> 1U);
+
   return;
 }
 
@@ -610,37 +765,46 @@ void apu_write(dword_t reg_addr, word_t val) {
 
       // Reset the sequencer position and envelope.
       pulse->pos = 0;
-      pulse->env_clock = pulse->control & PULSE_VOLUME_MASK;
-      pulse->env_volume = PULSE_DECAY_START;
+      pulse->env_clock = pulse->control & VOLUME_MASK;
+      pulse->env_volume = ENV_DECAY_START;
       break;
     case TRI_CONTROL_ADDR:
       // Update the linear control register.
       triangle->control = val;
-      // TODO: Other effects.
       break;
     case TRI_TIMERL_ADDR:
-      // TODO
+      // Update the low byte of the triangle period.
+      triangle->timer = (triangle->timer & ~TIMER_LOW_MASK) | val;
       break;
     case TRI_LENGTH_ADDR:
       // Update the triangle length and timer high.
       if (channel_status & FLAG_TRI_ACTIVE) {
         triangle->length = length_table[(val & LENGTH_MASK) >> LENGTH_SHIFT];
       }
-      // TODO: Other effects.
+      triangle->timer = (triangle->timer & TIMER_LOW_MASK)
+                      | ((((dword_t) val) & TIMER_HIGH_MASK)
+                      << TIMER_HIGH_SHIFT);
+
+      // Set the linear counter reload flag, which can be cleared by the
+      // control bit.
+      triangle->linear_reload = true;
       break;
     case NOISE_CONTROL_ADDR:
       // Update the noise envelope and control register.
       noise->control = val;
       break;
     case NOISE_PERIOD_ADDR:
-      // TODO
+      // Update the period register and timer.
+      noise->period = val;
+      noise->timer = noise_periods[noise->period & NOISE_PERIOD_MASK];
       break;
     case NOISE_LENGTH_ADDR:
       // Update the noise length counter.
-      // TODO
       if (channel_status & FLAG_NOISE_ACTIVE) {
         noise->length = length_table[(val & LENGTH_MASK) >> LENGTH_SHIFT];
       }
+      noise->env_clock = noise->control & VOLUME_MASK;
+      noise->env_volume = ENV_DECAY_START;
       break;
     case DMC_CONTROL_ADDR:
       // Update the control bits and rate of the DMC channel.

@@ -50,13 +50,16 @@ int main(int argc, char *argv[]) {
   char *pal_file = NULL;
   signed char opt;
 
-  while ((opt = getopt(argc, argv, "hf:p:")) != -1) {
+  while ((opt = getopt(argc, argv, "hf:p:t")) != -1) {
     switch (opt) {
       case 'f':
         rom_file = optarg;
         break;
       case 'p':
         pal_file = optarg;
+        break;
+      case 't':
+        enable_high_freqs = true;
         break;
       default:
         printf("usage: ndb -f <FILE> -p <PALETTE FILE>\n");

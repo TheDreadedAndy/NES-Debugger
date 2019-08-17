@@ -643,7 +643,6 @@ void apu_write(dword_t reg_addr, word_t val) {
       }
       break;
     case DMC_CONTROL_ADDR:
-      if (val & 0x80U) { printf("DMC IRQ ENABLED\n"); }
       // Update the control bits and rate of the DMC channel.
       dmc->control = val & DMC_CONTROL_MASK;
       dmc->rate = val & DMC_RATE_MASK;
@@ -672,8 +671,6 @@ void apu_write(dword_t reg_addr, word_t val) {
       if ((frame_control & FLAG_IRQ_DISABLE) && frame_irq) {
         frame_irq = false;
         irq_line--;
-      } else if (!((frame_control & FLAG_MODE) || (frame_control & FLAG_IRQ_DISABLE))) {
-        printf("FRAME IRQ ENABLED\n");
       }
 
       // Reset the frame timer.

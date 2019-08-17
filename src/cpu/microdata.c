@@ -22,7 +22,9 @@
  *       ---------------> Negative flag, equal to the MSB of the result.
  *
  * The hex values in the code that follows are used to mask in or out these
- * flags.
+ * flags. Note that the only memory operation (found in micromem.c) that
+ * modifies the processor state is mem_pull_a (since PLA sets the N and Z
+ * flags).
  */
 
 #include <stdlib.h>

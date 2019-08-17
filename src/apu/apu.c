@@ -241,7 +241,6 @@ static bool cycle_even = false;
 
 // Tracks when a sample should be played to the audio system.
 static word_t sample_clock;
-static bool sample_even = false;
 
 /*
  * The triangle channel can output at frequencies outside the human range of
@@ -700,8 +699,7 @@ void apu_update_dmc(void) {
  */
 void apu_play_sample(void) {
   // Increment the sample clock if a sample is not to be played this cycle.
-  if ((sample_even && (sample_clock < 40))
-                   || (!sample_even && (sample_clock < 41))) {
+  if (sample_clock < 37) {
     sample_clock++;
     return;
   }
@@ -717,7 +715,6 @@ void apu_play_sample(void) {
 
   // Reset the sample clock.
   sample_clock = 0;
-  sample_even = !sample_even;
 
   return;
 }

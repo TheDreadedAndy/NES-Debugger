@@ -8,10 +8,13 @@
 #include "./audio.h"
 #include "../util/util.h"
 
-// The max number of samples the buffer can hold.
+// The max number of samples the device buffer can hold.
 // Must be a power of 2.
 #define DEVICE_BUFFER_SIZE 1024U
-#define EMU_BUFFER_SIZE (DEVICE_BUFFER_SIZE << 1U)
+
+// The device may not request samples as fast as the emulation provides
+// them, so the emulation must have a larger audio buffer.
+#define EMU_BUFFER_SIZE (DEVICE_BUFFER_SIZE << 2U)
 
 /*
  * The emulation audio buffer is implemented as a ring buffer to
@@ -50,7 +53,7 @@ void audio_buffer_set_base(size_t offset);
 bool audio_init(void) {
   // The specs of the audio system this file expects are layed out here.
   SDL_AudioSpec want, have;
-  want.freq = 44100;
+  want.freq = 48000;
   want.format = AUDIO_F32SYS;
   want.channels = 1;
   want.samples = DEVICE_BUFFER_SIZE;

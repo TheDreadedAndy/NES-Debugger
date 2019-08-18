@@ -16,6 +16,7 @@
 #include "../util/util.h"
 #include "./memory.h"
 #include "./header.h"
+#include "./sxrom.h"
 #include "./uxrom.h"
 #include "../util/data.h"
 #include "../ppu/ppu.h"
@@ -70,6 +71,9 @@ bool memory_init(FILE *rom_file, header_t *header) {
 
   // Use the decoded header to decide which memory structure should be created.
   switch(header->mapper) {
+    case SXROM_MAPPER:
+      sxrom_new(rom_file, system_memory);
+      break;
     case UXROM_MAPPER:
       uxrom_new(rom_file, system_memory);
       break;

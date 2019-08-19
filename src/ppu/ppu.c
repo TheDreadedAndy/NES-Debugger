@@ -40,8 +40,8 @@
 #define FLAG_FOCUS_RED 0x20U
 #define FLAG_RENDER_SPRITES 0x10U
 #define FLAG_RENDER_BG 0x08U
-#define FLAG_SHOW_SPRITES 0x04U
-#define FLAG_SHOW_BG 0x02U
+#define FLAG_LEFT_SPRITES 0x04U
+#define FLAG_LEFT_BG 0x02U
 #define FLAG_GREYSCALE 0x01U
 
 // Flag masks for the PPU control register.
@@ -204,15 +204,18 @@ typedef struct ppu {
  * and scanline it is on. These variables track that information so that the
  * ppu emulation can adjust acordingly.
  */
-size_t current_scanline = 261;
-size_t current_cycle = 0;
-bool frame_odd = false;
+static size_t current_scanline = 261;
+static size_t current_cycle = 0;
+static bool frame_odd = false;
 
 /*
  * Global ppu structure. Cannot be accessed outside this file.
  * Initialized by ppu_init().
  */
-ppu_t *ppu = NULL;
+static ppu_t *ppu = NULL;
+
+// Used to signal the renderer what color to fill with.
+word_t fill_color = 0;
 
 /* Helper functions */
 bool ppu_is_disabled(void);
@@ -349,6 +352,7 @@ void ppu_draw_background(void) {
   size_t screen_x = current_cycle - 1;
   size_t screen_y = current_scanline;
   dword_t color_addr = PALETTE_BASE_ADDR;
+
   // The universal background color can be changed using the current vram
   // address.
   if ((ppu->vram_addr & VRAM_BUS_MASK) > PALETTE_BASE_ADDR) {
@@ -356,7 +360,8 @@ void ppu_draw_background(void) {
   }
 
   // Get the background color pixel.
-  word_t pixel = memory_vram_read(color_addr);
+  fill_color = memory_vram_read(color_addr);
+  word_t pixel = fill_color;
 
   // Apply a greyscale effect to the pixel, if needed.
   if (ppu->mask & FLAG_GREYSCALE) { pixel &= GREYSCALE_PIXEL_MASK; }
@@ -475,19 +480,22 @@ void ppu_render_draw_pixel(void) {
   dword_t color_addr = PALETTE_BASE_ADDR;
 
   // Get the background color pixel.
-  word_t pixel = memory_vram_read(color_addr);
+  fill_color = memory_vram_read(color_addr);
+  word_t pixel = fill_color;
   word_t bg_pixel = 0xFFU;
   word_t sprite_pixel = 0xFFU;
 
   // Get the background tile pixel.
-  if (ppu->mask & FLAG_RENDER_BG) {
+  if ((ppu->mask & FLAG_RENDER_BG) && ((screen_x >= 8)
+                                   || (ppu->mask & FLAG_LEFT_BG))) {
     bg_pixel = ppu_render_get_tile_pixel();
     if (bg_pixel != 0xFFU) { pixel = bg_pixel; }
   }
 
   // Get the sprite pixel.
   word_t sprite_index = ppu_render_get_sprite_index();
-  if ((ppu->mask & FLAG_RENDER_SPRITES) && (sprite_index < ppu->sprite_count)) {
+  if ((ppu->mask & FLAG_RENDER_SPRITES) && (sprite_index < ppu->sprite_count)
+                     && ((screen_x >= 8) || (ppu->mask & FLAG_LEFT_SPRITES))) {
     sprite_pixel = ppu_render_get_sprite_pixel();
     word_t sprite_attribute = ppu->sprite_memory[4 * sprite_index + 2];
 
@@ -499,11 +507,9 @@ void ppu_render_draw_pixel(void) {
 
     // Check if this counts as a sprite 0 hit.
     if ((sprite_index == 0) && (ppu->zero_in_mem) && (bg_pixel != 0xFFU)
-                      && ((screen_x >= 8) || ((ppu->mask & FLAG_SHOW_BG)
-                      && (ppu->mask & FLAG_SHOW_SPRITES)))
-                      && (screen_x != 255) && (sprite_pixel != 0xFFU)
-                      && (ppu->mask & FLAG_RENDER_BG)
-                      && (ppu->mask & FLAG_RENDER_SPRITES)) {
+                            && (screen_x != 255) && (sprite_pixel != 0xFFU)
+                            && (ppu->mask & FLAG_RENDER_BG)
+                            && (ppu->mask & FLAG_RENDER_SPRITES)) {
       ppu->status |= FLAG_HIT;
     }
   }
@@ -964,11 +970,12 @@ void ppu_eval_clear_soam(void) {
   // be raised during this phase of sprite evaluation.
   ppu->oam_mask = 0xFF;
 
-  // The clear operation should consecutively write to secondary OAM every
-  // even cycle.
-  if ((current_cycle % 2) == 0) {
-    ppu->soam_addr = (current_cycle >> 1) & 0x1F;
-    ppu->secondary_oam[ppu->soam_addr] = 0xFF;
+  // In the real PPU, SOAM is cleared by writing 0xFF every even cycle.
+  // It is more cache efficient, however, to do it all at once here.
+  if (current_cycle == 1) {
+    for (size_t i = 0; i < SECONDARY_OAM_SIZE; i++) {
+      ppu->secondary_oam[i] = 0xFF;
+    }
   }
 
   return;
@@ -1106,14 +1113,12 @@ void ppu_eval_fetch_sprites(void) {
     ppu->zero_in_mem = ppu->zero_in_soam;
     ppu->sprite_count = ppu->next_sprite_count;
     CONTRACT(ppu->sprite_count <= 8);
-  }
-
-  // Sprite evaluation and rendering alternate access to sprite data every 4
-  // cycles between 257 and 320.
-  if (((current_cycle - 1) & 0x04U) == 0) {
-    CONTRACT(ppu->soam_addr < SECONDARY_OAM_SIZE);
-    ppu->sprite_memory[ppu->soam_addr] = ppu->secondary_oam[ppu->soam_addr];
-    ppu->soam_addr++;
+    // Sprite evaluation and rendering alternate access to sprite data every 4
+    // cycles between 257 and 320. However, it is more efficiant to copy all the
+    // data at once.
+    for (size_t i = 0; i < SECONDARY_OAM_SIZE; i++) {
+      ppu->sprite_memory[i] = ppu->secondary_oam[i];
+    }
   }
 
   return;

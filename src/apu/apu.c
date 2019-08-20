@@ -515,12 +515,12 @@ void apu_inc_frame(void) {
   if (frame_clock > FRAME_STEP_LENGTH) {
     frame_clock = 0;
     frame_step++;
-  }
 
-  // Reset the step if a frame has been completed for the given mode.
-  if ((frame_step >= 5) || ((frame_step >= 4)
-                        && !(frame_control & FLAG_MODE))) {
-    frame_step = 0;
+    // Reset the step if a frame has been completed for the given mode.
+    if ((frame_step >= 5) || ((frame_step >= 4)
+                          && !(frame_control & FLAG_MODE))) {
+      frame_step = 0;
+    }
   }
 
   return;
@@ -657,23 +657,20 @@ void apu_update_dmc(void) {
     dmc->sample_buffer = memory_read(addr_lo, addr_hi);
     dmc->current_addr = (dmc->current_addr + 1) | DMC_CURRENT_ADDR_BASE;
     dmc->bytes_remaining--;
-
+    dmc->silent = false;
+  } else if ((dmc->bits_remaining == 0) && (dmc->bytes_remaining == 0)) {
     // If the sample is now over, send out an IRQ and loop it if either
     // is enabled.
-    if (dmc->bytes_remaining == 0) {
-      if ((dmc->control & FLAG_DMC_IRQ) && !dmc_irq) {
-        dmc_irq = true;
-        irq_line++;
-      }
+    if ((dmc->control & FLAG_DMC_IRQ) && !dmc_irq) {
+      dmc_irq = true;
+      irq_line++;
+    }
 
-      if (dmc->control & FLAG_DMC_LOOP) {
-        dmc->current_addr = dmc->addr;
-        dmc->bytes_remaining = dmc->length;
-      } else {
-        dmc->silent = true;
-      }
+    if (dmc->control & FLAG_DMC_LOOP) {
+      dmc->current_addr = dmc->addr;
+      dmc->bytes_remaining = dmc->length;
     } else {
-      dmc->silent = false;
+      dmc->silent = true;
     }
   }
 

@@ -501,15 +501,13 @@ void ppu_render_draw_pixel(void) {
 
     // Check if the pixel should be rendered on top of the background.
     if ((sprite_pixel != 0xFFU) && ((bg_pixel == 0xFFU)
-                            || !(sprite_attribute & FLAG_SPRITE_PRIORITY))) {
+                      || !(sprite_attribute & FLAG_SPRITE_PRIORITY))) {
       pixel = sprite_pixel;
     }
 
     // Check if this counts as a sprite 0 hit.
     if ((sprite_index == 0) && (ppu->zero_in_mem) && (bg_pixel != 0xFFU)
-                            && (screen_x != 255) && (sprite_pixel != 0xFFU)
-                            && (ppu->mask & FLAG_RENDER_BG)
-                            && (ppu->mask & FLAG_RENDER_SPRITES)) {
+                            && (screen_x != 255) && (sprite_pixel != 0xFFU)) {
       ppu->status |= FLAG_HIT;
     }
   }
@@ -819,7 +817,7 @@ word_t ppu_render_get_sprite(void) {
                  | index_offset;
   } else {
     dword_t tile_table = (ppu->ctrl & FLAG_SPRITE_TABLE) ? PATTERN_TABLE_HIGH
-                                                        : PATTERN_TABLE_LOW;
+                                                         : PATTERN_TABLE_LOW;
     tile_pattern = tile_offset | (tile_plane << X8_PLANE_SHIFT)
                  | (tile_index << X8_TILE_SHIFT) | tile_table;
   }
@@ -960,8 +958,7 @@ void ppu_render_update_vert(void) {
 }
 
 /*
- * Sets every value in secondary OAM to 0xFF over the course of
- * 64 cycles. Used in sprite evaluation.
+ * Sets every value in secondary OAM to 0xFF. Used in sprite evaluation.
  *
  * Assumes the ppu has been initialized.
  */
@@ -997,18 +994,18 @@ void ppu_eval_sprites(void) {
     ppu->zero_index = ppu->oam_addr;
     ppu->zero_in_soam = false;
     ppu->next_sprite_count = 0;
-  }
-
-  // On odd cycles, data is read from primary OAM.
-  if (current_cycle & 1U) {
-    ppu->eval_buf = ppu_oam_read();
     return;
   }
+
+  // The PPU is idle on odd cycles here, despite the read occuring during
+  // this cycle in real hardware. We also idle if evaluation is done.
+  if ((current_cycle & 1U) || (ppu->eval_state == DONE)) { return; }
 
   // We need to check for overflow to determine if evaluation has finished.
   word_t old_oam_addr = ppu->oam_addr;
 
   // On even cycles, the evaluation state determines the action.
+  ppu->eval_buf = ppu->primary_oam[ppu->oam_addr];
   switch(ppu->eval_state) {
     case SCAN:
       // Copy the Y cord to secondary OAM and change state if the sprite
@@ -1057,8 +1054,7 @@ void ppu_eval_sprites(void) {
         ppu->oam_addr += 5;
       }
       break;
-    case DONE:
-      // Evaluation is finished, so we do nothing.
+    default:
       break;
   }
 
@@ -1099,11 +1095,9 @@ bool ppu_eval_in_range(void) {
 }
 
 /*
- * Copies all the sprites in secondary OAM to sprite memory. Should only
- * be called from ppu_eval().
+ * Copies all the sprites in secondary OAM to sprite memory.
  *
  * Assumes the PPU has been initialized.
- * Assumes the current cycle is between 257 and 320.
  */
 void ppu_eval_fetch_sprites(void) {
   // Resets the address the first time this function is called for a scanline.
@@ -1145,18 +1139,18 @@ void ppu_inc(void) {
   current_cycle++;
 
   // Increment the scanline if it is time to wrap the cycle.
-  if ((current_cycle > 340) || ((current_cycle > 339)
-          && frame_odd && (current_scanline >= 261)
+  if ((current_cycle > 340) || (frame_odd
+          && (current_cycle > 339) && (current_scanline >= 261)
           && ((ppu->mask & FLAG_RENDER_BG)
           || (ppu->mask & FLAG_RENDER_SPRITES)))) {
     current_scanline++;
     current_cycle = 0;
-  }
 
-  // Wrap the scanline and toggle the frame if it is time to do so.
-  if (current_scanline > 261) {
-    current_scanline = 0;
-    frame_odd = !frame_odd;
+    // Wrap the scanline and toggle the frame if it is time to do so.
+    if (current_scanline > 261) {
+      current_scanline = 0;
+      frame_odd = !frame_odd;
+    }
   }
 
   return;
@@ -1218,15 +1212,15 @@ void ppu_mmio_scroll_write(word_t val) {
   // Determine which write should be done.
   if (ppu->write_toggle) {
     // Update scroll Y.
-    ppu->temp_vram_addr = (ppu->temp_vram_addr & SCROLL_X_MASK)
-             | (ppu->temp_vram_addr & SCROLL_NT_MASK)
+    ppu->temp_vram_addr = (ppu->temp_vram_addr
+             & (SCROLL_X_MASK | SCROLL_NT_MASK))
              | ((((dword_t) val) << COARSE_Y_SHIFT) & COARSE_Y_MASK)
              | ((((dword_t) val) << FINE_Y_SHIFT) & FINE_Y_MASK);
   } else {
     // Update scroll X.
     ppu->fine_x = val & FINE_X_MASK;
-    ppu->temp_vram_addr = (ppu->temp_vram_addr & SCROLL_Y_MASK)
-                        | (ppu->temp_vram_addr & SCROLL_NT_MASK)
+    ppu->temp_vram_addr = (ppu->temp_vram_addr
+                        & (SCROLL_Y_MASK | SCROLL_NT_MASK))
                         | (val >> COARSE_X_SHIFT);
   }
 
@@ -1306,9 +1300,9 @@ word_t ppu_read(dword_t reg_addr) {
       // internal bus.
       if (reg_addr < PPU_PALETTE_OFFSET) {
         ppu->bus = ppu->vram_bus;
-        ppu->vram_bus = memory_vram_read(reg_addr);
+        ppu->vram_bus = memory_vram_read(reg_addr & VRAM_BUS_MASK);
       } else {
-        ppu->bus = memory_vram_read(reg_addr);
+        ppu->bus = memory_vram_read(reg_addr & VRAM_BUS_MASK);
         ppu->vram_bus = memory_vram_read((reg_addr & VRAM_NT_ADDR_MASK)
                                                    | PPU_NT_OFFSET);
       }

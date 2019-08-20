@@ -32,10 +32,8 @@ void regfile_init(void) {
  * Assumes the regfile is non-null.
  */
 void regfile_inc_pc(void) {
-  dword_t pc = get_dword(R->pc_lo, R->pc_hi);
-  pc++;
-  R->pc_lo = (word_t)pc;
-  R->pc_hi = (word_t)(pc >> 8);
+  R->pc_lo++;
+  if (R->pc_lo == 0) { R->pc_hi++; }
   return;
 }
 

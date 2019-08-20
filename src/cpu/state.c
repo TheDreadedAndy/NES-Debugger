@@ -23,13 +23,12 @@
 /*
  * The state manages the individual micro instructions that happen
  * on each cycle of each instruction. The largest number of cycles an
- * instruction can take should be 8, but I put 16 to give some breathing
- * room.
+ * instruction can take is 8.
  *
  * WARNING: Memory corruption will occur if this is not a power of 2!
  */
-#define STATE_MAX_OPS 16
-#define STATE_MASK 0x0FU
+#define STATE_MAX_OPS 8
+#define STATE_MASK 0x07U
 
 // System state is managed by a fixed size queue of micro instructions
 typedef struct state_header {

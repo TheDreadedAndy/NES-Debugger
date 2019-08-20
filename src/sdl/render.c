@@ -36,7 +36,7 @@
 bool frame_output = false;
 
 /* Helper functions */
-void render_get_render_rect(SDL_Rect *render_rect);
+void render_get_window_rect(SDL_Surface *window_surface, SDL_Rect *window_rect);
 
 /*
  * Draws a pixel to the render surface.
@@ -45,12 +45,12 @@ void render_get_render_rect(SDL_Rect *render_rect);
  * Assumes the row and column are in range of the surface size.
  */
 void render_pixel(size_t row, size_t col, word_t pixel) {
-  CONTRACT(row < (size_t) next_frame->h);
-  CONTRACT(col < (size_t) next_frame->w);
+  CONTRACT(row < (size_t) render->h);
+  CONTRACT(col < (size_t) render->w);
 
   // Write the given pixel to the given location.
-  uint32_t *pixels = (uint32_t*) next_frame->pixels;
-  pixels[row * next_frame->w + col] = palette_decode(pixel);
+  uint32_t *pixels = (uint32_t*) render->pixels;
+  pixels[row * render->w + col] = palette_decode(pixel);
 
   return;
 }
@@ -62,33 +62,27 @@ void render_pixel(size_t row, size_t col, word_t pixel) {
  */
 void render_frame(void) {
   CONTRACT(window != NULL);
-  CONTRACT(next_frame != NULL);
+  CONTRACT(render != NULL);
+
+  // Get the window surface.
+  SDL_Surface *window_surface = SDL_GetWindowSurface(window);
 
   // Get the regions of the surfaces to be copied.
-  SDL_Rect next_frame_rect, render_rect;
-  next_frame_rect.x = NES_WIDTH_OFFSET;
-  next_frame_rect.y = NES_HEIGHT_OFFSET;
-  next_frame_rect.w = NES_WIDTH;
-  next_frame_rect.h = NES_TRUE_HEIGHT;
-  render_get_render_rect(&render_rect);
+  SDL_Rect render_rect, window_rect;
+  render_rect.x = NES_WIDTH_OFFSET;
+  render_rect.y = NES_HEIGHT_OFFSET;
+  render_rect.w = NES_WIDTH;
+  render_rect.h = NES_TRUE_HEIGHT;
+  render_get_window_rect(window_surface, &window_rect);
 
   // Clear the window surface before displaying the new image.
-  uint32_t background_color = palette_decode(fill_color);
-  word_t red = (background_color & PALETTE_RMASK) >> 16;
-  word_t green = (background_color & PALETTE_GMASK) >> 8;
-  word_t blue = (background_color & PALETTE_BMASK);
-  SDL_SetRenderDrawColor(render, red, green, blue, 0);
-  SDL_RenderClear(render);
+  SDL_FillRect(window_surface, NULL, palette_decode(fill_color));
 
-  // Create the texture to be rendered.
-  SDL_Texture *texture = SDL_CreateTextureFromSurface(render, next_frame);
+  // Copy the render surface to the window surface.
+  SDL_BlitScaled(render, &render_rect, window_surface, &window_rect);
 
-  // Render the frame and update the window.
-  SDL_RenderCopy(render, texture, &next_frame_rect, &render_rect);
-  SDL_RenderPresent(render);
-
-  // Free the frame that was drawn.
-  SDL_DestroyTexture(texture);
+  // Update the window.
+  SDL_UpdateWindowSurface(window);
 
   // Signal that a frame was drawn.
   frame_output = true;
@@ -102,22 +96,21 @@ void render_frame(void) {
  *
  * Assumes the given surface and rect are non-null.
  */
-void render_get_render_rect(SDL_Rect *render_rect) {
-  int w, h;
-  SDL_GetWindowSize(window, &w, &h);
+void render_get_window_rect(SDL_Surface *window_surface,
+                            SDL_Rect *window_rect) {
   // Determine which dimension the destination window should be padded in.
-  if ((NES_TRUE_H_TO_W * w) > h) {
+  if ((NES_TRUE_H_TO_W * window_surface->w) > window_surface->h) {
     // Fill in height, pad in width.
-    render_rect->h = h;
-    render_rect->y = 0;
-    render_rect->w = NES_W_TO_H * render_rect->h;
-    render_rect->x = (w / 2) - (render_rect->w / 2);
+    window_rect->h = window_surface->h;
+    window_rect->y = 0;
+    window_rect->w = NES_W_TO_H * window_rect->h;
+    window_rect->x = (window_surface->w / 2) - (window_rect->w / 2);
   } else {
     // Fill in width, pad in height.
-    render_rect->w = NES_TRUE_WIDTH_RATIO * w;
-    render_rect->x = NES_WIDTH_PAD_OFFSET_RATIO * render_rect->w;
-    render_rect->h = NES_TRUE_H_TO_W * w;
-    render_rect->y = (h / 2) - (render_rect->h / 2);
+    window_rect->w = NES_TRUE_WIDTH_RATIO * window_surface->w;
+    window_rect->x = NES_WIDTH_PAD_OFFSET_RATIO * window_rect->w;
+    window_rect->h = NES_TRUE_H_TO_W * window_surface->w;
+    window_rect->y = (window_surface->h / 2) - (window_rect->h / 2);
   }
 }
 

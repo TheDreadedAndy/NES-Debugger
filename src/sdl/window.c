@@ -34,15 +34,12 @@
 const char *window_name = "NES, I guess?";
 
 // Global sdl window variable, used to render to the game window, play sounds,
-// and collect input.
+// and collect input. Cannot be directly accessed outside this file.
 SDL_Window *window = NULL;
 
-// Global sdl accelerated renderer associated with the window.
-SDL_Renderer *render = NULL;
-
 // Global SDL surface that pixels are rendered to before being drawn in the
-// window.
-SDL_Surface *next_frame = NULL;
+// window. Cannot be directly accessed outside this file.
+SDL_Surface *render = NULL;
 
 /* Helper functions */
 void window_process_window_event(SDL_Event *event);
@@ -68,27 +65,18 @@ bool window_init(void) {
     return false;
   }
 
-  // Create the renderer for the window.
-  render = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
-
-  // Verify that the renderer was created successfully.
-  if (render == NULL) {
-    fprintf(stderr, "Failed to create SDL renderer for window.\n");
-    return false;
-  }
-
   // Create the rendering surface.
-  next_frame = SDL_CreateRGBSurface(0, NES_WIDTH, NES_HEIGHT, PALETTE_DEPTH,
+  render = SDL_CreateRGBSurface(0, NES_WIDTH, NES_HEIGHT, PALETTE_DEPTH,
                                 PALETTE_RMASK, PALETTE_GMASK, PALETTE_BMASK, 0);
 
   // Verify that the surface was created successfully.
-  if (next_frame == NULL) {
+  if (render == NULL) {
     fprintf(stderr, "Failed to create SDL rendering surface.\n");
     return false;
   }
 
   // Disable RLE acceleration on the render surface.
-  SDL_SetSurfaceRLE(next_frame, 0);
+  SDL_SetSurfaceRLE(render, 0);
 
   // Return success.
   return true;
@@ -164,7 +152,7 @@ void window_close(void) {
   CONTRACT(render != NULL);
 
   SDL_DestroyWindow(window);
-  SDL_FreeSurface(next_frame);
+  SDL_FreeSurface(render);
   SDL_Quit();
 
   return;

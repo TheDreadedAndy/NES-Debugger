@@ -119,6 +119,7 @@ void audio_callback(void *userdata, uint8_t *stream, int len) {
   static float last_normal_sample = 0;
   static float last_hpf1_sample = 0;
   static float last_hpf2_sample = 0;
+  static float last_lpf_sample = 0;
 
   // Get the device buffer and its size from the inputs.
   size_t device_buffer_size = len / sizeof(float);
@@ -148,16 +149,17 @@ void audio_callback(void *userdata, uint8_t *stream, int len) {
     filter_buffer[i] = HPF2_SMOOTH * (filter_buffer[i - 1] + device_buffer[i]
                                    - device_buffer[i - 1]);
   }
+  last_hpf2_sample = filter_buffer[stop - 1];
 
   // Finally, copy the filter buffer back to the device buffer, applying a 14KHz
   // low pass filter.
   device_buffer[0] = (LPF_SMOOTH * filter_buffer[0])
-                   + ((1.0 - LPF_SMOOTH) * last_hpf2_sample);
-  last_hpf2_sample = device_buffer[stop - 1];
+                   + ((1.0 - LPF_SMOOTH) * last_lpf_sample);
   for (i = 1; i < stop; i++) {
     device_buffer[i] = (LPF_SMOOTH * filter_buffer[i])
                      + ((1.0 - LPF_SMOOTH) * device_buffer[i - 1]);
   }
+  last_lpf_sample = device_buffer[stop - 1];
 
   // Fill in any unused space.
   for (; i < device_buffer_size; i++) {

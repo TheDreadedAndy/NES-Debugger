@@ -463,6 +463,7 @@ void apu_update_sweep(pulse_t *pulse) {
   dword_t target_period = apu_get_pulse_target(pulse);
   if ((pulse->sweep_counter == 0) && (pulse->sweep & PULSE_SWEEP_ENABLE)
                                   && (pulse->timer >= 8)
+                                  && (pulse->length > 0)
                                   && (target_period <= PULSE_TIMER_MASK)
                                   && (pulse->sweep & PULSE_SWEEP_SHIFT_MASK)) {
     pulse->timer = target_period;

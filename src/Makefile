@@ -5,7 +5,7 @@ OBJOUT = $(addprefix build/,$(MAINS) $(OBJECTS))
 DIRS = $(addprefix build/,$(sort $(dir $(OBJECTS))))
 CC = gcc
 LIBS = $(shell sdl2-config --libs)
-override CFLAGS += -fwrapv -Wall -Wshadow -Wextra -Werror -std=c99 -pedantic -O3 $(shell sdl2-config --cflags)
+override CFLAGS += -Wall -Wshadow -Wextra -Werror -std=c99 -pedantic -O3 $(shell sdl2-config --cflags)
 
 # Determine which OS is being compiled for.
 ifeq ($(OS),Windows_NT)

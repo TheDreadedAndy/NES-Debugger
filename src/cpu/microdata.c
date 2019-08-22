@@ -432,7 +432,7 @@ void data_sbc_mdr_a(void) {
   // without issues in the carry out.
   dword_t res = ((dword_t) R->A) + ((dword_t) ((~R->mdr) & WORD_MASK))
                                  + ((dword_t) (R->P & 0x01U));
-  word_t ovf = ((R->A & 0x80U) == ((~R->mdr) & 0x80U))
+  word_t ovf = ((R->A & 0x80U) == ((-R->mdr) & 0x80U))
             && ((R->A & 0x80U) != (res & 0x80U));
   R->A = (word_t) res;
   R->P = (R->P & 0x3CU) | (R->A & 0x80U) | ((R->A == 0U) << 1U)

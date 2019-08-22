@@ -294,7 +294,7 @@ void mem_pull_pch(void) {
  */
 void mem_pull_a(void) {
   R->A = memory_read(R->S, MEMORY_STACK_HIGH);
-  R->P = (R->P & 0x7DU) | (R->A & 0x80U) | ((R->A == 0) << 1U);
+  R->P = (R->P & 0x7DU) | (R->A & 0x80U) | ((R->A == 0U) << 1U);
   return;
 }
 

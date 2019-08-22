@@ -1195,7 +1195,10 @@ void ppu_write(dword_t reg_addr, word_t val) {
       break;
     case PPU_DATA_ACCESS:
       // Writes can only happen during vblank.
-      memory_vram_write(val, ppu->vram_addr & VRAM_BUS_MASK);
+      if (((current_scanline >= 240) && (current_scanline <= 260))
+                                     || ppu_is_disabled()) {
+        memory_vram_write(val, ppu->vram_addr);
+      }
       ppu_mmio_vram_addr_inc();
       break;
   }
@@ -1216,16 +1219,16 @@ void ppu_mmio_scroll_write(word_t val) {
              & (SCROLL_X_MASK | SCROLL_NT_MASK))
              | ((((dword_t) val) << COARSE_Y_SHIFT) & COARSE_Y_MASK)
              | ((((dword_t) val) << FINE_Y_SHIFT) & FINE_Y_MASK);
+    ppu->write_toggle = false;
   } else {
     // Update scroll X.
     ppu->fine_x = val & FINE_X_MASK;
     ppu->temp_vram_addr = (ppu->temp_vram_addr
                         & (SCROLL_Y_MASK | SCROLL_NT_MASK))
                         | (val >> COARSE_X_SHIFT);
+    ppu->write_toggle = true;
   }
 
-  // Toggle the write bit.
-  ppu->write_toggle = !(ppu->write_toggle);
   return;
 }
 
@@ -1240,14 +1243,13 @@ void ppu_mmio_addr_write(word_t val) {
     // Write the low byte and update v.
     ppu->temp_vram_addr = (ppu->temp_vram_addr & PPU_ADDR_HIGH_MASK) | val;
     ppu->vram_addr = ppu->temp_vram_addr;
+    ppu->write_toggle = false;
   } else {
     // Write the high byte.
     ppu->temp_vram_addr = (ppu->temp_vram_addr & PPU_ADDR_LOW_MASK)
         | ((((dword_t) val) << PPU_ADDR_HIGH_SHIFT) & PPU_ADDR_HIGH_MASK);
+    ppu->write_toggle = true;
   }
-
-  // Toggle the write bit.
-  ppu->write_toggle = !(ppu->write_toggle);
 
   return;
 }
@@ -1263,7 +1265,8 @@ void ppu_mmio_vram_addr_inc(void) {
   if (ppu_is_disabled() || (current_scanline >= 240
                             && current_scanline <= 260)) {
     // When the PPU is inactive, vram is incremented correctly.
-    ppu->vram_addr += (ppu->ctrl & FLAG_VRAM_VINC) ? 32 : 1;
+    ppu->vram_addr = (ppu->ctrl & FLAG_VRAM_VINC) ? (ppu->vram_addr + 32)
+                                                  : (ppu->vram_addr + 1);
   } else if (!(((current_cycle > 0 && current_cycle <= 256)
          || current_cycle > 320) && (current_cycle % 8) == 0)) {
     // Writing to PPU data during rendering causes a X and Y increment.

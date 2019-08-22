@@ -16,6 +16,13 @@
 // them, so the emulation must have a larger audio buffer.
 #define EMU_BUFFER_SIZE (DEVICE_BUFFER_SIZE << 2U)
 
+// The NES has 3 filters, which must be applied to the samples in the buffer
+// to correctly output audio. These smoothing factors are calculated using a
+// sampling rate of 48000.
+#define HPF1_SMOOTH 0.988356
+#define HPF2_SMOOTH 0.945541
+#define LPF_SMOOTH 0.646967
+
 /*
  * The emulation audio buffer is implemented as a ring buffer to
  * increase speed.
@@ -32,6 +39,11 @@ typedef struct audio_buffer {
  */
 static buffer_t *audio_buffer = NULL;
 static size_t buffer_slot = 0;
+
+/*
+ * This buffer is used for temperary storage while applying the filters.
+ */
+static float *filter_buffer = NULL;
 
 /*
  * Audio samples will be played to this device, which is obtained from
@@ -70,6 +82,7 @@ bool audio_init(void) {
   audio_buffer = xcalloc(1, sizeof(buffer_t));
   audio_buffer->buffer = xcalloc(EMU_BUFFER_SIZE, sizeof(float));
   audio_buffer->size = EMU_BUFFER_SIZE;
+  filter_buffer = xcalloc(DEVICE_BUFFER_SIZE, sizeof(float));
 
   // Unpause the device and return success.
   SDL_PauseAudioDevice(audio_device, 0);
@@ -102,16 +115,53 @@ void audio_add_sample(float sample) {
  * buffer.
  */
 void audio_callback(void *userdata, uint8_t *stream, int len) {
+  // Used to make the filter continuous.
+  static float last_normal_sample = 0;
+  static float last_hpf1_sample = 0;
+  static float last_hpf2_sample = 0;
+
   // Get the device buffer and its size from the inputs.
   size_t device_buffer_size = len / sizeof(float);
   float *device_buffer = (float*) stream;
   (void)userdata;
 
-  // Fill in the device buffer using the emulation audio buffer.
-  for (size_t i = 0; i < device_buffer_size; i++) {
-    float sample = (i < buffer_slot) ? audio_buffer_read(i)
-                                     : audio_buffer_read(buffer_slot - 1);
-    device_buffer[i] = sample;
+  // Fill in the device buffer using the emulation audio buffer, while also
+  // applying a 90Hz high pass filter.
+  device_buffer[0] = (buffer_slot) ? audio_buffer_read(0) : 0.0;
+  device_buffer[0] = HPF1_SMOOTH * (last_hpf1_sample + device_buffer[0]
+                                 - last_normal_sample);
+  size_t i = 1;
+  size_t stop = (buffer_slot < device_buffer_size) ? buffer_slot
+                                                   : device_buffer_size;
+  last_normal_sample = audio_buffer_read(stop - 1);
+  for (; i < stop; i++) {
+    device_buffer[i] = HPF1_SMOOTH * (device_buffer[i - 1]
+                     + audio_buffer_read(i) - audio_buffer_read(i - 1));
+  }
+
+  // Copy the device buffer to the filter buffer, applying a 440Hz high pass
+  // filter.
+  filter_buffer[0] = HPF2_SMOOTH * (last_hpf2_sample + device_buffer[0]
+                                 - last_hpf1_sample);
+  last_hpf1_sample = device_buffer[stop - 1];
+  for (i = 1; i < stop; i++) {
+    filter_buffer[i] = HPF2_SMOOTH * (filter_buffer[i - 1] + device_buffer[i]
+                                   - device_buffer[i - 1]);
+  }
+
+  // Finally, copy the filter buffer back to the device buffer, applying a 14KHz
+  // low pass filter.
+  device_buffer[0] = (LPF_SMOOTH * filter_buffer[0])
+                   + ((1.0 - LPF_SMOOTH) * last_hpf2_sample);
+  last_hpf2_sample = device_buffer[stop - 1];
+  for (i = 1; i < stop; i++) {
+    device_buffer[i] = (LPF_SMOOTH * filter_buffer[i])
+                     + ((1.0 - LPF_SMOOTH) * device_buffer[i - 1]);
+  }
+
+  // Fill in any unused space.
+  for (; i < device_buffer_size; i++) {
+    device_buffer[i] = device_buffer[i - 1];
   }
 
   // Update the emulation audio buffer.

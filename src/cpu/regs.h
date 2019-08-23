@@ -11,7 +11,7 @@ typedef struct regfile {
   word_t A;
   word_t X;
   word_t Y;
-  word_t S;
+  mword_t S;
   word_t P;
   mword_t pc;
   word_t inst;
@@ -28,9 +28,6 @@ extern regfile_t *R;
 
 // Creates a regfile. regfiles can be freed by free.
 void regfile_init();
-
-// Increments the PC registers in the regfile.
-void regfile_inc_pc();
 
 // Prints out the contents of the register file.
 void regfile_print(size_t i);

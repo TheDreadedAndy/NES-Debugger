@@ -23,9 +23,6 @@ typedef union multi_word {
 // Integer promotion is of the Devil.
 #define WORD_MASK 0xFFU
 
-// Converts two words into a double word.
-dword_t get_dword(word_t lo, word_t hi);
-
 // Reverses a word.
 word_t reverse_word(word_t word);
 

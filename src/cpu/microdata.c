@@ -48,7 +48,7 @@ void data_nop(void) {
  * Increments the stack pointer.
  */
 void data_inc_s(void) {
-  R->S++;
+  R->S.w[WORD_LO]++;
   return;
 }
 
@@ -83,7 +83,7 @@ void data_inc_mdr(void) {
  * Decrements the S register. Used in push/pull. Does not set flags.
  */
 void data_dec_s(void) {
-  R->S--;
+  R->S.w[WORD_LO]--;
   return;
 }
 
@@ -136,7 +136,7 @@ void data_mov_a_y(void) {
  * Copies the value stored in S to X. Sets the N and Z flags.
  */
 void data_mov_s_x(void) {
-  R->X = R->S;
+  R->X = R->S.w[WORD_LO];
   R->P = (R->P & 0x7DU) | (R->X & 0x80U) | ((R->X == 0U) << 1U);
   return;
 }
@@ -154,7 +154,7 @@ void data_mov_x_a(void) {
  * Copies the value stored in X to S. Sets no flag (S is the stack pointer).
  */
 void data_mov_x_s(void) {
-  R->S = R->X;
+  R->S.w[WORD_LO] = R->X;
   return;
 }
 

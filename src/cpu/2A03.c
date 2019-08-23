@@ -61,7 +61,7 @@ bool irq_ready = false;
 // Used for DMA transfer to OAM. The transfer adds a cycle on odd frames.
 static bool cycle_even = false;
 static size_t dma_cycles_remaining = 0;
-static word_t dma_high = 0;
+static mword_t dma_addr = { 0 };
 
 /* Helper functions. */
 void cpu_run_mem(micro_t *micro);
@@ -169,7 +169,7 @@ bool cpu_can_poll(void) {
 void cpu_start_dma(word_t addr) {
   // Starts the dma transfer by setting the high CPU memory byte and reseting
   // the cycle counter.
-  dma_high = addr;
+  dma_addr.w[WORD_HI] = addr;
   dma_cycles_remaining = DMA_CYCLE_LENGTH;
 
   // If the CPU is on an odd cycle, the DMA takes one cycle longer.
@@ -185,7 +185,6 @@ void cpu_start_dma(word_t addr) {
  */
 void cpu_execute_dma(void) {
   // Current cpu memory address to read from.
-  static word_t dma_low = 0;
   static word_t dma_mdr = 0;
 
   // The CPU is idle until there are <= 512 dma cycles remaining.
@@ -194,11 +193,11 @@ void cpu_execute_dma(void) {
     ppu_oam_dma(dma_mdr);
   } else if (dma_cycles_remaining < DMA_CYCLE_LENGTH) {
     // Even cycle, so we read from memory.
-    dma_mdr = memory_read(get_dword(dma_low, dma_high));
-    dma_low++;
+    dma_mdr = memory_read(dma_addr.dw);
+    dma_addr.w[WORD_LO]++;
   } else {
     dma_mdr = 0;
-    dma_low = 0;
+    dma_addr.w[WORD_LO] = 0;
   }
   dma_cycles_remaining--;
 

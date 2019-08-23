@@ -140,8 +140,9 @@ void mem_read_ptr_addrl(void) {
  * register.
  */
 void mem_read_ptr1_addrh(void) {
-  R->addr.w[WORD_HI] = memory_read(get_dword(R->ptr.w[WORD_LO] + 1U,
-                                             R->ptr.w[WORD_HI]));
+  R->ptr.w[WORD_LO]++;
+  R->addr.w[WORD_HI] = memory_read(R->ptr.dw);
+  R->ptr.w[WORD_LO]--;
   return;
 }
 
@@ -150,8 +151,9 @@ void mem_read_ptr1_addrh(void) {
  * register.
  */
 void mem_read_ptr1_pch(void) {
-  R->pc.w[WORD_HI] = memory_read(get_dword(R->ptr.w[WORD_LO] + 1U,
-                                           R->ptr.w[WORD_HI]));
+  R->ptr.w[WORD_LO]++;
+  R->pc.w[WORD_HI] = memory_read(R->ptr.dw);
+  R->ptr.w[WORD_LO]--;
   return;
 }
 
@@ -191,7 +193,7 @@ void mem_write_y_addr(void) {
  * Writes the pcl to the stack.
  */
 void mem_push_pcl(void) {
-  memory_write(R->pc.w[WORD_LO], get_dword(R->S, MEMORY_STACK_HIGH));
+  memory_write(R->pc.w[WORD_LO], R->S.dw);
   return;
 }
 
@@ -199,7 +201,7 @@ void mem_push_pcl(void) {
  * Writes the pch to the stack.
  */
 void mem_push_pch(void) {
-  memory_write(R->pc.w[WORD_HI], get_dword(R->S, MEMORY_STACK_HIGH));
+  memory_write(R->pc.w[WORD_HI], R->S.dw);
   return;
 }
 
@@ -207,7 +209,7 @@ void mem_push_pch(void) {
  * Writes A to the stack.
  */
 void mem_push_a(void) {
-  memory_write(R->A, get_dword(R->S, MEMORY_STACK_HIGH));
+  memory_write(R->A, R->S.dw);
   return;
 }
 
@@ -215,7 +217,7 @@ void mem_push_a(void) {
  * Writes the cpu state to the stack. Clears the B flag.
  */
 void mem_push_p(void) {
-  memory_write((R->P | 0x20U), get_dword(R->S, MEMORY_STACK_HIGH));
+  memory_write((R->P | 0x20U), R->S.dw);
   return;
 }
 
@@ -223,7 +225,7 @@ void mem_push_p(void) {
  * Writes the cpu state to the stack. Sets the B flag.
  */
 void mem_push_p_b(void) {
-  memory_write((R->P | 0x30U), get_dword(R->S, MEMORY_STACK_HIGH));
+  memory_write((R->P | 0x30U), R->S.dw);
   return;
 }
 
@@ -232,7 +234,7 @@ void mem_push_p_b(void) {
  * next cycles of the interrupt according to hijacking behavior.
  */
 void mem_brk(void) {
-  memory_write((R->P | 0x30U), get_dword(R->S, MEMORY_STACK_HIGH));
+  memory_write((R->P | 0x30U), R->S.dw);
 
   // Allows an nmi to hijack the brk instruction.
   if (nmi_edge) {
@@ -256,7 +258,7 @@ void mem_brk(void) {
  * the next cycles of the interrupt according to hijacking behavior.
  */
 void mem_irq(void) {
-  memory_write((R->P | 0x20U), get_dword(R->S, MEMORY_STACK_HIGH));
+  memory_write((R->P | 0x20U), R->S.dw);
 
   // Allows an nmi to hijack an irq interrupt.
   if (nmi_edge) {
@@ -277,7 +279,7 @@ void mem_irq(void) {
  * Pulls the pcl from the stack.
  */
 void mem_pull_pcl(void) {
-  R->pc.w[WORD_LO] = memory_read(get_dword(R->S, MEMORY_STACK_HIGH));
+  R->pc.w[WORD_LO] = memory_read(R->S.dw);
   return;
 }
 
@@ -285,7 +287,7 @@ void mem_pull_pcl(void) {
  * Pulls the pch from the stack.
  */
 void mem_pull_pch(void) {
-  R->pc.w[WORD_HI] = memory_read(get_dword(R->S, MEMORY_STACK_HIGH));
+  R->pc.w[WORD_HI] = memory_read(R->S.dw);
   return;
 }
 
@@ -293,7 +295,7 @@ void mem_pull_pch(void) {
  * Pulls A from the stack. This is the only memory op that sets flags.
  */
 void mem_pull_a(void) {
-  R->A = memory_read(get_dword(R->S, MEMORY_STACK_HIGH));
+  R->A = memory_read(R->S.dw);
   R->P = (R->P & 0x7DU) | (R->A & 0x80U) | ((R->A == 0U) << 1U);
   return;
 }
@@ -302,7 +304,7 @@ void mem_pull_a(void) {
  * Pulls the cpu state from the stack. Zeros out the B flag.
  */
 void mem_pull_p(void) {
-  R->P = memory_read(get_dword(R->S, MEMORY_STACK_HIGH)) & 0xCFU;
+  R->P = memory_read(R->S.dw) & 0xCFU;
   return;
 }
 

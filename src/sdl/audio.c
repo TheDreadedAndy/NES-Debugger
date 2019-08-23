@@ -78,7 +78,7 @@ void audio_add_sample(float sample) {
 
   // Apply the first high pass filter (90Hz).
   float sample_temp = HPF1_SMOOTH * (last_hpf1_sample + sample
-                                      - last_normal_sample);
+                                  - last_normal_sample);
   last_normal_sample = sample;
 
   // Apply the second high pass filter (440Hz).

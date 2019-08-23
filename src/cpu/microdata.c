@@ -194,7 +194,7 @@ void data_mov_mdr_x(void) {
 }
 
 /*
- * Copies the value stored in the MDR to Register X. Sets the N and Z flags.
+ * Copies the value stored in the MDR to Register Y. Sets the N and Z flags.
  */
 void data_mov_mdr_y(void) {
   R->Y = R->mdr;
@@ -521,7 +521,7 @@ void data_fix_pch(void) {
  */
 void data_branch(void) {
   // Calculate whether or not the branch was taken.
-  word_t flag = (R->inst >> 6U) & 3U;
+  word_t flag = (R->inst >> 6U) & 0x03U;
   bool cond = (bool) ((R->inst >> 5U) & 1U);
   // Black magic that pulls the proper flag from the status reg.
   flag = (flag & 2U) ? ((R->P >> (flag & 1U)) & 1U)

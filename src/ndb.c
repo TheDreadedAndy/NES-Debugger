@@ -137,6 +137,10 @@ int main(int argc, char *argv[]) {
 void start_emulation(char *rom, char *pal) {
   // Open the rom.
   FILE *rom_file = fopen(rom, "rb");
+  if (rom_file == NULL) {
+    fprintf(stderr, "Failed to open specified file.\n");
+    abort();
+  }
 
   // Decode the header so that the emulation can be prepared.
   header_t *header = decode_header(rom_file);

@@ -1103,7 +1103,6 @@ void ppu_eval_fetch_sprites(void) {
   // Resets the address the first time this function is called for a scanline.
   // Flags if sprite zero is in slot 0.
   if (current_cycle == 257) {
-    ppu->soam_addr = 0;
     ppu->zero_in_mem = ppu->zero_in_soam;
     ppu->sprite_count = ppu->next_sprite_count;
     CONTRACT(ppu->sprite_count <= 8);
@@ -1195,10 +1194,7 @@ void ppu_write(dword_t reg_addr, word_t val) {
       break;
     case PPU_DATA_ACCESS:
       // Writes can only happen during vblank.
-      if (((current_scanline >= 240) && (current_scanline <= 260))
-                                     || ppu_is_disabled()) {
-        memory_vram_write(val, ppu->vram_addr);
-      }
+      memory_vram_write(val, ppu->vram_addr);
       ppu_mmio_vram_addr_inc();
       break;
   }
@@ -1271,6 +1267,7 @@ void ppu_mmio_vram_addr_inc(void) {
          || current_cycle > 320) && (current_cycle % 8) == 0)) {
     // Writing to PPU data during rendering causes a X and Y increment.
     // This only happens when the PPU would not otherwise be incrementing them.
+    // FIXME: May not be both at once.
     ppu_render_yinc();
     ppu_render_xinc();
   }
@@ -1340,7 +1337,7 @@ void ppu_oam_dma(word_t val) {
     ppu->oam_addr += 4;
   }
 
-  // The PPU bus is filled with the value, incase we are coming from a CPU  DMA.
+  // The PPU bus is filled with the value, incase we are coming from a CPU DMA.
   ppu->bus = val;
   return;
 }

@@ -232,6 +232,7 @@ void mem_push_p_b(void) {
  * next cycles of the interrupt according to hijacking behavior.
  */
 void mem_brk(void) {
+  printf("Running brk\n");
   memory_write((R->P | 0x30U), R->S, MEMORY_STACK_HIGH);
 
   // Allows an nmi to hijack the brk instruction.

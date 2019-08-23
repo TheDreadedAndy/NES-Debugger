@@ -13,16 +13,13 @@ typedef struct regfile {
   word_t Y;
   word_t S;
   word_t P;
-  word_t pc_lo;
-  word_t pc_hi;
+  mword_t pc;
   word_t inst;
   // These registers didn't necessarily exist in the 6502, but are used to
   // manage the machine state.
   word_t mdr;
-  word_t addr_lo;
-  word_t addr_hi;
-  word_t ptr_lo;
-  word_t ptr_hi;
+  mword_t addr;
+  mword_t ptr;
   word_t carry;
 } regfile_t;
 

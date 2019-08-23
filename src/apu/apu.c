@@ -653,9 +653,7 @@ void apu_update_dmc(void) {
   if ((dmc->bits_remaining == 0) && (dmc->bytes_remaining > 0)) {
     // TODO: Stall CPU.
     // Load the next word into the sample buffer.
-    word_t addr_lo = (word_t) dmc->current_addr;
-    word_t addr_hi = (word_t) (dmc->current_addr >> 8);
-    dmc->sample_buffer = memory_read(addr_lo, addr_hi);
+    dmc->sample_buffer = memory_read(dmc->current_addr);
     dmc->current_addr = (dmc->current_addr + 1) | DMC_CURRENT_ADDR_BASE;
     dmc->bytes_remaining--;
     dmc->silent = false;

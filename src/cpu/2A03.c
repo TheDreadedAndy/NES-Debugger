@@ -68,7 +68,7 @@ void cpu_run_mem(micro_t *micro);
 void cpu_run_data(micro_t *micro);
 bool cpu_can_poll(void);
 void cpu_execute_dma(void);
-void cpu_decode_inst(word_t inst);
+void cpu_decode_inst(void);
 void cpu_decode_izpx(microdata_t *micro_op);
 void cpu_decode_zp(microdata_t *micro_op);
 void cpu_decode_imm(microdata_t *micro_op);
@@ -106,8 +106,8 @@ void cpu_init(FILE *rom_file, header_t *header) {
   regfile_init();
 
   // Load the reset location into the pc.
-  R->pc_lo = memory_read(MEMORY_RESET_LOW, MEMORY_RESET_HIGH);
-  R->pc_hi = memory_read(MEMORY_RESET_LOW+1, MEMORY_RESET_HIGH);
+  R->pc.w[WORD_LO] = memory_read(MEMORY_RESET_ADDR);
+  R->pc.w[WORD_HI] = memory_read(MEMORY_RESET_ADDR + 1);
 
   // Queue the first cycle to be emulated.
   state_add_cycle(&mem_fetch, &data_nop, PC_INC);
@@ -138,7 +138,7 @@ void cpu_run_cycle(void) {
   micro_t *next_micro = state_next_cycle();
   next_micro->mem();
   next_micro->data();
-  if (next_micro->inc_pc) { regfile_inc_pc(); }
+  if (next_micro->inc_pc) { R->pc.dw++; }
 
   // Poll the interrupt lines and update the detectors.
   cpu_poll_nmi_line();
@@ -194,7 +194,7 @@ void cpu_execute_dma(void) {
     ppu_oam_dma(dma_mdr);
   } else if (dma_cycles_remaining < DMA_CYCLE_LENGTH) {
     // Even cycle, so we read from memory.
-    dma_mdr = memory_read(dma_low, dma_high);
+    dma_mdr = memory_read(get_dword(dma_low, dma_high));
     dma_low++;
   } else {
     dma_mdr = 0;
@@ -220,7 +220,7 @@ void cpu_fetch(micro_t *micro) {
     // We set the micro ops pc_inc field here, in case we were coming
     // from a branch.
     micro->inc_pc = PC_INC;
-    R->inst = memory_read(R->pc_lo, R->pc_hi);
+    R->inst = memory_read(R->pc.dw);
   } else {
     // All interrupts fill the instruction register with 0x00 (BRK).
     R->inst = INST_BRK;
@@ -229,7 +229,7 @@ void cpu_fetch(micro_t *micro) {
   }
 
   // Decode the instruction.
-  cpu_decode_inst(R->inst);
+  cpu_decode_inst();
 
   return;
 }
@@ -242,7 +242,7 @@ void cpu_fetch(micro_t *micro) {
  * Assumes that all cpu structures have been initialized.
  * Should only be called from cpu_fetch().
  */
-void cpu_decode_inst(word_t inst) {
+void cpu_decode_inst(void) {
   // We only decode the instruction if there are no interrupts.
   if (nmi_edge) {
     // An nmi signal has priority over an irq, and resets the ready flag for it.
@@ -278,7 +278,7 @@ void cpu_decode_inst(word_t inst) {
    * addressing mode (with one micro op being changed to perform the desired
    * instruction).
    */
-  switch (inst) {
+  switch (R->inst) {
     case INST_ORA_IZPX:
       cpu_decode_izpx(&data_ora_mdr_a);
       break;
@@ -745,7 +745,7 @@ void cpu_decode_inst(word_t inst) {
       cpu_decode_nomem(&data_nop);
       break;
     default:
-      printf("Instruction %x is not implemented\n", inst);
+      printf("Instruction %x is not implemented\n", R->inst);
       abort();
   }
   return;

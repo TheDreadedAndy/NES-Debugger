@@ -8,12 +8,9 @@
 
 // Memory addressing constants.
 #define MEMORY_STACK_HIGH 0x01U
-#define MEMORY_IRQ_LOW 0xFEU
-#define MEMORY_IRQ_HIGH 0xFFU
-#define MEMORY_RESET_LOW 0xFCU
-#define MEMORY_RESET_HIGH 0xFFU
-#define MEMORY_NMI_LOW 0xFAU
-#define MEMORY_NMI_HIGH 0xFFU
+#define MEMORY_IRQ_ADDR 0xFFFEU
+#define MEMORY_RESET_ADDR 0xFFFCU
+#define MEMORY_NMI_ADDR 0xFFFAU
 
 // Function types, used in memory structure to point to the proper
 // mapper function.
@@ -46,10 +43,10 @@ typedef struct memory {
 bool memory_init(FILE *rom_file, header_t *header);
 
 // Generic memory read function.
-word_t memory_read(word_t mem_lo, word_t mem_hi);
+word_t memory_read(dword_t addr);
 
 // Generic memory write function.
-void memory_write(word_t val, word_t mem_lo, word_t mem_hi);
+void memory_write(word_t val, dword_t addr);
 
 // Generic vram read function.
 word_t memory_vram_read(dword_t addr);

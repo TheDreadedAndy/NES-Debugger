@@ -41,7 +41,7 @@ void mem_fetch(void) {
  * Reads a byte from the pc address, then discards it.
  */
 void mem_read_pc_nodest(void) {
-  memory_read(R->pc_lo, R->pc_hi);
+  memory_read(R->pc.dw);
   return;
 }
 
@@ -49,7 +49,7 @@ void mem_read_pc_nodest(void) {
  * Reads a byte from the pc address into the mdr.
  */
 void mem_read_pc_mdr(void) {
-  R->mdr = memory_read(R->pc_lo, R->pc_hi);
+  R->mdr = memory_read(R->pc.dw);
   return;
 }
 
@@ -57,7 +57,7 @@ void mem_read_pc_mdr(void) {
  * Reads a byte from the pc address into the pch.
  */
 void mem_read_pc_pch(void) {
-  R->pc_hi = memory_read(R->pc_lo, R->pc_hi);
+  R->pc.w[WORD_HI] = memory_read(R->pc.dw);
   return;
 }
 
@@ -66,8 +66,7 @@ void mem_read_pc_pch(void) {
  * Zeros out the address high register.
  */
 void mem_read_pc_zp_addr(void) {
-  R->addr_hi = 0;
-  R->addr_lo = memory_read(R->pc_lo, R->pc_hi);
+  R->addr.dw = memory_read(R->pc.dw);
   return;
 }
 
@@ -75,7 +74,7 @@ void mem_read_pc_zp_addr(void) {
  * Reads a byte from the pc address into the address low register.
  */
 void mem_read_pc_addrl(void) {
-  R->addr_lo = memory_read(R->pc_lo, R->pc_hi);
+  R->addr.w[WORD_LO] = memory_read(R->pc.dw);
   return;
 }
 
@@ -83,7 +82,7 @@ void mem_read_pc_addrl(void) {
  * Reads a byte from the pc address into the address high register.
  */
 void mem_read_pc_addrh(void) {
-  R->addr_hi = memory_read(R->pc_lo, R->pc_hi);
+  R->addr.w[WORD_HI] = memory_read(R->pc.dw);
   return;
 }
 
@@ -92,8 +91,7 @@ void mem_read_pc_addrh(void) {
  * Zeros out the pointer high register.
  */
 void mem_read_pc_zp_ptr(void) {
-  R->ptr_hi = 0;
-  R->ptr_lo = memory_read(R->pc_lo, R->pc_hi);
+  R->ptr.dw = memory_read(R->pc.dw);
   return;
 }
 
@@ -101,7 +99,7 @@ void mem_read_pc_zp_ptr(void) {
  * Reads a byte from the pc address into the pointer low register.
  */
 void mem_read_pc_ptrl(void) {
-  R->ptr_lo = memory_read(R->pc_lo, R->pc_hi);
+  R->ptr.w[WORD_LO] = memory_read(R->pc.dw);
   return;
 }
 
@@ -109,7 +107,7 @@ void mem_read_pc_ptrl(void) {
  * Reads a byte from the pc address into the pointer high register.
  */
 void mem_read_pc_ptrh(void) {
-  R->ptr_hi = memory_read(R->pc_lo, R->pc_hi);
+  R->ptr.w[WORD_HI] = memory_read(R->pc.dw);
   return;
 }
 
@@ -117,7 +115,7 @@ void mem_read_pc_ptrh(void) {
  * Reads a byte from the addr address into the mdr.
  */
 void mem_read_addr_mdr(void) {
-  R->mdr = memory_read(R->addr_lo, R->addr_hi);
+  R->mdr = memory_read(R->addr.dw);
   return;
 }
 
@@ -125,7 +123,7 @@ void mem_read_addr_mdr(void) {
  * Reads a byte from the ptr address into the mdr.
  */
 void mem_read_ptr_mdr(void) {
-  R->mdr = memory_read(R->ptr_lo, R->ptr_hi);
+  R->mdr = memory_read(R->ptr.dw);
   return;
 }
 
@@ -133,7 +131,7 @@ void mem_read_ptr_mdr(void) {
  * Reads a byte from the ptr address into the address low register.
  */
 void mem_read_ptr_addrl(void) {
-  R->addr_lo = memory_read(R->ptr_lo, R->ptr_hi);
+  R->addr.w[WORD_LO] = memory_read(R->ptr.dw);
   return;
 }
 
@@ -142,7 +140,8 @@ void mem_read_ptr_addrl(void) {
  * register.
  */
 void mem_read_ptr1_addrh(void) {
-  R->addr_hi = memory_read(R->ptr_lo + 1U, R->ptr_hi);
+  R->addr.w[WORD_HI] = memory_read(get_dword(R->ptr.w[WORD_LO] + 1U,
+                                             R->ptr.w[WORD_HI]));
   return;
 }
 
@@ -151,7 +150,8 @@ void mem_read_ptr1_addrh(void) {
  * register.
  */
 void mem_read_ptr1_pch(void) {
-  R->pc_hi = memory_read(R->ptr_lo + 1U, R->ptr_hi);
+  R->pc.w[WORD_HI] = memory_read(get_dword(R->ptr.w[WORD_LO] + 1U,
+                                           R->ptr.w[WORD_HI]));
   return;
 }
 
@@ -159,7 +159,7 @@ void mem_read_ptr1_pch(void) {
  * Writes the mdr to the addr address.
  */
 void mem_write_mdr_addr(void) {
-  memory_write(R->mdr, R->addr_lo, R->addr_hi);
+  memory_write(R->mdr, R->addr.dw);
   return;
 }
 
@@ -167,7 +167,7 @@ void mem_write_mdr_addr(void) {
  * Writes A to the addr address.
  */
 void mem_write_a_addr(void) {
-  memory_write(R->A, R->addr_lo, R->addr_hi);
+  memory_write(R->A, R->addr.dw);
   return;
 }
 
@@ -175,7 +175,7 @@ void mem_write_a_addr(void) {
  * Writes X to the addr address.
  */
 void mem_write_x_addr(void) {
-  memory_write(R->X, R->addr_lo, R->addr_hi);
+  memory_write(R->X, R->addr.dw);
   return;
 }
 
@@ -183,7 +183,7 @@ void mem_write_x_addr(void) {
  * Writes Y to the addr address.
  */
 void mem_write_y_addr(void) {
-  memory_write(R->Y, R->addr_lo, R->addr_hi);
+  memory_write(R->Y, R->addr.dw);
   return;
 }
 
@@ -191,7 +191,7 @@ void mem_write_y_addr(void) {
  * Writes the pcl to the stack.
  */
 void mem_push_pcl(void) {
-  memory_write(R->pc_lo, R->S, MEMORY_STACK_HIGH);
+  memory_write(R->pc.w[WORD_LO], get_dword(R->S, MEMORY_STACK_HIGH));
   return;
 }
 
@@ -199,7 +199,7 @@ void mem_push_pcl(void) {
  * Writes the pch to the stack.
  */
 void mem_push_pch(void) {
-  memory_write(R->pc_hi, R->S, MEMORY_STACK_HIGH);
+  memory_write(R->pc.w[WORD_HI], get_dword(R->S, MEMORY_STACK_HIGH));
   return;
 }
 
@@ -207,7 +207,7 @@ void mem_push_pch(void) {
  * Writes A to the stack.
  */
 void mem_push_a(void) {
-  memory_write(R->A, R->S, MEMORY_STACK_HIGH);
+  memory_write(R->A, get_dword(R->S, MEMORY_STACK_HIGH));
   return;
 }
 
@@ -215,7 +215,7 @@ void mem_push_a(void) {
  * Writes the cpu state to the stack. Clears the B flag.
  */
 void mem_push_p(void) {
-  memory_write((R->P | 0x20U), R->S, MEMORY_STACK_HIGH);
+  memory_write((R->P | 0x20U), get_dword(R->S, MEMORY_STACK_HIGH));
   return;
 }
 
@@ -223,7 +223,7 @@ void mem_push_p(void) {
  * Writes the cpu state to the stack. Sets the B flag.
  */
 void mem_push_p_b(void) {
-  memory_write((R->P | 0x30U), R->S, MEMORY_STACK_HIGH);
+  memory_write((R->P | 0x30U), get_dword(R->S, MEMORY_STACK_HIGH));
   return;
 }
 
@@ -232,8 +232,7 @@ void mem_push_p_b(void) {
  * next cycles of the interrupt according to hijacking behavior.
  */
 void mem_brk(void) {
-  printf("Running brk\n");
-  memory_write((R->P | 0x30U), R->S, MEMORY_STACK_HIGH);
+  memory_write((R->P | 0x30U), get_dword(R->S, MEMORY_STACK_HIGH));
 
   // Allows an nmi to hijack the brk instruction.
   if (nmi_edge) {
@@ -257,7 +256,7 @@ void mem_brk(void) {
  * the next cycles of the interrupt according to hijacking behavior.
  */
 void mem_irq(void) {
-  memory_write((R->P | 0x20U), R->S, MEMORY_STACK_HIGH);
+  memory_write((R->P | 0x20U), get_dword(R->S, MEMORY_STACK_HIGH));
 
   // Allows an nmi to hijack an irq interrupt.
   if (nmi_edge) {
@@ -278,7 +277,7 @@ void mem_irq(void) {
  * Pulls the pcl from the stack.
  */
 void mem_pull_pcl(void) {
-  R->pc_lo = memory_read(R->S, MEMORY_STACK_HIGH);
+  R->pc.w[WORD_LO] = memory_read(get_dword(R->S, MEMORY_STACK_HIGH));
   return;
 }
 
@@ -286,7 +285,7 @@ void mem_pull_pcl(void) {
  * Pulls the pch from the stack.
  */
 void mem_pull_pch(void) {
-  R->pc_hi = memory_read(R->S, MEMORY_STACK_HIGH);
+  R->pc.w[WORD_HI] = memory_read(get_dword(R->S, MEMORY_STACK_HIGH));
   return;
 }
 
@@ -294,7 +293,7 @@ void mem_pull_pch(void) {
  * Pulls A from the stack. This is the only memory op that sets flags.
  */
 void mem_pull_a(void) {
-  R->A = memory_read(R->S, MEMORY_STACK_HIGH);
+  R->A = memory_read(get_dword(R->S, MEMORY_STACK_HIGH));
   R->P = (R->P & 0x7DU) | (R->A & 0x80U) | ((R->A == 0U) << 1U);
   return;
 }
@@ -303,7 +302,7 @@ void mem_pull_a(void) {
  * Pulls the cpu state from the stack. Zeros out the B flag.
  */
 void mem_pull_p(void) {
-  R->P = memory_read(R->S, MEMORY_STACK_HIGH) & 0xCFU;
+  R->P = memory_read(get_dword(R->S, MEMORY_STACK_HIGH)) & 0xCFU;
   return;
 }
 
@@ -311,7 +310,7 @@ void mem_pull_p(void) {
  * Reads from the nmi address into the pcl.
  */
 void mem_nmi_pcl(void) {
-  R->pc_lo = memory_read(MEMORY_NMI_LOW, MEMORY_NMI_HIGH);
+  R->pc.w[WORD_LO] = memory_read(MEMORY_NMI_ADDR);
   return;
 }
 
@@ -319,7 +318,7 @@ void mem_nmi_pcl(void) {
  * Reads from the nmi address (offset by 1) into the pch.
  */
 void mem_nmi_pch(void) {
-  R->pc_hi = memory_read(MEMORY_NMI_LOW + 1U, MEMORY_NMI_HIGH);
+  R->pc.w[WORD_HI] = memory_read(MEMORY_NMI_ADDR + 1U);
   return;
 }
 
@@ -327,7 +326,7 @@ void mem_nmi_pch(void) {
  * Reads from the reset address into the pcl.
  */
 void mem_reset_pcl(void) {
-  R->pc_lo = memory_read(MEMORY_RESET_LOW, MEMORY_RESET_HIGH);
+  R->pc.w[WORD_LO] = memory_read(MEMORY_RESET_ADDR);
   return;
 }
 
@@ -335,7 +334,7 @@ void mem_reset_pcl(void) {
  * Reads from the reset address (offset by 1) into the pch.
  */
 void mem_reset_pch(void) {
-  R->pc_hi = memory_read(MEMORY_RESET_LOW + 1U, MEMORY_RESET_HIGH);
+  R->pc.w[WORD_HI] = memory_read(MEMORY_RESET_ADDR + 1U);
   return;
 }
 
@@ -343,7 +342,7 @@ void mem_reset_pch(void) {
  * Reads from the irq address into the pcl.
  */
 void mem_irq_pcl(void) {
-  R->pc_lo = memory_read(MEMORY_IRQ_LOW, MEMORY_IRQ_HIGH);
+  R->pc.w[WORD_LO] = memory_read(MEMORY_IRQ_ADDR);
   return;
 }
 
@@ -351,6 +350,6 @@ void mem_irq_pcl(void) {
  * Reads from the irq address (offset by 1) into the pch.
  */
 void mem_irq_pch(void) {
-  R->pc_hi = memory_read(MEMORY_IRQ_LOW + 1U, MEMORY_IRQ_HIGH);
+  R->pc.w[WORD_HI] = memory_read(MEMORY_IRQ_ADDR + 1U);
   return;
 }

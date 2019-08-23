@@ -171,7 +171,7 @@ void data_mov_y_a(void) {
  * Copies the value stored in the MDR to the PCL register. Sets no flags.
  */
 void data_mov_mdr_pcl(void) {
-  R->pc_lo = R->mdr;
+  R->pc.w[WORD_LO] = R->mdr;
   return;
 }
 
@@ -454,8 +454,8 @@ void data_bit_mdr_a(void) {
  * abstraction register.
  */
 void data_add_addrl_x(void) {
-  dword_t res = ((dword_t) R->addr_lo) + ((dword_t) R->X);
-  R->addr_lo = (word_t) res;
+  dword_t res = ((dword_t) (R->addr.w[WORD_LO])) + ((dword_t) R->X);
+  R->addr.w[WORD_LO] = (word_t) res;
   R->carry = res >> 8U;
   return;
 }
@@ -465,8 +465,8 @@ void data_add_addrl_x(void) {
  * abstraction register.
  */
 void data_add_addrl_y(void) {
-  dword_t res = ((dword_t) R->addr_lo) + ((dword_t) R->Y);
-  R->addr_lo = (word_t) res;
+  dword_t res = ((dword_t) (R->addr.w[WORD_LO])) + ((dword_t) R->Y);
+  R->addr.w[WORD_LO] = (word_t) res;
   R->carry = res >> 8U;
   return;
 }
@@ -475,7 +475,7 @@ void data_add_addrl_y(void) {
  * Adds X to the low pointer byte. Page crossings are ignored.
  */
 void data_add_ptrl_x(void) {
-  R->ptr_lo = R->ptr_lo + R->X;
+  R->ptr.w[WORD_LO] = R->ptr.w[WORD_LO] + R->X;
   return;
 }
 
@@ -485,7 +485,7 @@ void data_add_ptrl_x(void) {
  */
 void data_fixa_addrh(void) {
   if (R->carry) {
-    R->addr_hi += R->carry;
+    R->addr.w[WORD_HI] += R->carry;
     micro_t *micro = state_last_cycle();
     state_push_cycle(micro->mem, &data_nop, PC_NOP);
   }
@@ -496,7 +496,7 @@ void data_fixa_addrh(void) {
  * Adds the carry out from the last addressing data operation to addr_hi.
  */
 void data_fix_addrh(void) {
-  R->addr_hi = R->addr_hi + R->carry;
+  R->addr.w[WORD_HI] = R->addr.w[WORD_HI] + R->carry;
   return;
 }
 
@@ -504,7 +504,7 @@ void data_fix_addrh(void) {
  * Adds the carry out from the last addressing data operation to PCH.
  */
 void data_fix_pch(void) {
-  R->pc_hi = R->pc_hi + R->carry;
+  R->pc.w[WORD_HI] = R->pc.w[WORD_HI] + R->carry;
   return;
 }
 
@@ -529,7 +529,7 @@ void data_branch(void) {
   bool taken = (((bool) flag) == cond);
 
   // Add the reletive address to pc_lo. Reletive addressing is signed.
-  dword_t res = ((dword_t) R->pc_lo) + ((dword_t) R->mdr);
+  dword_t res = ((dword_t) R->pc.w[WORD_LO]) + ((dword_t) R->mdr);
   R->carry = (word_t)(res >> 8U);
   // Effectively sign extend the MDR in the carry out.
   if (R->mdr & 0x80U) { R->carry += 0xFFU; }
@@ -540,12 +540,12 @@ void data_branch(void) {
     cpu_fetch(state_last_cycle());
   } else if (R->carry) {
     // Case 2.
-    R->pc_lo = (word_t) res;
+    R->pc.w[WORD_LO] = (word_t) res;
     state_add_cycle(&mem_nop, &data_fix_pch, PC_NOP);
     state_add_cycle(&mem_fetch, &data_nop, PC_INC);
   } else {
     // Case 1.
-    R->pc_lo = (word_t) res;
+    R->pc.w[WORD_LO] = (word_t) res;
     state_add_cycle(&mem_fetch, &data_nop, PC_INC);
   }
 

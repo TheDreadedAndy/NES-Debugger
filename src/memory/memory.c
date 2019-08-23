@@ -93,9 +93,7 @@ bool memory_init(FILE *rom_file, header_t *header) {
  *
  * Assumes the memory structure is valid.
  */
-word_t memory_read(word_t mem_lo, word_t mem_hi) {
-  dword_t addr = get_dword(mem_lo, mem_hi);
-
+word_t memory_read(dword_t addr) {
   // Determine if the NES address space or the mapper should be accessed.
   if (addr < PPU_OFFSET) {
     // Access standard ram.
@@ -124,9 +122,7 @@ word_t memory_read(word_t mem_lo, word_t mem_hi) {
  *
  * Assumes the memory structure is valid.
  */
-void memory_write(word_t val, word_t mem_lo, word_t mem_hi) {
-  dword_t addr = get_dword(mem_lo, mem_hi);
-
+void memory_write(word_t val, dword_t addr) {
   // Determine if the NES address space or the mapper should be accessed.
   if (addr < PPU_OFFSET) {
     // Access standard ram.

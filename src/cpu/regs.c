@@ -28,16 +28,6 @@ void regfile_init(void) {
 }
 
 /*
- * Increments the PC registers in a regfile.
- * Assumes the regfile is non-null.
- */
-void regfile_inc_pc(void) {
-  R->pc_lo++;
-  if (R->pc_lo == 0) { R->pc_hi++; }
-  return;
-}
-
-/*
  * Prints a regfile.
  */
 void regfile_print(size_t i) {
@@ -47,12 +37,10 @@ void regfile_print(size_t i) {
          R->X, R->Y, R->inst);
   printf("State (flags): %x, Stack pointer: %x\n", R->P,
          R->S);
-  printf("PCL: %x, PCH: %x\n", R->pc_lo, R->pc_hi);
+  printf("PC: %x\n", R->pc.dw);
   printf("Abstraction register state:\n");
   printf("MDR: %x, Carry: %x\n", R->mdr, R->carry);
-  printf("Addr Low: %x, Addr High: %x\n", R->addr_lo,
-         R->addr_hi);
-  printf("Pointer Low: %x, Pointer High: %x\n", R->ptr_lo,
-         R->ptr_hi);
+  printf("Addr %x\n", R->addr.dw);
+  printf("Pointer: %x\n", R->ptr.dw);
   return;
 }

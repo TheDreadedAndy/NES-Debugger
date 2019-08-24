@@ -182,8 +182,8 @@ typedef struct ppu {
   bool zero_in_mem;
 
   // Temporary storage used in rendering.
-  word_t next_tile[BIT_PLANES];
   mword_t tile_scroll[BIT_PLANES];
+  word_t next_tile[BIT_PLANES];
   word_t palette_scroll[BIT_PLANES];
   word_t palette_latch[BIT_PLANES];
   word_t next_palette[BIT_PLANES];

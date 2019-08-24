@@ -183,8 +183,7 @@ typedef struct ppu {
 
   // Temporary storage used in rendering.
   word_t next_tile[BIT_PLANES];
-  word_t queued_bits[BIT_PLANES];
-  word_t tile_scroll[BIT_PLANES];
+  mword_t tile_scroll[BIT_PLANES];
   word_t palette_scroll[BIT_PLANES];
   word_t palette_latch[BIT_PLANES];
   word_t next_palette[BIT_PLANES];
@@ -529,8 +528,10 @@ void ppu_render_draw_pixel(void) {
  */
 word_t ppu_render_get_tile_pixel(void) {
   // Get the pattern of the background tile.
-  word_t tile_pattern = (((ppu->tile_scroll[0] << ppu->fine_x) >> 7U) & 1U)
-                      | (((ppu->tile_scroll[1] << ppu->fine_x) >> 6U) & 2U);
+  word_t tile_pattern = (((ppu->tile_scroll[0].w[WORD_HI] << ppu->fine_x)
+                      >> 7U) & 1U)
+                      | (((ppu->tile_scroll[1].w[WORD_HI] << ppu->fine_x)
+                      >> 6U) & 2U);
 
   // Determine if the background tile pixel is transparent, and load the color
   // if its not.
@@ -624,10 +625,8 @@ word_t ppu_render_get_sprite_pattern(word_t sprite_index) {
  */
 void ppu_render_update_registers(void) {
   // Shift the tile registers.
-  ppu->tile_scroll[0] = (ppu->tile_scroll[0] << 1) | (ppu->queued_bits[0] >> 7);
-  ppu->queued_bits[0] = ppu->queued_bits[0] << 1;
-  ppu->tile_scroll[1] = (ppu->tile_scroll[1] << 1) | (ppu->queued_bits[1] >> 7);
-  ppu->queued_bits[1] = ppu->queued_bits[1] << 1;
+  ppu->tile_scroll[0].dw = ppu->tile_scroll[0].dw << 1;
+  ppu->tile_scroll[1].dw = ppu->tile_scroll[1].dw << 1;
 
   // Shift the pattern registers.
   ppu->palette_scroll[0] = (ppu->palette_scroll[0] << 1)
@@ -637,8 +636,8 @@ void ppu_render_update_registers(void) {
 
   // Reload the queued bits if the queue should now be empty.
   if ((current_cycle % 8) == 0) {
-    ppu->queued_bits[0] = ppu->next_tile[0];
-    ppu->queued_bits[1] = ppu->next_tile[1];
+    ppu->tile_scroll[0].w[WORD_LO] = ppu->next_tile[0];
+    ppu->tile_scroll[1].w[WORD_LO] = ppu->next_tile[1];
     ppu->palette_latch[0] = ppu->next_palette[0];
     ppu->palette_latch[1] = ppu->next_palette[1];
   }

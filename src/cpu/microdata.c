@@ -265,9 +265,10 @@ void data_sei(void) {
 void data_cmp_mdr_a(void) {
   // The carry flag is unsigned overflow. We use a double word to hold
   // the extra bit.
-  dword_t res = ((dword_t) R->A) + ((dword_t) ((~R->mdr) & WORD_MASK)) + 1U;
-  R->P = (R->P & 0x7CU) | (res & 0x80U) | (res >> 8U)
-                        | (((res & WORD_MASK) == 0U) << 1U);
+  mword_t res;
+  res.dw = R->A + ((~R->mdr) & WORD_MASK) + 1U;
+  R->P = (R->P & 0x7CU) | (res.w[WORD_LO] & 0x80U) | res.w[WORD_HI]
+                        | ((res.w[WORD_LO] == 0U) << 1U);
   return;
 }
 
@@ -276,9 +277,10 @@ void data_cmp_mdr_a(void) {
  * of the result.
  */
 void data_cmp_mdr_x(void) {
-  dword_t res = ((dword_t) R->X) + ((dword_t) ((~R->mdr) & WORD_MASK)) + 1U;
-  R->P = (R->P & 0x7CU) | (res & 0x80U) | (res >> 8U)
-                        | (((res & WORD_MASK) == 0U) << 1U);
+  mword_t res;
+  res.dw = R->X + ((~R->mdr) & WORD_MASK) + 1U;
+  R->P = (R->P & 0x7CU) | (res.w[WORD_LO] & 0x80U) | res.w[WORD_HI]
+                        | ((res.w[WORD_LO] == 0U) << 1U);
   return;
 }
 
@@ -287,9 +289,10 @@ void data_cmp_mdr_x(void) {
  * of the result.
  */
 void data_cmp_mdr_y(void) {
-  dword_t res = ((dword_t) R->Y) + ((dword_t) ((~R->mdr) & WORD_MASK)) + 1U;
-  R->P = (R->P & 0x7CU) | (res & 0x80U) | (res >> 8U)
-                        | (((res & WORD_MASK) == 0U) << 1U);
+  mword_t res;
+  res.dw = R->Y + ((~R->mdr) & WORD_MASK) + 1U;
+  R->P = (R->P & 0x7CU) | (res.w[WORD_LO] & 0x80U) | res.w[WORD_HI]
+                        | ((res.w[WORD_LO] == 0U) << 1U);
   return;
 }
 
@@ -413,13 +416,13 @@ void data_ora_mdr_a(void) {
  * Sets the N, V, Z, and C flags.
  */
 void data_adc_mdr_a(void) {
-  dword_t res = ((dword_t) R->A) + ((dword_t) R->mdr)
-                                 + ((dword_t) (R->P & 0x01U));
+  mword_t res;
+  res.dw = R->A + R->mdr + (R->P & 0x01U);
   word_t ovf = ((R->A & 0x80U) == (R->mdr & 0x80U))
-            && ((R->A & 0x80U) != (res & 0x80U));
-  R->A = (word_t) res;
+            && ((R->A & 0x80U) != (res.w[WORD_LO] & 0x80U));
+  R->A = res.w[WORD_LO];
   R->P = (R->P & 0x3CU) | (R->A & 0x80U) | ((R->A == 0U) << 1U)
-                        | (ovf << 6U) | (res >> 8U);
+                        | (ovf << 6U) | res.w[WORD_HI];
   return;
 }
 
@@ -430,13 +433,13 @@ void data_adc_mdr_a(void) {
 void data_sbc_mdr_a(void) {
   // See documentation for proof of this line. Gives the correct result
   // without issues in the carry out.
-  dword_t res = ((dword_t) R->A) + ((dword_t) ((~R->mdr) & WORD_MASK))
-                                 + ((dword_t) (R->P & 0x01U));
+  mword_t res;
+  res.dw = R->A + ((~R->mdr) & WORD_MASK) + (R->P & 0x01U);
   word_t ovf = ((R->A & 0x80U) == ((-R->mdr) & 0x80U))
-            && ((R->A & 0x80U) != (res & 0x80U));
-  R->A = (word_t) res;
+            && ((R->A & 0x80U) != (res.w[WORD_LO] & 0x80U));
+  R->A = res.w[WORD_LO];
   R->P = (R->P & 0x3CU) | (R->A & 0x80U) | ((R->A == 0U) << 1U)
-                        | (ovf << 6U) | (res >> 8U);
+                        | (ovf << 6U) | res.w[WORD_HI];
   return;
 }
 

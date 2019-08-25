@@ -1298,10 +1298,10 @@ word_t ppu_read(dword_t reg_addr) {
       // internal bus.
       if (reg_addr < PPU_PALETTE_OFFSET) {
         ppu->bus = ppu->vram_buf;
-        ppu->vram_buf = memory_vram_read(reg_addr);
+        ppu->vram_buf = memory_vram_read(ppu->vram_addr);
       } else {
-        ppu->bus = memory_vram_read(reg_addr);
-        ppu->vram_buf = memory_vram_read((reg_addr & VRAM_NT_ADDR_MASK)
+        ppu->bus = memory_vram_read(ppu->vram_addr);
+        ppu->vram_buf = memory_vram_read((ppu->vram_addr & VRAM_NT_ADDR_MASK)
                                                    | PPU_NT_OFFSET);
       }
       ppu_mmio_vram_addr_inc();

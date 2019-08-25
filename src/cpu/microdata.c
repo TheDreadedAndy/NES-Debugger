@@ -263,12 +263,8 @@ void data_sei(void) {
  * of the result.
  */
 void data_cmp_mdr_a(void) {
-  // The carry flag is unsigned overflow. We use a double word to hold
-  // the extra bit.
-  mword_t res;
-  res.dw = R->A + ((~R->mdr) & WORD_MASK) + 1U;
-  R->P = (R->P & 0x7CU) | (res.w[WORD_LO] & 0x80U) | res.w[WORD_HI]
-                        | ((res.w[WORD_LO] == 0U) << 1U);
+  R->P = (R->P & 0x7CU) | ((R->A - R->mdr) & 0x80U) | (R->A >= R->mdr)
+                        | ((R->A == R->mdr) << 1U);
   return;
 }
 
@@ -277,10 +273,8 @@ void data_cmp_mdr_a(void) {
  * of the result.
  */
 void data_cmp_mdr_x(void) {
-  mword_t res;
-  res.dw = R->X + ((~R->mdr) & WORD_MASK) + 1U;
-  R->P = (R->P & 0x7CU) | (res.w[WORD_LO] & 0x80U) | res.w[WORD_HI]
-                        | ((res.w[WORD_LO] == 0U) << 1U);
+  R->P = (R->P & 0x7CU) | ((R->X - R->mdr) & 0x80U) | (R->X >= R->mdr)
+                        | ((R->X == R->mdr) << 1U);
   return;
 }
 
@@ -289,10 +283,8 @@ void data_cmp_mdr_x(void) {
  * of the result.
  */
 void data_cmp_mdr_y(void) {
-  mword_t res;
-  res.dw = R->Y + ((~R->mdr) & WORD_MASK) + 1U;
-  R->P = (R->P & 0x7CU) | (res.w[WORD_LO] & 0x80U) | res.w[WORD_HI]
-                        | ((res.w[WORD_LO] == 0U) << 1U);
+  R->P = (R->P & 0x7CU) | ((R->Y - R->mdr) & 0x80U) | (R->Y >= R->mdr)
+                        | ((R->Y == R->mdr) << 1U);
   return;
 }
 
@@ -302,7 +294,7 @@ void data_cmp_mdr_y(void) {
  */
 void data_asl_mdr(void) {
   word_t carry = (R->mdr >> 7U) & 0x01U;
-  R->mdr = (R->mdr << 1U) & 0xFE;
+  R->mdr = (R->mdr << 1U) & 0xFEU;
   R->P = (R->P & 0x7CU) | (R->mdr & 0x80U) | ((R->mdr == 0U) << 1U) | carry;
   return;
 }
@@ -313,7 +305,7 @@ void data_asl_mdr(void) {
  */
 void data_asl_a(void) {
   word_t carry = (R->A >> 7U) & 0x01U;
-  R->A = (R->A << 1U) & 0xFE;
+  R->A = (R->A << 1U) & 0xFEU;
   R->P = (R->P & 0x7CU) | (R->A & 0x80U) | ((R->A == 0U) << 1U) | carry;
   return;
 }
@@ -324,7 +316,7 @@ void data_asl_a(void) {
  */
 void data_lsr_mdr(void) {
   word_t carry = R->mdr & 0x01U;
-  R->mdr = (R->mdr >> 1U) & 0x7F;
+  R->mdr = (R->mdr >> 1U) & 0x7FU;
   R->P = (R->P & 0x7CU) | (R->mdr & 0x80U) | ((R->mdr == 0U) << 1U) | carry;
   return;
 }
@@ -335,7 +327,7 @@ void data_lsr_mdr(void) {
  */
 void data_lsr_a(void) {
   word_t carry = R->A & 0x01U;
-  R->A = (R->A >> 1U) & 0x7F;
+  R->A = (R->A >> 1U) & 0x7FU;
   R->P = (R->P & 0x7CU) | (R->A & 0x80U) | ((R->A == 0U) << 1U) | carry;
   return;
 }
@@ -346,7 +338,7 @@ void data_lsr_a(void) {
  */
 void data_rol_mdr(void) {
   word_t carry = (R->mdr >> 7U) & 0x01U;
-  R->mdr = ((R->mdr << 1U) & 0xFE) | (R->P & 0x01U);
+  R->mdr = ((R->mdr << 1U) & 0xFEU) | (R->P & 0x01U);
   R->P = (R->P & 0x7CU) | (R->mdr & 0x80U) | ((R->mdr == 0U) << 1U) | carry;
   return;
 }
@@ -357,7 +349,7 @@ void data_rol_mdr(void) {
  */
 void data_rol_a(void) {
   word_t carry = (R->A >> 7U) & 0x01U;
-  R->A = ((R->A << 1U) & 0xFE) | (R->P & 0x01U);
+  R->A = ((R->A << 1U) & 0xFEU) | (R->P & 0x01U);
   R->P = (R->P & 0x7CU) | (R->A & 0x80U) | ((R->A == 0U) << 1U) | carry;
   return;
 }
@@ -368,7 +360,7 @@ void data_rol_a(void) {
  */
 void data_ror_mdr(void) {
   word_t carry = R->mdr & 0x01U;
-  R->mdr = ((R->mdr >> 1U) & 0x7F) | ((R->P << 7U) & 0x80);
+  R->mdr = ((R->mdr >> 1U) & 0x7FU) | ((R->P << 7U) & 0x80U);
   R->P = (R->P & 0x7CU) | (R->mdr & 0x80U) | ((R->mdr == 0U) << 1U) | carry;
   return;
 }
@@ -379,7 +371,7 @@ void data_ror_mdr(void) {
  */
 void data_ror_a(void) {
   word_t carry = R->A & 0x01U;
-  R->A = ((R->A >> 1U) & 0x7F) | ((R->P << 7U) & 0x80);
+  R->A = ((R->A >> 1U) & 0x7FU) | ((R->P << 7U) & 0x80U);
   R->P = (R->P & 0x7CU) | (R->A & 0x80U) | ((R->A == 0U) << 1U) | carry;
   return;
 }
@@ -532,8 +524,8 @@ void data_branch(void) {
   bool taken = (((bool) flag) == cond);
 
   // Add the reletive address to pc_lo. Reletive addressing is signed.
-  dword_t res = ((dword_t) R->pc.w[WORD_LO]) + ((dword_t) R->mdr);
-  R->carry = (word_t)(res >> 8U);
+  dword_t res = R->pc.w[WORD_LO] + R->mdr;
+  R->carry = res >> 8U;
   // Effectively sign extend the MDR in the carry out.
   if (R->mdr & 0x80U) { R->carry += 0xFFU; }
 
@@ -543,12 +535,12 @@ void data_branch(void) {
     cpu_fetch(state_last_cycle());
   } else if (R->carry) {
     // Case 2.
-    R->pc.w[WORD_LO] = (word_t) res;
+    R->pc.w[WORD_LO] = res;
     state_add_cycle(&mem_nop, &data_fix_pch, PC_NOP);
     state_add_cycle(&mem_fetch, &data_nop, PC_INC);
   } else {
     // Case 1.
-    R->pc.w[WORD_LO] = (word_t) res;
+    R->pc.w[WORD_LO] = res;
     state_add_cycle(&mem_fetch, &data_nop, PC_INC);
   }
 

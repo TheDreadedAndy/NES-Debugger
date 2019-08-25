@@ -163,7 +163,7 @@ typedef struct ppu {
 
   // Memory mapped ppu registers.
   word_t bus;
-  word_t vram_bus;
+  word_t vram_buf;
   word_t ctrl;
   word_t mask;
   word_t status;
@@ -1192,7 +1192,6 @@ void ppu_write(dword_t reg_addr, word_t val) {
       ppu_mmio_addr_write(val);
       break;
     case PPU_DATA_ACCESS:
-      // Writes can only happen during vblank.
       memory_vram_write(val, ppu->vram_addr);
       ppu_mmio_vram_addr_inc();
       break;
@@ -1298,11 +1297,11 @@ word_t ppu_read(dword_t reg_addr) {
       // Reading from mappable VRAM (not the palette) returns the value to an
       // internal bus.
       if (reg_addr < PPU_PALETTE_OFFSET) {
-        ppu->bus = ppu->vram_bus;
-        ppu->vram_bus = memory_vram_read(reg_addr & VRAM_BUS_MASK);
+        ppu->bus = ppu->vram_buf;
+        ppu->vram_buf = memory_vram_read(reg_addr);
       } else {
-        ppu->bus = memory_vram_read(reg_addr & VRAM_BUS_MASK);
-        ppu->vram_bus = memory_vram_read((reg_addr & VRAM_NT_ADDR_MASK)
+        ppu->bus = memory_vram_read(reg_addr);
+        ppu->vram_buf = memory_vram_read((reg_addr & VRAM_NT_ADDR_MASK)
                                                    | PPU_NT_OFFSET);
       }
       ppu_mmio_vram_addr_inc();

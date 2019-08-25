@@ -302,7 +302,7 @@ void data_cmp_mdr_y(void) {
  */
 void data_asl_mdr(void) {
   word_t carry = (R->mdr >> 7U) & 0x01U;
-  R->mdr = R->mdr << 1U;
+  R->mdr = (R->mdr << 1U) & 0xFE;
   R->P = (R->P & 0x7CU) | (R->mdr & 0x80U) | ((R->mdr == 0U) << 1U) | carry;
   return;
 }
@@ -313,7 +313,7 @@ void data_asl_mdr(void) {
  */
 void data_asl_a(void) {
   word_t carry = (R->A >> 7U) & 0x01U;
-  R->A = R->A << 1U;
+  R->A = (R->A << 1U) & 0xFE;
   R->P = (R->P & 0x7CU) | (R->A & 0x80U) | ((R->A == 0U) << 1U) | carry;
   return;
 }
@@ -324,7 +324,7 @@ void data_asl_a(void) {
  */
 void data_lsr_mdr(void) {
   word_t carry = R->mdr & 0x01U;
-  R->mdr = R->mdr >> 1U;
+  R->mdr = (R->mdr >> 1U) & 0x7F;
   R->P = (R->P & 0x7CU) | (R->mdr & 0x80U) | ((R->mdr == 0U) << 1U) | carry;
   return;
 }
@@ -335,7 +335,7 @@ void data_lsr_mdr(void) {
  */
 void data_lsr_a(void) {
   word_t carry = R->A & 0x01U;
-  R->A = R->A >> 1U;
+  R->A = (R->A >> 1U) & 0x7F;
   R->P = (R->P & 0x7CU) | (R->A & 0x80U) | ((R->A == 0U) << 1U) | carry;
   return;
 }
@@ -346,7 +346,7 @@ void data_lsr_a(void) {
  */
 void data_rol_mdr(void) {
   word_t carry = (R->mdr >> 7U) & 0x01U;
-  R->mdr = (R->mdr << 1U) | (R->P & 0x01U);
+  R->mdr = ((R->mdr << 1U) & 0xFE) | (R->P & 0x01U);
   R->P = (R->P & 0x7CU) | (R->mdr & 0x80U) | ((R->mdr == 0U) << 1U) | carry;
   return;
 }
@@ -357,7 +357,7 @@ void data_rol_mdr(void) {
  */
 void data_rol_a(void) {
   word_t carry = (R->A >> 7U) & 0x01U;
-  R->A = (R->A << 1U) | (R->P & 0x01U);
+  R->A = ((R->A << 1U) & 0xFE) | (R->P & 0x01U);
   R->P = (R->P & 0x7CU) | (R->A & 0x80U) | ((R->A == 0U) << 1U) | carry;
   return;
 }
@@ -368,7 +368,7 @@ void data_rol_a(void) {
  */
 void data_ror_mdr(void) {
   word_t carry = R->mdr & 0x01U;
-  R->mdr = (R->mdr >> 1U) | (R->P << 7U);
+  R->mdr = ((R->mdr >> 1U) & 0x7F) | ((R->P << 7U) & 0x80);
   R->P = (R->P & 0x7CU) | (R->mdr & 0x80U) | ((R->mdr == 0U) << 1U) | carry;
   return;
 }
@@ -379,7 +379,7 @@ void data_ror_mdr(void) {
  */
 void data_ror_a(void) {
   word_t carry = R->A & 0x01U;
-  R->A = (R->A >> 1U) | (R->P << 7U);
+  R->A = ((R->A >> 1U) & 0x7F) | ((R->P << 7U) & 0x80);
   R->P = (R->P & 0x7CU) | (R->A & 0x80U) | ((R->A == 0U) << 1U) | carry;
   return;
 }
@@ -487,7 +487,7 @@ void data_add_ptrl_x(void) {
  * page bound and needed to be fixed.
  */
 void data_fixa_addrh(void) {
-  if (R->carry) {
+  if (R->carry > 0) {
     R->addr.w[WORD_HI] += R->carry;
     micro_t *micro = state_last_cycle();
     state_push_cycle(micro->mem, &data_nop, PC_NOP);

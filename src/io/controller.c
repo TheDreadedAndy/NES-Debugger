@@ -33,7 +33,7 @@ word_t controller_read(dword_t addr) {
     press = (joy1_shift & 1);
     joy1_shift = 0x80U | (joy1_shift >> 1);
   } else if (addr == IO_JOY2_ADDR) {
-    press = (joy2_shift & 2);
+    press = (joy2_shift & 1);
     joy2_shift = 0x80U | (joy2_shift >> 1);
   }
 

@@ -17,9 +17,6 @@
 #include "./uxrom.h"
 #include "../util/data.h"
 
-//TODO DELETE THIS
-#include "../cpu/regs.h"
-
 // Constants used to size and access memory.
 #define MAX_BANKS 16U
 #define BANK_SIZE 0x4000U
@@ -250,9 +247,6 @@ void uxrom_vram_write(word_t val, dword_t addr, void *map) {
     // Name table is being accessed.
     word_t table = (addr & NAMETABLE_SELECT_MASK) >> 10;
     M->nametable[table][addr & NAMETABLE_ADDR_MASK] = val;
-    if ((addr & 0xff) == 0xdf) {
-      printf("bank: %x, PC %04x\n", M->current_bank, R->pc.dw);
-    }
   } else if (M->is_chr_ram) {
     // Pattern table is being accessed.
     M->pattern_table[addr & PATTERN_TABLE_MASK] = val;

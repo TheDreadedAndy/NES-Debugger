@@ -19,6 +19,10 @@
 #define ROM_BANK_SIZE 0x4000U
 #define MAX_RAM_BANKS 4U
 #define RAM_BANK_SIZE 0x2000U
+#define INES_RAM_SIZE 0x8000U
+
+// Constants used to control accesses to memory.
+#define SHIFT_BASE 0x10U
 
 // Constants used to size and access VRAM.
 #define MAX_CHR_BANKS 8U
@@ -85,7 +89,12 @@ void sxrom_new(FILE *rom_file, memory_t *M) {
 }
 
 /*
- * TODO
+ * Creates a ram space with the amount of memory requested by the mapper.
+ * If an INES header is used, the size is not defined and is assumed to be
+ * 32K.
+ *
+ * Assumes the memory structure and its mapper field are non-null.
+ * Assumes the header provided by the memory structure is valid.
  */
 void sxrom_load_prg_ram(memory_t *M) {
   // Cast back from the generic structure.

@@ -102,7 +102,8 @@ int main(int argc, char *argv[]) {
     // Update the frame rate display.
     if (emutime_gt(&current_time, &fps_wait)) {
       time_t now = time(NULL);
-      window_display_fps(frames_drawn / difftime(now, last_fps_display));
+      window_display_fps(((double) frames_drawn) /
+                         difftime(now, last_fps_display));
       last_fps_display = now;
       frames_drawn = 0;
       emutime_update(&current_time, &fps_wait, NSECS_PER_SEC);

@@ -225,7 +225,7 @@ void ppu_render_visible(void);
 void ppu_render_update_frame(bool output);
 void ppu_render_draw_pixel(void);
 word_t ppu_render_get_tile_pixel(void);
-word_t ppu_render_get_sprite_pixel(void);
+word_t ppu_render_get_sprite_pixel(word_t sprite_index);
 word_t ppu_render_get_sprite_index(void);
 word_t ppu_render_get_sprite_pattern(word_t sprite_index);
 void ppu_render_update_registers(void);
@@ -492,15 +492,16 @@ void ppu_render_draw_pixel(void) {
   }
 
   // Get the sprite pixel.
-  word_t sprite_index = ppu_render_get_sprite_index();
-  if ((ppu->mask & FLAG_RENDER_SPRITES) && (sprite_index < ppu->sprite_count)
-                     && ((screen_x >= 8) || (ppu->mask & FLAG_LEFT_SPRITES))) {
+  word_t sprite_index;
+  if ((ppu->mask & FLAG_RENDER_SPRITES)
+     && ((screen_x >= 8) || (ppu->mask & FLAG_LEFT_SPRITES))
+     && ((sprite_index = ppu_render_get_sprite_index()) < ppu->sprite_count)) {
     word_t sprite_attribute = ppu->sprite_memory[4 * sprite_index + 2];
 
     // Check if the pixel should be rendered on top of the background.
     if ((bg_pixel == 0xFFU) || !(sprite_attribute & FLAG_SPRITE_PRIORITY)) {
       // Render the pixel if it is not transparent.
-      sprite_pixel = ppu_render_get_sprite_pixel();
+      sprite_pixel = ppu_render_get_sprite_pixel(sprite_index);
       if (sprite_pixel != 0xFFU) { pixel = sprite_pixel; }
     }
 
@@ -544,9 +545,9 @@ word_t ppu_render_get_tile_pixel(void) {
     dword_t tile_address = PALETTE_BASE_ADDR
                          | (tile_palette << 2U) | tile_pattern;
     return memory_vram_read(tile_address) & PIXEL_MASK;
-  } else {
-    return 0xFFU;
   }
+
+  return 0xFFU;
 }
 
 /*
@@ -556,10 +557,9 @@ word_t ppu_render_get_tile_pixel(void) {
  * Assumes the PPU has been initialized.
  * Assumes there is a visible sprite on the current pixel.
  */
-word_t ppu_render_get_sprite_pixel(void) {
+word_t ppu_render_get_sprite_pixel(word_t sprite_index) {
   // Get the bit pattern of the current pixel for the sprite that is being
   // rendered.
-  word_t sprite_index = ppu_render_get_sprite_index();
   word_t sprite_pattern = ppu_render_get_sprite_pattern(sprite_index);
 
   // Check if the pixel was transparent.
@@ -605,7 +605,7 @@ word_t ppu_render_get_sprite_index(void) {
 word_t ppu_render_get_sprite_pattern(word_t sprite_index) {
   // Determine which pixel of the sprite is to be rendered from its x position.
   size_t screen_x = current_cycle - 1;
-  word_t sprite_x = ppu->sprite_memory[(sprite_index << 2) + 3];
+  word_t sprite_x = ppu->sprite_memory[(sprite_index << 2) | 3];
   word_t sprite_dx = screen_x - sprite_x;
 
   // Get the sprite pattern.

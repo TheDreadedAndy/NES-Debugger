@@ -8,10 +8,8 @@
 #include <Windows.h>
 #endif
 
-#ifdef _NES_OSLIN
 // The size of the buffer used to hold the opened files name in open_file()
 #define NAME_BUFFER_SIZE 1024U
-#endif
 
 /*
  * Attempts to allocate the requested number of bytes using calloc.
@@ -98,9 +96,10 @@ size_t get_file_size(FILE *file) {
  * that file. The opened file is placed in the provided pointer.
  */
 void open_file(FILE **file) {
+  char user_file_name[NAME_BUFFER_SIZE];
+
 #ifdef _NES_OSLIN
   // Get the file name of the file the user opened.
-  char user_file_name[NAME_BUFFER_SIZE];
   FILE *user_file = popen("zenity --file-selection", "r");
   fgets(user_file_name, NAME_BUFFER_SIZE, user_file);
 
@@ -111,14 +110,21 @@ void open_file(FILE **file) {
       break;
     }
   }
-
-  // Open the provided file.
-  *file = fopen(user_file_name, "rb");
 #endif
 
 #ifdef _NES_OSWIN
-  // TODO
+  // Prepare the structure which is used to open the file prompt.
+  OPENFILENAMEA *prompt_info = xcalloc(1, sizeof(OPENFILENAMEA));
+  prompt_info->lStructSize = sizeof(OPENFILENAMEA);
+  prompt_info->lpstrFile = &user_file_name;
+  prompt_info->nMaxFile = NAME_BUFFER_SIZE;
+  memset(&user_file_name, 0, NAME_BUFFER_SIZE);
+
+  // Open the file prompt.
+  GetOpenFileNameA(prompt_info);
 #endif
 
+  // Open the provided file.
+  *file = fopen(user_file_name, "rb");
   return;
 }

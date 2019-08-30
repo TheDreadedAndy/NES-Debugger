@@ -68,12 +68,6 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  // Ensures that the user specified an NES file.
-  if (rom_file == NULL || pal_file == NULL) {
-    printf("usage: ndb -f <ROM FILE> -p <PALETTE FILE>\n");
-    exit(0);
-  }
-
   // Prepares the NES emulation for execution.
   window_init();
   audio_init();
@@ -136,10 +130,18 @@ int main(int argc, char *argv[]) {
  * Assumes the file location is valid.
  */
 void start_emulation(char *rom, char *pal) {
-  // Open the rom.
-  FILE *rom_file = fopen(rom, "rb");
+  // Open the rom. Prompt the user to select one if they did not already provide
+  // one.
+  FILE *rom_file = NULL;
+  if (rom != NULL) {
+    rom_file = fopen(rom, "rb");
+  } else {
+    open_file(&rom_file);
+  }
+
+  // Verify that the users file was opened correctly.
   if (rom_file == NULL) {
-    fprintf(stderr, "Failed to open specified file.\n");
+    fprintf(stderr, "Failed to open the specified file.\n");
     abort();
   }
 

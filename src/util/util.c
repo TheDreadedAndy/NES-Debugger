@@ -4,6 +4,15 @@
 #include <time.h>
 #include "./data.h"
 
+#ifdef _NES_OSWIN
+#include <Windows.h>
+#endif
+
+#ifdef _NES_OSLIN
+// The size of the buffer used to hold the opened files name in open_file()
+#define NAME_BUFFER_SIZE 1024U
+#endif
+
 /*
  * Attempts to allocate the requested number of bytes using calloc.
  *
@@ -82,4 +91,34 @@ size_t get_file_size(FILE *file) {
   // Reset the position and return.
   fseek(file, pos, SEEK_SET);
   return file_size;
+}
+
+/*
+ * Opens a file open dialogue for the user to select a file, then opens
+ * that file. The opened file is placed in the provided pointer.
+ */
+void open_file(FILE **file) {
+#ifdef _NES_OSLIN
+  // Get the file name of the file the user opened.
+  char user_file_name[NAME_BUFFER_SIZE];
+  FILE *user_file = popen("zenity --file-selection", "r");
+  fgets(user_file_name, NAME_BUFFER_SIZE, user_file);
+
+  // Remove the newline character added by zenity.
+  for (size_t i = 0; i < NAME_BUFFER_SIZE; i++) {
+    if (user_file_name[i] == '\n') {
+      user_file_name[i] = '\0';
+      break;
+    }
+  }
+
+  // Open the provided file.
+  *file = fopen(user_file_name, "rb");
+#endif
+
+#ifdef _NES_OSWIN
+  // TODO
+#endif
+
+  return;
 }

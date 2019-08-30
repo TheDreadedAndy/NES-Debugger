@@ -23,7 +23,7 @@ uint32_t *decoded_palette = NULL;
 #define PALETTE_SIZE 0x40U
 
 // The files size of an NES palette.
-#define PALETTE_FILE_SIZE 192U
+#define PALETTE_FILE_SIZE 1536U
 
 /* Helper Functions */
 bool palette_invalid(FILE *pal_file);
@@ -33,29 +33,44 @@ bool palette_invalid(FILE *pal_file);
  *
  * Assumes the specified file is non-NULL.
  */
-bool palette_init(char *file) {
+void palette_init(char *file) {
+  // This variable contains the default palette file.
+  extern const word_t _binary_bins_nes_palette_bin_start[];
+
   // Open the palette file and verify it is in the proper format.
-  FILE *pal_file = fopen(file, "rb");
-  if (palette_invalid(pal_file)) {
-    fprintf(stderr, "Invalid palette file.\n");
-    fclose(pal_file);
-    return false;
+  FILE *pal_file = NULL;
+  if (file != NULL) {
+    pal_file = fopen(file, "rb");
+    if ((pal_file == NULL) || palette_invalid(pal_file)) {
+      fprintf(stderr, "Invalid palette file.\n");
+    }
   }
 
   // Load the palette file into the decoded palette array.
-  fseek(pal_file, 0, SEEK_SET);
   decoded_palette = xcalloc(PALETTE_SIZE, sizeof(uint32_t));
   uint32_t red, green, blue;
-  for (size_t i = 0; i < PALETTE_SIZE; i++) {
-    red = (word_t) fgetc(pal_file);
-    green = (word_t) fgetc(pal_file);
-    blue = (word_t) fgetc(pal_file);
-    decoded_palette[i] = (red << 16) | (green << 8) | blue;
+  if (pal_file != NULL) {
+    // Load the file the user provided.
+    fseek(pal_file, 0, SEEK_SET);
+    for (size_t i = 0; i < PALETTE_SIZE; i++) {
+      red = (word_t) fgetc(pal_file);
+      green = (word_t) fgetc(pal_file);
+      blue = (word_t) fgetc(pal_file);
+      decoded_palette[i] = (red << 16) | (green << 8) | blue;
+    }
+  } else {
+    // If the file was invalid (or not provided), load the default instead.
+    for (size_t i = 0; i < PALETTE_SIZE; i++) {
+      red = _binary_bins_nes_palette_bin_start[3 * i + 0];
+      green = _binary_bins_nes_palette_bin_start[3 * i + 1];
+      blue = _binary_bins_nes_palette_bin_start[3 * i + 2];
+      decoded_palette[i] = (red << 16) | (green << 8) | blue;
+    }
   }
 
   // Clean up and return success.
-  fclose(pal_file);
-  return true;
+  if (pal_file != NULL) { fclose(pal_file); }
+  return;
 }
 
 /*

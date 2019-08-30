@@ -267,10 +267,7 @@ bool ppu_init(char *file) {
   ppu->sprite_memory = xcalloc(SECONDARY_OAM_SIZE, sizeof(word_t));
 
   // Load in the palette.
-  if (!palette_init(file)) {
-    fprintf(stderr, "Failed to initialize NES palette.\n");
-    return false;
-  }
+  palette_init(file);
 
   // Return success.
   return true;

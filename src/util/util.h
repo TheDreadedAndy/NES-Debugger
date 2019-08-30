@@ -19,4 +19,8 @@ void *rand_alloc(size_t size);
 // Returns the size of the given file.
 size_t get_file_size(FILE *file);
 
+// Prompts the user to open a file, and then opens the file into the
+// given pointer.
+void open_file(FILE **file);
+
 #endif

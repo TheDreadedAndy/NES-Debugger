@@ -3,9 +3,11 @@
 #include <stdbool.h>
 #include <time.h>
 #include "./data.h"
+#include "./util.h"
 
 #ifdef _NES_OSWIN
-#include <Windows.h>
+#include <windows.h>
+#include <string.h>
 #endif
 
 // The size of the buffer used to hold the opened files name in open_file()
@@ -116,9 +118,9 @@ void open_file(FILE **file) {
   // Prepare the structure which is used to open the file prompt.
   OPENFILENAMEA *prompt_info = xcalloc(1, sizeof(OPENFILENAMEA));
   prompt_info->lStructSize = sizeof(OPENFILENAMEA);
-  prompt_info->lpstrFile = &user_file_name;
+  prompt_info->lpstrFile = user_file_name;
   prompt_info->nMaxFile = NAME_BUFFER_SIZE;
-  memset(&user_file_name, 0, NAME_BUFFER_SIZE);
+  memset(user_file_name, 0, NAME_BUFFER_SIZE);
 
   // Open the file prompt.
   GetOpenFileNameA(prompt_info);

@@ -427,8 +427,8 @@ void data_sbc_mdr_a(void) {
   // without issues in the carry out.
   mword_t res;
   res.dw = R->A + ((~R->mdr) & WORD_MASK) + (R->P & 0x01U);
-  word_t ovf = (((R->A & R->mdr & (~res.w[WORD_LO]))
-             | ((~R->A) & (~R->mdr) & res.w[WORD_LO])) & 0x80) >> 1U;
+  word_t ovf = (((R->A & (~R->mdr) & (~res.w[WORD_LO]))
+             | ((~R->A) & R->mdr & res.w[WORD_LO])) & 0x80) >> 1U;
   R->A = res.w[WORD_LO];
   R->P = (R->P & 0x3CU) | (R->A & 0x80U) | ((R->A == 0U) << 1U)
                         | ovf | res.w[WORD_HI];

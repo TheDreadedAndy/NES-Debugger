@@ -319,9 +319,11 @@ void ppu_disabled(void) {
   // if the PPU gets enabled in the middle of a frame.
   ppu->eval_state = SCAN;
   ppu->soam_addr = 0;
-  ppu->zero_index = 0;
+  ppu->zero_index = ppu->oam_addr;
   ppu->zero_in_soam = false;
+  ppu->zero_in_mem = false;
   ppu->next_sprite_count = 0;
+  ppu->sprite_count = 0;
 
   // Determine which action should be performed.
   if (current_scanline < 240) {

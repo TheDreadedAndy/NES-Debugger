@@ -40,7 +40,7 @@ SDL_Window *window = NULL;
 
 // Global SDL surface that pixels are rendered to before being drawn in the
 // window. Cannot be directly accessed outside this file.
-SDL_Surface *render = NULL;
+SDL_Renderer *render = NULL;
 
 /* Helper functions */
 void window_process_window_event(SDL_Event *event);
@@ -66,18 +66,14 @@ bool window_init(void) {
     return false;
   }
 
-  // Create the rendering surface.
-  render = SDL_CreateRGBSurface(0, NES_WIDTH, NES_HEIGHT, PALETTE_DEPTH,
-                                PALETTE_RMASK, PALETTE_GMASK, PALETTE_BMASK, 0);
+  // Create the renderer
+  render = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
 
-  // Verify that the surface was created successfully.
+  // Verify that the renderer was created successfully.
   if (render == NULL) {
-    fprintf(stderr, "Failed to create SDL rendering surface.\n");
+    fprintf(stderr, "Failed to create SDL renderer.\n");
     return false;
   }
-
-  // Disable RLE acceleration on the render surface.
-  SDL_SetSurfaceRLE(render, 0);
 
   // Return success.
   return true;
@@ -156,8 +152,8 @@ void window_close(void) {
   CONTRACT(window != NULL);
   CONTRACT(render != NULL);
 
+  SDL_DestroyRenderer(render);
   SDL_DestroyWindow(window);
-  SDL_FreeSurface(render);
   SDL_Quit();
 
   return;

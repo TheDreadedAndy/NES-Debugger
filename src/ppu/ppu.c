@@ -269,6 +269,9 @@ bool ppu_init(char *file) {
   // Load in the palette.
   palette_init(file);
 
+  // Setup rendering.
+  render_init();
+
   // Return success.
   return true;
 }
@@ -1363,6 +1366,9 @@ void ppu_free(void) {
 
   // Free the NES palette data.
   palette_free();
+
+  // Close rendering.
+  render_free();
 
   return;
 }

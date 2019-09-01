@@ -498,10 +498,10 @@ void ppu_render_draw_pixel(void) {
     word_t sprite_attribute = ppu->sprite_memory[4 * sprite_index + 2];
 
     // Check if the pixel should be rendered on top of the background.
-    if ((bg_pixel == 0xFFU) || !(sprite_attribute & FLAG_SPRITE_PRIORITY)) {
-      // Render the pixel if it is not transparent.
-      sprite_pixel = ppu_render_get_sprite_pixel(sprite_index);
-      if (sprite_pixel != 0xFFU) { pixel = sprite_pixel; }
+    sprite_pixel = ppu_render_get_sprite_pixel(sprite_index);
+    if (((bg_pixel == 0xFFU) || !(sprite_attribute & FLAG_SPRITE_PRIORITY))
+                             && (sprite_pixel != 0xFFU)) {
+      pixel = sprite_pixel;
     }
 
     // Check if this counts as a sprite 0 hit.

@@ -657,20 +657,18 @@ void apu_update_dmc(void) {
     dmc->current_addr = (dmc->current_addr + 1) | DMC_CURRENT_ADDR_BASE;
     dmc->bytes_remaining--;
     dmc->silent = false;
-  } else if ((dmc->bits_remaining == 0) && (dmc->bytes_remaining == 0)) {
-    // If the sample is now over, send out an IRQ and loop it if either
-    // is enabled.
-    if ((dmc->control & FLAG_DMC_IRQ) && !dmc_irq) {
+
+    if ((dmc->bytes_remaining == 0) && (dmc->control & FLAG_DMC_LOOP)) {
+      dmc->current_addr = dmc->addr;
+      dmc->bytes_remaining = dmc->length;
+    } else if ((dmc->bytes_remaining == 0) && (dmc->control & FLAG_DMC_IRQ)
+                                           && !dmc_irq) {
+      // Send an IRQ if dmc IRQ's are eneabled and the sample has ended.
       dmc_irq = true;
       irq_line++;
     }
-
-    if (dmc->control & FLAG_DMC_LOOP) {
-      dmc->current_addr = dmc->addr;
-      dmc->bytes_remaining = dmc->length;
-    } else {
-      dmc->silent = true;
-    }
+  } else if ((dmc->bits_remaining == 0) && (dmc->bytes_remaining == 0)) {
+    dmc->silent = true;
   }
 
   // Use the sample buffer to update the dmc level.

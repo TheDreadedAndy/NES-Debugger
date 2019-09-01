@@ -103,7 +103,10 @@ void open_file(FILE **file) {
 #ifdef _NES_OSLIN
   // Get the file name of the file the user opened.
   FILE *user_file = popen("zenity --file-selection", "r");
-  fgets(user_file_name, NAME_BUFFER_SIZE, user_file);
+  if (fgets(user_file_name, NAME_BUFFER_SIZE, user_file) == NULL) {
+    *file = NULL;
+    return;
+  }
 
   // Remove the newline character added by zenity.
   for (size_t i = 0; i < NAME_BUFFER_SIZE; i++) {

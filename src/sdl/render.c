@@ -72,20 +72,21 @@ void render_frame(void) {
 
   // Setup the window surface.
   static SDL_Surface *window_surface = NULL;
-
-  // Get the window surface if it is invalid.
-  if (!window_surface_valid) {
-    window_surface = SDL_GetWindowSurface(window);
-    window_surface_valid = true;
+  static SDL_Rect render_rect, window_rect;
+  if (window_surface == NULL) {
+    render_rect.x = NES_WIDTH_OFFSET;
+    render_rect.y = NES_HEIGHT_OFFSET;
+    render_rect.w = NES_WIDTH;
+    render_rect.h = NES_TRUE_HEIGHT;
   }
 
-  // Get the regions of the surfaces to be copied.
-  SDL_Rect render_rect, window_rect;
-  render_rect.x = NES_WIDTH_OFFSET;
-  render_rect.y = NES_HEIGHT_OFFSET;
-  render_rect.w = NES_WIDTH;
-  render_rect.h = NES_TRUE_HEIGHT;
-  render_get_window_rect(window_surface, &window_rect);
+
+  // Get the window surface, and recalculate the rect, if the surface is invalid.
+  if (!window_surface_valid) {
+    window_surface = SDL_GetWindowSurface(window);
+    render_get_window_rect(window_surface, &window_rect);
+    window_surface_valid = true;
+  }
 
   // Clear the window surface before displaying the new image.
   SDL_FillRect(window_surface, NULL, palette_decode(fill_color));

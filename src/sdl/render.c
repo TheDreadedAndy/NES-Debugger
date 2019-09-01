@@ -33,7 +33,13 @@
  * Reset whenever render_has_drawn() is called.
  * Used to track the frame rate of the emulator and, thus, throttle it.
  */
-bool frame_output = false;
+static bool frame_output = false;
+
+/*
+ * Set whenever the size of the window changes, which means the window
+ * surface must be obtained again.
+ */
+static bool window_surface_valid = false;
 
 /* Helper functions */
 void render_get_window_rect(SDL_Surface *window_surface, SDL_Rect *window_rect);
@@ -64,8 +70,14 @@ void render_frame(void) {
   CONTRACT(window != NULL);
   CONTRACT(render != NULL);
 
-  // Get the window surface.
-  SDL_Surface *window_surface = SDL_GetWindowSurface(window);
+  // Setup the window surface.
+  static SDL_Surface *window_surface = NULL;
+
+  // Get the window surface if it is invalid.
+  if (!window_surface_valid) {
+    window_surface = SDL_GetWindowSurface(window);
+    window_surface_valid = true;
+  }
 
   // Get the regions of the surfaces to be copied.
   SDL_Rect render_rect, window_rect;
@@ -122,4 +134,13 @@ bool render_has_drawn(void) {
   bool frame = frame_output;
   frame_output = false;
   return frame;
+}
+
+/*
+ * Sets the value of window_surface_valid to false.
+ * Called from the SDL event manager to invalidate the window.
+ */
+void render_invalidate_window_surface(void) {
+  window_surface_valid = false;
+  return;
 }

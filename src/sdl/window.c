@@ -18,6 +18,7 @@
 #include <SDL2/SDL.h>
 #include "./window.h"
 #include "./input.h"
+#include "./render.h"
 #include "../util/contracts.h"
 #include "../util/util.h"
 #include "../ppu/palette.h"
@@ -122,6 +123,10 @@ void window_process_window_event(SDL_Event *event) {
     case SDL_WINDOWEVENT_CLOSE:
       // The emulation window has been closed, and so the program should quit.
       ndb_running = false;
+      break;
+    case SDL_WINDOWEVENT_SIZE_CHANGED:
+      // The window has been resized, so the surface must be marked as invalid.
+      render_invalidate_window_surface();
       break;
     default:
       break;

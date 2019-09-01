@@ -1,10 +1,9 @@
 # Creates a list of main files, headers, and objects (that are not main).
 MAINS = ndb.o
-OBJECTS = $(filter-out $(MAINS),$(patsubst %.c,%.o,$(wildcard */*.c)))
-BINS = $(patsubst %.bin,%.o,$(wildcard bins/*.bin))
-OBJOUT = $(addprefix build/,$(MAINS) $(OBJECTS))
-BINOUT = $(addprefix build/,$(BINS))
-DIRS = $(addprefix build/,$(sort $(dir $(OBJECTS) $(BINS))))
+OBJECTS = $(addprefix build/,$(filter-out $(MAINS),$(patsubst %.c,%.o,$(wildcard */*.c))))
+HEADERS = $(wildcard */*.h)
+BINS = $(addprefix build/,$(patsubst %.bin,%.o,$(wildcard bins/*.bin)))
+DIRS = $(sort $(dir $(OBJECTS) $(BINS)))
 CC = gcc
 LIBS = $(shell sdl2-config --libs)
 override CFLAGS += -Wall -Wshadow -Wextra -Werror -std=c99 -pedantic -O3 $(shell sdl2-config --cflags)
@@ -25,17 +24,17 @@ endif
 default: ndb
 
 # Builds a general object file.
-$(OBJECTS): $(patsubst %.o,%.c,$(OBJECTS)) $(DIRS)
-	$(CC) $(CFLAGS) -c $(patsubst %.o,%.c,$@) -o build/$@
+$(OBJECTS): build/%.o : %.c $(DIRS) $(HEADERS)
+	$(CC) $(CFLAGS) -c $(patsubst build/%.o,%.c,$@) -o $@
 
 # Setup a binary file to be linked.
-$(BINS): $(patsubst %.o,%.bin,$(BINS)) $(DIRS)
-	ld -r -b binary $(patsubst %.o,%.bin,$@) -o build/$@
+$(BINS): build/%.o : %.bin $(DIRS)
+	ld -r -b binary $(patsubst build/%.o,%.bin,$@) -o $@
 
 # General format for building a main file.
 $(patsubst %.o,%,$(MAINS)): $(OBJECTS) $(BINS)
 	$(CC) $(CFLAGS) -c $@.c -o build/$@.o
-	$(CC) $(BINOUT) $(OBJOUT) -o $@ $(LIBS)
+	$(CC) $(OBJECTS) $(BINS) build/$@.o -o $@ $(LIBS)
 
 $(DIRS):
 	mkdir -p $@
@@ -45,5 +44,5 @@ $(DIRS):
 
 # Removes built files.
 clean:
-	-rm -f $(OBJOUT) $(BINS)
+	-rm -f $(OBJECTS) $(BINS) $(addprefix build/,$(MAINS))
 #	-rm -f $(patsubst %.o,%,$(MAINS))

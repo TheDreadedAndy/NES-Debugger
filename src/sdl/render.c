@@ -85,22 +85,26 @@ void render_pixel(size_t row, size_t col, word_t pixel) {
   CONTRACT(row < (size_t) NES_HEIGHT);
   CONTRACT(col < (size_t) NES_WIDTH);
 
+  // Holds the current pixel size rect.
+  static SDL_Rect pixel_rect;
+
   // If the first pixel is being drawn, validate the frame buffer.
   if ((row == 0) && (col == 0)) {
     buffered_frame_valid = true;
+    pixel_rect.w = (((float) (size_t) window_size->dx) >= window_size->dx)
+                 ? ((size_t) window_size->dx)
+                 : ((size_t) window_size->dx) + 1;
+    pixel_rect.h = (((float) (size_t) window_size->dy) >= window_size->dy)
+                 ? ((size_t) window_size->dy)
+                 : ((size_t) window_size->dy) + 1;
   } else if (!buffered_frame_valid) {
     // Otherwise, the window has been resized and a pixel should not be drawn.
     return;
   }
 
   // Determine the actual size of the pixel to be rendered.
-  SDL_Rect pixel_rect;
   pixel_rect.x = window_size->x + ((size_t) (((float) col) * window_size->dx));
   pixel_rect.y = window_size->y + ((size_t) (((float) row) * window_size->dy));
-  pixel_rect.w = ((size_t) (((float) (col + 1)) * window_size->dx))
-               - ((size_t) (((float) col) * window_size->dx));
-  pixel_rect.h = ((size_t) (((float) (row + 1)) * window_size->dy))
-               - ((size_t) (((float) row) * window_size->dy));
 
   // Render the pixel to the window.
   render_set_draw_color(palette_decode(pixel));

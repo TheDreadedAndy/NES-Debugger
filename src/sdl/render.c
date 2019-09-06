@@ -20,14 +20,10 @@
  * SDL rendering surface to the appropriate size on the SDL window, given
  * this information about the NES.
  */
-#define NES_WIDTH_OFFSET 0
 #define NES_WIDTH 256
 #define NES_HEIGHT 240
-#define NES_HEIGHT_OFFSET 8
 #define NES_TRUE_HEIGHT 224
-#define NES_TRUE_WIDTH_RATIO (256.0 / 280.0)
-#define NES_WIDTH_PAD_OFFSET_RATIO (12.0 / 280.0)
-#define NES_W_TO_H (256.0 / 224.0)
+#define NES_TRUE_WIDTH 280
 #define NES_TRUE_H_TO_W (224.0 / 280.0)
 
 /*
@@ -61,7 +57,7 @@ void render_pixel(size_t row, size_t col, word_t pixel) {
 
   // Render the pixel to the window.
   render_set_draw_color(palette_decode(pixel));
-  SDL_RenderDrawPoint(render, col, row - 8);
+  SDL_RenderDrawPoint(render, col + 12, row - 8);
 
   return;
 }
@@ -118,19 +114,17 @@ void render_update_renderer_scale(void) {
   SDL_GetRendererOutputSize(render, &w, &h);
 
   // Determine how the renderer should be scaled.
-  float scale_x, scale_y;
+  float scale;
   if ((NES_TRUE_H_TO_W * w) > h) {
     // Fill in height, pad in width.
-    scale_y = ((float) h) / ((float) NES_TRUE_HEIGHT);
-    scale_x = NES_W_TO_H * scale_y;
+    scale = ((float) h) / ((float) NES_TRUE_HEIGHT);
   } else {
     // Fill in width, pad in height.
-    scale_x = (NES_TRUE_WIDTH_RATIO * w) / ((float) NES_WIDTH);
-    scale_y = NES_TRUE_H_TO_W * scale_x;
+    scale = ((float) w) / ((float) NES_TRUE_WIDTH);
   }
 
   // Update the renderer scaling.
-  SDL_RenderSetScale(render, scale_x, scale_y);
+  SDL_RenderSetScale(render, scale, scale);
 }
 
 /*

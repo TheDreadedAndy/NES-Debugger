@@ -31,6 +31,26 @@
 #define NES_TRUE_H_TO_W (224.0 / 280.0)
 
 /*
+ * Holds the sizing values and offset of the main window.
+ */
+typedef struct window_size {
+  // Scaled NES output size.
+  int h;
+  int w;
+  // NES output offset.
+  int x;
+  int y;
+  // Scaled NES pixel size.
+  float dx;
+  float dy;
+} window_size_t;
+
+/*
+ * Holds the current window size and offsets.
+ */
+window_size_t *window_size = NULL;
+
+/*
  * Set whenever the ppu draws a frame (which happens at vblank).
  * Reset whenever render_has_drawn() is called.
  * Used to track the frame rate of the emulator and, thus, throttle it.
@@ -41,28 +61,17 @@ static bool frame_output = false;
  * Set by the event manager whenever the size of the window changes.
  */
 static bool window_size_valid = false;
-
-/*
- * Holds the next frame of pixels to be streamed to the texture and rendered
- * to the window.
- */
-static uint32_t *pixels = NULL;
-
-/*
- * Used to stream the pixel changes to the window renderer.
- */
-static SDL_Texture *frame_texture = NULL;
+static bool buffered_frame_valid = false;
 
 /* Helper functions */
-void render_get_window_rect(SDL_Rect *window_rect);
+void render_set_draw_color(uint32_t color);
+void render_update_window_size(void);
 
 /*
- * Allocates the buffer used to render a frame of video.
+ * Allocates the window size structure so that rendering may safely begin.
  */
 void render_init(void) {
-  pixels = xcalloc(NES_WIDTH * NES_HEIGHT, sizeof(uint32_t));
-  frame_texture = SDL_CreateTexture(render, SDL_PIXELFORMAT_RGB888,
-                  SDL_TEXTUREACCESS_STREAMING, NES_WIDTH, NES_HEIGHT);
+  window_size = xcalloc(1, sizeof(window_size_t));
   return;
 }
 
@@ -76,9 +85,39 @@ void render_pixel(size_t row, size_t col, word_t pixel) {
   CONTRACT(row < (size_t) NES_HEIGHT);
   CONTRACT(col < (size_t) NES_WIDTH);
 
-  // Write the given pixel to the given location.
-  pixels[row * NES_WIDTH + col] = palette_decode(pixel);
+  // If the first pixel is being drawn, validate the frame buffer.
+  if ((row == 0) && (col == 0)) {
+    buffered_frame_valid = true;
+  } else if (!buffered_frame_valid) {
+    // Otherwise, the window has been resized and a pixel should not be drawn.
+    return;
+  }
 
+  // Determine the actual size of the pixel to be rendered.
+  SDL_Rect pixel_rect;
+  pixel_rect.x = window_size->x + ((size_t) (((float) col) * window_size->dx));
+  pixel_rect.y = window_size->y + ((size_t) (((float) row) * window_size->dy));
+  pixel_rect.w = ((size_t) (((float) (col + 1)) * window_size->dx))
+               - ((size_t) (((float) col) * window_size->dx));
+  pixel_rect.h = ((size_t) (((float) (row + 1)) * window_size->dy))
+               - ((size_t) (((float) row) * window_size->dy));
+
+  // Render the pixel to the window.
+  render_set_draw_color(palette_decode(pixel));
+  SDL_RenderFillRect(render, &pixel_rect);
+
+  return;
+}
+
+/*
+ * Sets the SDL rendering color to the given xRGB color.
+ */
+void render_set_draw_color(uint32_t color) {
+  word_t red, green, blue;
+  red = (color >> 16) & WORD_MASK;
+  green = (color >> 8) & WORD_MASK;
+  blue = color & WORD_MASK;
+  SDL_SetRenderDrawColor(render, red, green, blue, 0);
   return;
 }
 
@@ -91,39 +130,19 @@ void render_frame(void) {
   CONTRACT(window != NULL);
   CONTRACT(render != NULL);
 
-  // Setup the rendering rects.
-  static SDL_Rect frame_rect = { .x = NES_WIDTH_OFFSET, .y = NES_HEIGHT_OFFSET,
-                                 .w = NES_WIDTH, .h = NES_TRUE_HEIGHT };
-  static SDL_Rect window_rect;
-
   // Recalculate the window rect if the window has been resized.
   if (!window_size_valid) {
-    render_get_window_rect(&window_rect);
+    render_update_window_size();
     window_size_valid = true;
   }
 
-  // Clear the window before displaying the new image.
-  word_t red, green, blue;
-  red = (fill_color >> 16) & WORD_MASK;
-  green = (fill_color >> 8) & WORD_MASK;
-  blue = fill_color & WORD_MASK;
-  SDL_SetRenderDrawColor(render, red, green, blue, 0);
+  // Update the window if the buffered frame has not been invalidated
+  // by a window resizing.
+  if (buffered_frame_valid) { SDL_RenderPresent(render); }
+
+  // Clear the window so the next frame can be drawn.
+  render_set_draw_color(fill_color);
   SDL_RenderClear(render);
-
-  // Update the texture with the latest pixel data.
-  void *texture_pixels;
-  int pitch;
-  SDL_LockTexture(frame_texture, NULL, &texture_pixels, &pitch);
-  for (int i = 0; i < (NES_WIDTH * NES_HEIGHT); i++) {
-    ((uint32_t*) texture_pixels)[i] = pixels[i];
-  }
-  SDL_UnlockTexture(frame_texture);
-
-  // Copy the render surface to the window surface.
-  SDL_RenderCopy(render, frame_texture, &frame_rect, &window_rect);
-
-  // Update the window.
-  SDL_RenderPresent(render);
 
   // Signal that a frame was drawn.
   frame_output = true;
@@ -137,7 +156,7 @@ void render_frame(void) {
  *
  * Assumes the given surface and rect are non-null.
  */
-void render_get_window_rect(SDL_Rect *window_rect) {
+void render_update_window_size(void) {
   // Get the size of the window, to be used in the following calculation.
   int w, h;
   SDL_GetWindowSize(window, &w, &h);
@@ -145,17 +164,21 @@ void render_get_window_rect(SDL_Rect *window_rect) {
   // Determine which dimension the destination window should be padded in.
   if ((NES_TRUE_H_TO_W * w) > h) {
     // Fill in height, pad in width.
-    window_rect->h = h;
-    window_rect->y = 0;
-    window_rect->w = NES_W_TO_H * window_rect->h;
-    window_rect->x = (w / 2) - (window_rect->w / 2);
+    window_size->h = h;
+    window_size->y = 0;
+    window_size->w = NES_W_TO_H * window_size->h;
+    window_size->x = (w / 2) - (window_size->w / 2);
   } else {
     // Fill in width, pad in height.
-    window_rect->w = NES_TRUE_WIDTH_RATIO * w;
-    window_rect->x = NES_WIDTH_PAD_OFFSET_RATIO * window_rect->w;
-    window_rect->h = NES_TRUE_H_TO_W * w;
-    window_rect->y = (h / 2) - (window_rect->h / 2);
+    window_size->w = NES_TRUE_WIDTH_RATIO * w;
+    window_size->x = NES_WIDTH_PAD_OFFSET_RATIO * window_size->w;
+    window_size->h = NES_TRUE_H_TO_W * w;
+    window_size->y = (h / 2) - (window_size->h / 2);
   }
+
+  // Calculate the NES pixel size for the window.
+  window_size->dx = ((float) window_size->w) / ((float) NES_WIDTH);
+  window_size->dy = ((float) window_size->h) / ((float) NES_TRUE_HEIGHT);
 }
 
 /*
@@ -174,14 +197,14 @@ bool render_has_drawn(void) {
  */
 void render_invalidate_window_surface(void) {
   window_size_valid = false;
+  buffered_frame_valid = false;
   return;
 }
 
 /*
- * Frees the pixel buffer that was created when render_init() was called.
+ * Frees the window size structure.
  */
 void render_free(void) {
-  free(pixels);
-  SDL_DestroyTexture(frame_texture);
+  free(window_size);
   return;
 }

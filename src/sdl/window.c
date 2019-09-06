@@ -60,7 +60,7 @@ bool window_init(void) {
   // Create window.
   window = SDL_CreateWindow(window_name, SDL_WINDOWPOS_CENTERED,
                             SDL_WINDOWPOS_CENTERED, WINDOW_WIDTH, WINDOW_HEIGHT,
-                            SDL_WINDOW_RESIZABLE);
+                            SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL);
 
   // Check if the window was created successfully.
   if (window == NULL) {
@@ -69,7 +69,7 @@ bool window_init(void) {
   }
 
   // Create the renderer
-  render = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
+  render = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE);
 
   // Verify that the renderer was created successfully.
   if (render == NULL) {
@@ -81,6 +81,7 @@ bool window_init(void) {
   // resolution.
   SDL_RenderSetLogicalSize(render, NES_TRUE_WIDTH, NES_TRUE_HEIGHT);
   SDL_RenderSetViewport(render, NULL);
+  SDL_SetHint(SDL_HINT_RENDER_DRIVER, "opengl");
 
   // Return success.
   return true;

@@ -27,6 +27,7 @@
 // Window size constants
 #define NES_WIDTH 256
 #define NES_HEIGHT 240
+#define NES_TRUE_HEIGHT 224
 #define WINDOW_WIDTH 560
 #define WINDOW_HEIGHT 448
 #define MAX_TITLE_SIZE 256
@@ -74,6 +75,10 @@ bool window_init(void) {
     fprintf(stderr, "Failed to create SDL renderer.\n");
     return false;
   }
+
+  // Set the logical size of the renderer to the size of the NES output
+  // resolution.
+  SDL_RenderSetLogicalSize(render, NES_WIDTH, NES_TRUE_HEIGHT);
 
   // Return success.
   return true;

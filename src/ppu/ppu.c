@@ -491,9 +491,9 @@ void ppu_render_draw_pixel(void) {
     sprite_attribute = ppu->sprite_memory[4 * sprite_index + 2];
 
     // Check if the pixel should be rendered on top of the background.
+    sprite_pattern = ppu_render_get_sprite_pattern(sprite_index);
     if (((bg_pattern == 0) || !(sprite_attribute & FLAG_SPRITE_PRIORITY))
-       && ((sprite_pattern = ppu_render_get_sprite_pattern(sprite_index))
-       != 0)) {
+                           && (sprite_pattern != 0)) {
       sprite_on_top = true;
     }
 

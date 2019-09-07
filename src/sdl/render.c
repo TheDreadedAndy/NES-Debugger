@@ -48,7 +48,7 @@ void render_update_renderer_scale(void);
  * Assumes the render surface has been initialized.
  * Assumes the row and column are in range of the surface size.
  */
-void render_pixel(size_t row, size_t col, word_t pixel) {
+void render_pixel(size_t row, size_t col, uint32_t pixel) {
   CONTRACT(row < (size_t) NES_HEIGHT);
   CONTRACT(col < (size_t) NES_WIDTH);
 
@@ -56,7 +56,7 @@ void render_pixel(size_t row, size_t col, word_t pixel) {
   if ((row < 8) || (row >= (NES_HEIGHT - 8))) { return; }
 
   // Render the pixel to the window.
-  render_set_draw_color(palette_decode(pixel));
+  render_set_draw_color(pixel);
   SDL_RenderDrawPoint(render, col + 12, row - 8);
 
   return;

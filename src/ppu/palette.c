@@ -16,14 +16,30 @@
 #include "../util/util.h"
 #include "./palette.h"
 
-// Holds the decoded palette, which is used by palette_decode.
-uint32_t *decoded_palette = NULL;
-
 // The number of different NES colors in a given palette.
 #define PALETTE_SIZE 0x40U
 
 // The files size of an NES palette.
 #define PALETTE_FILE_SIZE 1536U
+
+// Used to access PPUMASK and update the settings of the palette.
+#define FLAG_GRAYSCALE 0x01U
+#define FLAG_COLOR_TINT 0xE0U
+#define COLOR_TINT_SHIFT 5U
+
+// Used to force a given color to grayscale.
+#define GRAYSCALE_MASK 0x30U
+
+// Holds the decoded palette, which is used by palette_decode.
+uint32_t *decoded_palette = NULL;
+
+// Holds the index for the palette being accessed. Controlled by the emphasis
+// bits in PPUMASK.
+word_t color_tint = 0;
+
+// Determines if a greyscale effect should be applied to requested colors.
+// Controlled by PPUMASK.
+bool grayscale_colors = false;
 
 /* Helper Functions */
 bool palette_invalid(FILE *pal_file);
@@ -87,7 +103,23 @@ bool palette_invalid(FILE *pal_file) {
  * Assumes the palette has been initialized.
  */
 uint32_t palette_decode(word_t color) {
-  return decoded_palette[color & PIXEL_MASK];
+  color = (grayscale_colors) ? (color & GRAYSCALE_MASK) : (color & PIXEL_MASK);
+  return decoded_palette[(color_tint * PALETTE_SIZE) + color];
+}
+
+/*
+ * Updates the settings of the palette controlled by PPUMASK.
+ *
+ * Assumes the palette has been initialized.
+ */
+void palette_update_mask(word_t mask) {
+  // Update the palette settings.
+  grayscale_colors = mask & FLAG_GRAYSCALE;
+  color_tint = (mask & FLAG_COLOR_TINT) >> COLOR_TINT_SHIFT;
+
+  // Signal memory to update its copies of the decoded palette pixels.
+  memory_palette_update();
+  return;
 }
 
 /*

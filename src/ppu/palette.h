@@ -18,6 +18,9 @@ void palette_init(char *file);
 // Decodes an NES color into an ARGB color.
 uint32_t palette_decode(word_t color);
 
+// Updates the mask settings of the palette.
+void palette_update_mask(word_t mask);
+
 // Frees the palette file.
 void palette_free(void);
 

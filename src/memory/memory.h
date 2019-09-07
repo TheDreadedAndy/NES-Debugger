@@ -25,7 +25,11 @@ typedef struct memory {
   // NES system RAM and VRAM palette data.
   // Mappers do not change this or any MMIO.
   word_t *ram;
-  word_t *palette_data;
+
+  // As an optimization, palette data is stored with the MSB as the NES color
+  // and the lower three bytes as a decoded xRGB color. See ppu/palette.c for
+  // more details.
+  uint32_t *palette_data;
 
   // Mapper information.
   void *map;
@@ -53,6 +57,12 @@ word_t memory_vram_read(dword_t addr);
 
 // Generic vram write function.
 void memory_vram_write(word_t val, dword_t addr);
+
+// Reads an xRGB color from palette ram.
+uint32_t memory_palette_read(dword_t addr);
+
+// Refreshes the xRGB colors stored in palette ram.
+void memory_palette_update(void);
 
 // Generic memory free function.
 void memory_free(void);

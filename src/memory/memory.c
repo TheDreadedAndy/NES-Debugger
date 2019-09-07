@@ -20,6 +20,7 @@
 #include "./uxrom.h"
 #include "../util/data.h"
 #include "../ppu/ppu.h"
+#include "../ppu/palette.h"
 #include "../cpu/2A03.h"
 #include "../io/controller.h"
 #include "../apu/apu.h"
@@ -46,6 +47,10 @@
 #define PALETTE_BG_ACCESS_MASK 0x0003U
 #define PALETTE_BG_MASK 0x000CU
 
+// Used to interact with the optimized palette.
+#define PALETTE_NES_PIXEL_SHIFT 24U
+#define PALETTE_XRGB_MASK 0x00FFFFFFU
+
 // VRAM can only address 14 bits.
 #define VRAM_ADDR_MASK 0x3FFFU
 
@@ -66,7 +71,7 @@ bool memory_init(FILE *rom_file, header_t *header) {
   // Allocate the generic memory structure.
   system_memory = xcalloc(1, sizeof(memory_t));
   system_memory->ram = rand_alloc(sizeof(word_t) * RAM_SIZE);
-  system_memory->palette_data = rand_alloc(sizeof(word_t) * PALETTE_SIZE);
+  system_memory->palette_data = rand_alloc(sizeof(uint32_t) * PALETTE_SIZE);
   system_memory->header = header;
 
   // Use the decoded header to decide which memory structure should be created.
@@ -161,7 +166,7 @@ word_t memory_vram_read(dword_t addr) {
     // Convert the address into an access to the palette data array.
     addr = (addr & PALETTE_BG_ACCESS_MASK) ? (addr & PALETTE_ADDR_MASK)
                                            : (addr & PALETTE_BG_MASK);
-    return system_memory->palette_data[addr];
+    return system_memory->palette_data[addr] >> PALETTE_NES_PIXEL_SHIFT;
   } else {
     // Access the pattern table/nametable.
     return system_memory->vram_read(addr, system_memory->map);
@@ -173,6 +178,7 @@ word_t memory_vram_read(dword_t addr) {
  * a word to vram. Handles palette accesses.
  *
  * Assumes memory has been initialized.
+ * Assumes the palette has been initialized.
  */
 void memory_vram_write(word_t val, dword_t addr) {
   // Mask out any extra bits.
@@ -180,15 +186,47 @@ void memory_vram_write(word_t val, dword_t addr) {
 
   // Check if the palette is being accessed.
   if ((addr & PALETTE_ACCESS_MASK) == PALETTE_ACCESS_MASK) {
+    // Create the NES/xRGB pixel to be written.
+    uint32_t pixel = (val << PALETTE_NES_PIXEL_SHIFT) | palette_decode(val);
+
     // Convert the address into an access to the palette data array.
     addr = (addr & PALETTE_BG_ACCESS_MASK) ? (addr & PALETTE_ADDR_MASK)
                                            : (addr & PALETTE_BG_MASK);
-    system_memory->palette_data[addr] = val;
+    system_memory->palette_data[addr] = pixel;
   } else {
     // Access the pattern table/nametable.
     system_memory->vram_write(val, addr, system_memory->map);
   }
 
+  return;
+}
+
+/*
+ * Reads an xRGB color from the palette.
+ *
+ * Assumes memory has been initialized.
+ * Assumes invalid colors will not be accessed.
+ */
+uint32_t memory_palette_read(dword_t addr) {
+  addr &= PALETTE_ADDR_MASK;
+  return system_memory->palette_data[addr] & PALETTE_XRGB_MASK;
+}
+
+/*
+ * Refreshes the xRGB pixels that are stored in the palette.
+ *
+ * Assumes memory has been initialized.
+ * Assumes the palette has been initialized.
+ */
+void memory_palette_update(void) {
+  // Update each entry in the palette.
+  word_t nes_pixel;
+  uint32_t pixel;
+  for (size_t i = 0; i < PALETTE_SIZE; i++) {
+    nes_pixel = system_memory->palette_data[i] >> PALETTE_NES_PIXEL_SHIFT;
+    pixel = (nes_pixel << PALETTE_NES_PIXEL_SHIFT) | palette_decode(nes_pixel);
+    system_memory->palette_data[i] = pixel;
+  }
   return;
 }
 

@@ -11,7 +11,6 @@
 #include "./render.h"
 #include "../util/contracts.h"
 #include "../ppu/palette.h"
-#include "../ppu/ppu.h"
 
 /*
  * The NES draws a 256x240 pictures, which is padded to 280x240. Most tvs
@@ -89,7 +88,7 @@ void render_frame(void) {
   }
 
   // Clear the window surface before displaying the new image.
-  SDL_FillRect(window_surface, NULL, palette_decode(fill_color));
+  SDL_FillRect(window_surface, NULL, 0);
 
   // Copy the render surface to the window surface.
   SDL_BlitScaled(render, &render_rect, window_surface, &window_rect);

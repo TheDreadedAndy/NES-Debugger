@@ -213,9 +213,6 @@ static bool frame_odd = false;
  */
 static ppu_t *ppu = NULL;
 
-// Used to signal the renderer what color to fill with.
-word_t fill_color = 0;
-
 /* Helper functions */
 bool ppu_is_disabled(void);
 void ppu_disabled(void);
@@ -224,10 +221,11 @@ void ppu_render(void);
 void ppu_render_visible(void);
 void ppu_render_update_frame(bool output);
 void ppu_render_draw_pixel(void);
-word_t ppu_render_get_tile_pixel(void);
-word_t ppu_render_get_sprite_pixel(word_t sprite_index);
+word_t ppu_render_get_tile_pattern(void);
+word_t ppu_render_get_tile_palette(void);
 word_t ppu_render_get_sprite_index(void);
 word_t ppu_render_get_sprite_pattern(word_t sprite_index);
+word_t ppu_render_get_sprite_palette(word_t sprite_attribute);
 void ppu_render_update_registers(void);
 void ppu_render_get_attribute(void);
 word_t ppu_render_get_tile(word_t index, bool plane_high);
@@ -358,8 +356,7 @@ void ppu_draw_background(void) {
   }
 
   // Get the background color pixel.
-  fill_color = memory_vram_read(color_addr);
-  word_t pixel = fill_color;
+  word_t pixel = memory_vram_read(color_addr);
 
   // Apply a greyscale effect to the pixel, if needed.
   if (ppu->mask & FLAG_GREYSCALE) { pixel &= GREYSCALE_PIXEL_MASK; }
@@ -472,44 +469,58 @@ void ppu_render_update_frame(bool output) {
  * between 1 and 256 (inclusive) of a visible scanline.
  */
 void ppu_render_draw_pixel(void) {
-  // Get the universal background color address and the screen position.
+  // Get the screen position.
   size_t screen_x = current_cycle - 1;
   size_t screen_y = current_scanline;
-  dword_t color_addr = PALETTE_BASE_ADDR;
 
-  // Get the background color pixel.
-  fill_color = memory_vram_read(color_addr);
-  word_t pixel = fill_color;
-  word_t bg_pixel = 0xFFU;
-  word_t sprite_pixel = 0xFFU;
+  // Holds the background and sprite palette color index.
+  word_t bg_pattern = 0;
+  word_t sprite_pattern = 0;
 
-  // Get the background tile pixel.
+  // Flags whether the background or sprite pixel should be rendered.
+  bool sprite_on_top = false;
+
+  // Get the background tile pattern.
   if ((ppu->mask & FLAG_RENDER_BG) && ((screen_x >= 8)
                                    || (ppu->mask & FLAG_LEFT_BG))) {
-    bg_pixel = ppu_render_get_tile_pixel();
-    if (bg_pixel != 0xFFU) { pixel = bg_pixel; }
+    bg_pattern = ppu_render_get_tile_pattern();
   }
 
-  // Get the sprite pixel.
-  word_t sprite_index;
+  // Get the sprite pattern.
+  word_t sprite_index, sprite_attribute;
   if ((ppu->mask & FLAG_RENDER_SPRITES)
      && ((screen_x >= 8) || (ppu->mask & FLAG_LEFT_SPRITES))
      && ((sprite_index = ppu_render_get_sprite_index()) < ppu->sprite_count)) {
-    word_t sprite_attribute = ppu->sprite_memory[4 * sprite_index + 2];
+    sprite_attribute = ppu->sprite_memory[4 * sprite_index + 2];
 
     // Check if the pixel should be rendered on top of the background.
-    sprite_pixel = ppu_render_get_sprite_pixel(sprite_index);
-    if (((bg_pixel == 0xFFU) || !(sprite_attribute & FLAG_SPRITE_PRIORITY))
-                             && (sprite_pixel != 0xFFU)) {
-      pixel = sprite_pixel;
+    if (((bg_pattern == 0) || !(sprite_attribute & FLAG_SPRITE_PRIORITY))
+       && ((sprite_pattern = ppu_render_get_sprite_pattern(sprite_index))
+       != 0)) {
+      sprite_on_top = true;
     }
 
     // Check if this counts as a sprite 0 hit.
-    if ((sprite_index == 0) && (ppu->zero_in_mem) && (bg_pixel != 0xFFU)
-                            && (screen_x != 255) && (sprite_pixel != 0xFFU)) {
+    if ((sprite_index == 0) && (ppu->zero_in_mem) && (bg_pattern != 0)
+                            && (screen_x != 255) && (sprite_pattern != 0)) {
       ppu->status |= FLAG_HIT;
     }
   }
+
+  // Calculate the address of the pixel to be drawn.
+  dword_t pixel_addr;
+  if (sprite_on_top) {
+    pixel_addr = PALETTE_BASE_ADDR | sprite_pattern
+               | ppu_render_get_sprite_palette(sprite_attribute);
+  } else if (bg_pattern != 0) {
+    pixel_addr = PALETTE_BASE_ADDR | bg_pattern
+               | ppu_render_get_tile_palette();
+  } else {
+    pixel_addr = PALETTE_BASE_ADDR;
+  }
+
+  // Get the pixel.
+  word_t pixel = memory_vram_read(pixel_addr);
 
   // Apply a greyscale effect to the pixel, if needed.
   if (ppu->mask & FLAG_GREYSCALE) { pixel &= GREYSCALE_PIXEL_MASK; }
@@ -521,57 +532,31 @@ void ppu_render_draw_pixel(void) {
 }
 
 /*
- * Pulls the next background tile pixel from the shift registers.
- * Returns -1 if the tile is transparent.
+ * Pulls the next background tile pattern from the shift registers.
  *
  * Assumes the PPU has been initialized.
  */
-word_t ppu_render_get_tile_pixel(void) {
+word_t ppu_render_get_tile_pattern(void) {
   // Get the pattern of the background tile.
   word_t tile_pattern = (((ppu->tile_scroll[0].w[WORD_HI] << ppu->fine_x)
                       >> 7U) & 1U)
                       | (((ppu->tile_scroll[1].w[WORD_HI] << ppu->fine_x)
                       >> 6U) & 2U);
-
-  // Determine if the background tile pixel is transparent, and load the color
-  // if its not.
-  if (tile_pattern) {
-    // Get the palette of the background tile.
-    word_t tile_palette = (((ppu->palette_scroll[0] << ppu->fine_x) >> 7U) & 1U)
-                      | (((ppu->palette_scroll[1] << ppu->fine_x) >> 6U) & 2U);
-
-    // Get the address of the background tile color and read in the pixel.
-    dword_t tile_address = PALETTE_BASE_ADDR
-                         | (tile_palette << 2U) | tile_pattern;
-    return memory_vram_read(tile_address) & PIXEL_MASK;
-  }
-
-  return 0xFFU;
+  return tile_pattern;
 }
 
 /*
- * Pulls the next sprite pixel from the shift registers.
- * Returns -1 if the tile is transparent.
+ * Gets the palette index of the current background tile from the shift
+ * registers.
  *
  * Assumes the PPU has been initialized.
- * Assumes there is a visible sprite on the current pixel.
+ * Assumes the current tile pattern is non-zero.
  */
-word_t ppu_render_get_sprite_pixel(word_t sprite_index) {
-  // Get the bit pattern of the current pixel for the sprite that is being
-  // rendered.
-  word_t sprite_pattern = ppu_render_get_sprite_pattern(sprite_index);
-
-  // Check if the pixel was transparent.
-  if (sprite_pattern) {
-    word_t sprite_palette = ppu->sprite_memory[(sprite_index << 2U) + 2U]
-                          & FLAG_SPRITE_PALETTE;
-    dword_t sprite_address = PALETTE_BASE_ADDR | SPRITE_PALETTE_BASE
-                            | (sprite_palette << 2U) | sprite_pattern;
-    return memory_vram_read(sprite_address) & PIXEL_MASK;
-  }
-
-  // Since the sprite pixel was transparent, we return an empty pixel.
-  return 0xFFU;
+word_t ppu_render_get_tile_palette(void) {
+  // Get the palette of the background tile.
+  word_t tile_palette = (((ppu->palette_scroll[0] << ppu->fine_x) >> 7U) & 1U)
+                      | (((ppu->palette_scroll[1] << ppu->fine_x) >> 6U) & 2U);
+  return tile_palette << 2U;
 }
 
 /*
@@ -614,6 +599,15 @@ word_t ppu_render_get_sprite_pattern(word_t sprite_index) {
                         << sprite_dx) >> 6U) & 2U);
 
   return sprite_pattern;
+}
+
+/*
+ * Pulls the sprite palette from the given attribute byte.
+ */
+word_t ppu_render_get_sprite_palette(word_t sprite_attribute) {
+  // Caclulate the sprite palette using the attribute byte.
+  word_t sprite_palette = sprite_attribute & FLAG_SPRITE_PALETTE;
+  return SPRITE_PALETTE_BASE | (sprite_palette << 2);
 }
 
 /*

@@ -84,11 +84,9 @@ void render_frame(void) {
   if (!window_surface_valid) {
     window_surface = SDL_GetWindowSurface(window);
     render_get_window_rect(window_surface, &window_rect);
+    SDL_FillRect(window_surface, NULL, 0);
     window_surface_valid = true;
   }
-
-  // Clear the window surface before displaying the new image.
-  SDL_FillRect(window_surface, NULL, 0);
 
   // Copy the render surface to the window surface.
   SDL_BlitScaled(render, &render_rect, window_surface, &window_rect);

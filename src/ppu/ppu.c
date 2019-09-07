@@ -324,13 +324,13 @@ void ppu_disabled(void) {
   ppu->sprite_count = 0;
 
   // Determine which action should be performed.
-  if (current_scanline < 240) {
+  if ((current_scanline >= 8) && (current_scanline < 232)) {
     // Draws the background color to the screen when rendering is disabled.
     if ((current_cycle > 0) && (current_cycle < 257)) { ppu_draw_background(); }
-  } else if (current_scanline < 261) {
+  } else if ((current_scanline >= 240) && (current_scanline < 261)) {
     // Signals the start of vblanks.
     ppu_render_blank();
-  } else if (current_cycle == 1) {
+  } else if ((current_scanline >= 261) && (current_cycle == 1)) {
     // Resets the status register during the pre-render scanline.
     ppu->status = 0;
   }
@@ -441,8 +441,11 @@ void ppu_render_visible(void) {
  * 1 and 256 (inclusive) of a visible scanline.
  */
 void ppu_render_update_frame(bool output) {
-  // Render the pixel.
-  if (output) { ppu_render_draw_pixel(); }
+  // Render the pixel. Since the top/bottom eight scanlines are not visible,
+  // they are not drawn.
+  if (output && (current_scanline >= 8) && (current_scanline < 232)) {
+    ppu_render_draw_pixel();
+  }
 
   // Update the background registers.
   ppu_render_update_registers();

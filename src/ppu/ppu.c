@@ -441,11 +441,8 @@ void ppu_render_visible(void) {
  * 1 and 256 (inclusive) of a visible scanline.
  */
 void ppu_render_update_frame(bool output) {
-  // Render the pixel. Since the top/bottom eight scanlines are not visible,
-  // they are not drawn.
-  if (output && (current_scanline >= 8) && (current_scanline < 232)) {
-    ppu_render_draw_pixel();
-  }
+  // Render the pixel.
+  if (output) { ppu_render_draw_pixel(); }
 
   // Update the background registers.
   ppu_render_update_registers();
@@ -519,11 +516,14 @@ void ppu_render_draw_pixel(void) {
     pixel_addr = PALETTE_BASE_ADDR;
   }
 
-  // Get the pixel.
-  uint32_t pixel = memory_palette_read(pixel_addr);
+  // Check if the pixel is on a scanline that is displayed.
+  if ((current_scanline >= 8) && (current_scanline < 232)) {
+    // Get the pixel.
+    uint32_t pixel = memory_palette_read(pixel_addr);
 
-  // Render the pixel.
-  render_pixel(screen_y, screen_x, pixel);
+    // Render the pixel.
+    render_pixel(screen_y, screen_x, pixel);
+  }
 
   return;
 }

@@ -205,10 +205,11 @@ void memory_vram_write(word_t val, dword_t addr) {
  * Reads an xRGB color from the palette.
  *
  * Assumes memory has been initialized.
- * Assumes invalid colors will not be accessed.
  */
 uint32_t memory_palette_read(dword_t addr) {
-  addr &= PALETTE_ADDR_MASK;
+  // Convert the address into an access to the palette data array.
+  addr = (addr & PALETTE_BG_ACCESS_MASK) ? (addr & PALETTE_ADDR_MASK)
+                                         : (addr & PALETTE_BG_MASK);
   return system_memory->palette_data[addr] & PALETTE_XRGB_MASK;
 }
 

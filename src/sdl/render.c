@@ -7,12 +7,10 @@
 #include <stdint.h>
 #include <SDL2/SDL.h>
 #include "../util/data.h"
-#include "../util/util.h"
 #include "./window.h"
 #include "./render.h"
 #include "../util/contracts.h"
 #include "../ppu/palette.h"
-#include "../ppu/ppu.h"
 
 /*
  * The NES draws a 256x240 pictures, which is padded to 280x240. Most tvs
@@ -20,10 +18,13 @@
  * SDL rendering surface to the appropriate size on the SDL window, given
  * this information about the NES.
  */
+#define NES_WIDTH_OFFSET 0
 #define NES_WIDTH 256
-#define NES_HEIGHT 240
+#define NES_HEIGHT_OFFSET 8
 #define NES_TRUE_HEIGHT 224
-#define NES_TRUE_WIDTH 280
+#define NES_TRUE_WIDTH_RATIO (256.0 / 280.0)
+#define NES_WIDTH_PAD_OFFSET_RATIO (12.0 / 280.0)
+#define NES_W_TO_H (256.0 / 224.0)
 #define NES_TRUE_H_TO_W (224.0 / 280.0)
 
 /*
@@ -34,13 +35,13 @@
 static bool frame_output = false;
 
 /*
- * Set by the event manager whenever the size of the window changes.
+ * Set whenever the size of the window changes, which means the window
+ * surface must be obtained again.
  */
-static bool window_size_valid = false;
+static bool window_surface_valid = false;
 
 /* Helper functions */
-void render_set_draw_color(uint32_t color);
-void render_update_renderer_scale(void);
+void render_get_window_rect(SDL_Surface *window_surface, SDL_Rect *window_rect);
 
 /*
  * Draws a pixel to the render surface.
@@ -49,28 +50,13 @@ void render_update_renderer_scale(void);
  * Assumes the row and column are in range of the surface size.
  */
 void render_pixel(size_t row, size_t col, uint32_t pixel) {
-  CONTRACT(row < (size_t) NES_HEIGHT);
-  CONTRACT(col < (size_t) NES_WIDTH);
+  CONTRACT(row < (size_t) render->h);
+  CONTRACT(col < (size_t) render->w);
 
-  // Ignore the first/last 8 scanlines.
-  if ((row < 8) || (row >= (NES_HEIGHT - 8))) { return; }
+  // Write the given pixel to the given location.
+  uint32_t *pixels = (uint32_t*) render->pixels;
+  pixels[row * render->w + col] = pixel;
 
-  // Render the pixel to the window.
-  render_set_draw_color(pixel);
-  SDL_RenderDrawPoint(render, col + 12, row - 8);
-
-  return;
-}
-
-/*
- * Sets the SDL rendering color to the given xRGB color.
- */
-void render_set_draw_color(uint32_t color) {
-  word_t red, green, blue;
-  red = (color >> 16) & WORD_MASK;
-  green = (color >> 8) & WORD_MASK;
-  blue = color & WORD_MASK;
-  SDL_SetRenderDrawColor(render, red, green, blue, 0);
   return;
 }
 
@@ -83,18 +69,32 @@ void render_frame(void) {
   CONTRACT(window != NULL);
   CONTRACT(render != NULL);
 
-  // Recalculate the window rect if the window has been resized.
-  if (!window_size_valid) {
-    render_update_renderer_scale();
-    window_size_valid = true;
+  // Setup the window surface.
+  static SDL_Surface *window_surface = NULL;
+  static SDL_Rect render_rect, window_rect;
+  if (window_surface == NULL) {
+    render_rect.x = NES_WIDTH_OFFSET;
+    render_rect.y = NES_HEIGHT_OFFSET;
+    render_rect.w = NES_WIDTH;
+    render_rect.h = NES_TRUE_HEIGHT;
   }
 
-  // Update the window.
-  SDL_RenderPresent(render);
 
-  // Clear the window so the next frame can be drawn.
-  render_set_draw_color(fill_color);
-  SDL_RenderClear(render);
+  // Get the window surface, and recalculate the rect, if the surface is invalid.
+  if (!window_surface_valid) {
+    window_surface = SDL_GetWindowSurface(window);
+    render_get_window_rect(window_surface, &window_rect);
+    window_surface_valid = true;
+  }
+
+  // Clear the window surface before displaying the new image.
+  SDL_FillRect(window_surface, NULL, 0);
+
+  // Copy the render surface to the window surface.
+  SDL_BlitScaled(render, &render_rect, window_surface, &window_rect);
+
+  // Update the window.
+  SDL_UpdateWindowSurface(window);
 
   // Signal that a frame was drawn.
   frame_output = true;
@@ -108,23 +108,22 @@ void render_frame(void) {
  *
  * Assumes the given surface and rect are non-null.
  */
-void render_update_renderer_scale(void) {
-  // Get the size of the window, to be used in the following calculation.
-  int w, h;
-  SDL_GetRendererOutputSize(render, &w, &h);
-
-  // Determine how the renderer should be scaled.
-  float scale;
-  if ((NES_TRUE_H_TO_W * w) > h) {
+void render_get_window_rect(SDL_Surface *window_surface,
+                            SDL_Rect *window_rect) {
+  // Determine which dimension the destination window should be padded in.
+  if ((NES_TRUE_H_TO_W * window_surface->w) > window_surface->h) {
     // Fill in height, pad in width.
-    scale = ((float) h) / ((float) NES_TRUE_HEIGHT);
+    window_rect->h = window_surface->h;
+    window_rect->y = 0;
+    window_rect->w = NES_W_TO_H * window_rect->h;
+    window_rect->x = (window_surface->w / 2) - (window_rect->w / 2);
   } else {
     // Fill in width, pad in height.
-    scale = ((float) w) / ((float) NES_TRUE_WIDTH);
+    window_rect->w = NES_TRUE_WIDTH_RATIO * window_surface->w;
+    window_rect->x = NES_WIDTH_PAD_OFFSET_RATIO * window_rect->w;
+    window_rect->h = NES_TRUE_H_TO_W * window_surface->w;
+    window_rect->y = (window_surface->h / 2) - (window_rect->h / 2);
   }
-
-  // Update the renderer scaling.
-  SDL_RenderSetScale(render, scale, scale);
 }
 
 /*
@@ -138,10 +137,10 @@ bool render_has_drawn(void) {
 }
 
 /*
- * Sets the value of window_size_valid to false.
+ * Sets the value of window_surface_valid to false.
  * Called from the SDL event manager to invalidate the window.
  */
 void render_invalidate_window_surface(void) {
-  window_size_valid = false;
+  window_surface_valid = false;
   return;
 }

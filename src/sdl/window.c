@@ -26,9 +26,7 @@
 
 // Window size constants
 #define NES_WIDTH 256
-#define NES_TRUE_WIDTH 280
 #define NES_HEIGHT 240
-#define NES_TRUE_HEIGHT 224
 #define WINDOW_WIDTH 560
 #define WINDOW_HEIGHT 448
 #define MAX_TITLE_SIZE 256
@@ -42,7 +40,7 @@ SDL_Window *window = NULL;
 
 // Global SDL surface that pixels are rendered to before being drawn in the
 // window. Cannot be directly accessed outside this file.
-SDL_Renderer *render = NULL;
+SDL_Surface *render = NULL;
 
 /* Helper functions */
 void window_process_window_event(SDL_Event *event);
@@ -68,19 +66,18 @@ bool window_init(void) {
     return false;
   }
 
-  // Create the renderer
-  render = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE);
+  // Create the rendering surface.
+  render = SDL_CreateRGBSurface(0, NES_WIDTH, NES_HEIGHT, PALETTE_DEPTH,
+                                PALETTE_RMASK, PALETTE_GMASK, PALETTE_BMASK, 0);
 
-  // Verify that the renderer was created successfully.
+  // Verify that the surface was created successfully.
   if (render == NULL) {
-    fprintf(stderr, "Failed to create SDL renderer.\n");
+    fprintf(stderr, "Failed to create SDL rendering surface.\n");
     return false;
   }
 
-  // Set the logical size of the renderer to the size of the NES output
-  // resolution.
-  SDL_RenderSetLogicalSize(render, NES_TRUE_WIDTH, NES_TRUE_HEIGHT);
-  SDL_RenderSetViewport(render, NULL);
+  // Disable RLE acceleration on the render surface.
+  SDL_SetSurfaceRLE(render, 0);
 
   // Return success.
   return true;
@@ -159,8 +156,8 @@ void window_close(void) {
   CONTRACT(window != NULL);
   CONTRACT(render != NULL);
 
-  SDL_DestroyRenderer(render);
   SDL_DestroyWindow(window);
+  SDL_FreeSurface(render);
   SDL_Quit();
 
   return;

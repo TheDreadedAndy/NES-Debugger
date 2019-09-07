@@ -15,6 +15,7 @@
 #include "../util/data.h"
 #include "../util/util.h"
 #include "./palette.h"
+#include "../memory/memory.h"
 
 // The number of different NES colors in a given palette.
 #define PALETTE_SIZE 0x40U

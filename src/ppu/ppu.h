@@ -5,10 +5,6 @@
 #ifndef _NES_PPU
 #define _NES_PPU
 
-// The current background color of the PPU. Should only be read from.
-// Used to fill the window the the games background color.
-extern word_t fill_color;
-
 // Inits the ppu structure, allowing the ppu to be used.
 bool ppu_init(char *file);
 

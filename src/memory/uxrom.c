@@ -43,7 +43,7 @@
 // Nes virtual memory data structure for uxrom (mapper 2).
 typedef struct uxrom {
   // Cart memory.
-  word_t *bat;
+  word_t bat[BAT_SIZE];
   word_t *cart[MAX_BANKS];
   word_t current_bank;
   // Should always be the final used bank.
@@ -51,7 +51,7 @@ typedef struct uxrom {
   word_t bank_mask;
 
   // PPU memory.
-  word_t *pattern_table;
+  word_t pattern_table[PATTERN_TABLE_SIZE];
   bool is_chr_ram;
   word_t *nametable[MAX_SCREENS];
 } uxrom_t;
@@ -70,16 +70,13 @@ void uxrom_load_chr(FILE *rom_file, memory_t *M);
  */
 void uxrom_new(FILE *rom_file, memory_t *M) {
   // Allocate memory structure and set up its data.
-  uxrom_t *map = xcalloc(1, sizeof(uxrom_t));
+  uxrom_t *map = rand_alloc(sizeof(uxrom_t));
   M->map = (void*) map;
   M->read = &uxrom_read;
   M->write = &uxrom_write;
   M->vram_read = &uxrom_vram_read;
   M->vram_write = &uxrom_vram_write;
   M->free = &uxrom_free;
-
-  // Set up the cart ram space.
-  map->bat = rand_alloc(BAT_SIZE * sizeof(word_t));
 
   // Load the rom data into memory.
   uxrom_load_prg(rom_file, M);
@@ -146,16 +143,14 @@ void uxrom_load_chr(FILE *rom_file, memory_t *M) {
   if (M->header->chr_ram_size > 0) {
     map->is_chr_ram = true;
     // chr-ram should always be 8K for this mapper.
-    map->pattern_table = rand_alloc(sizeof(word_t) * M->header->chr_ram_size);
     return;
   }
 
   // Otherwise, the rom uses chr-rom and the data needs to be copied
   // from the rom file.
   map->is_chr_ram = false;
-  map->pattern_table = xmalloc(sizeof(word_t) * M->header->chr_rom_size);
   fseek(rom_file, HEADER_SIZE + M->header->prg_rom_size, SEEK_SET);
-  for (size_t i = 0; i < M->header->chr_rom_size; i++) {
+  for (size_t i = 0; i < PATTERN_TABLE_SIZE; i++) {
     map->pattern_table[i] = fgetc(rom_file);
   }
 
@@ -266,8 +261,6 @@ void uxrom_free(void *map) {
   uxrom_t *M = (uxrom_t*) map;
 
   // Free the contents of the structure.
-  free(M->bat);
-  free(M->pattern_table);
   free(M->nametable[0]);
   free(M->nametable[3]);
 

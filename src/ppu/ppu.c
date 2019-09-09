@@ -171,9 +171,9 @@ typedef struct ppu {
 
   // Working memory for the ppu.
   word_t oam_mask;
-  word_t *primary_oam;
-  word_t *secondary_oam;
-  word_t *sprite_memory;
+  word_t primary_oam[PRIMARY_OAM_SIZE];
+  word_t secondary_oam[SECONDARY_OAM_SIZE];
+  word_t sprite_memory[SECONDARY_OAM_SIZE];
   word_t sprite_data[SPRITE_DATA_SIZE][BIT_PLANES];
   word_t sprite_count;
   word_t next_sprite_count;
@@ -260,9 +260,6 @@ void ppu_mmio_vram_addr_inc(void);
 bool ppu_init(char *file) {
   // Prepare the ppu structure.
   ppu = xcalloc(1, sizeof(ppu_t));
-  ppu->primary_oam = xcalloc(PRIMARY_OAM_SIZE, sizeof(word_t));
-  ppu->secondary_oam = xcalloc(SECONDARY_OAM_SIZE, sizeof(word_t));
-  ppu->sprite_memory = xcalloc(SECONDARY_OAM_SIZE, sizeof(word_t));
 
   // Load in the palette.
   palette_init(file);
@@ -1348,9 +1345,6 @@ word_t ppu_oam_read(void) {
  */
 void ppu_free(void) {
   // Free the ppu structure.
-  free(ppu->primary_oam);
-  free(ppu->secondary_oam);
-  free(ppu->sprite_memory);
   free(ppu);
 
   // Free the NES palette data.

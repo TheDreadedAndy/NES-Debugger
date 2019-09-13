@@ -22,6 +22,7 @@
 #define BANK_SELECT_MASK 0x4000U
 #define BANK_SELECT_SHIFT 14U
 #define BANK_OFFSET 0x8000U
+#define BANK_OPT_OFFSET 0xC000U
 #define BANK_ADDR_MASK 0x3FFFU
 #define BAT_SIZE 0x2000U
 #define BAT_OFFSET 0x6000U
@@ -163,15 +164,15 @@ word_t nrom_read(dword_t addr, void *map) {
   nrom_t *M = (nrom_t*) map;
 
   // Detect where in memory we need to access and do so.
-  word_t bank;
   if (addr < BAT_OFFSET) {
     fprintf(stderr, "WARNING: Memory not implemented.\n");
     return 0;
   } else if (addr < BANK_OFFSET) {
     return M->bat[addr & BAT_MASK];
+  } else if (addr < BANK_OPT_OFFSET) {
+    return M->cart[0][addr & BANK_ADDR_MASK];
   } else {
-    bank = (addr & BANK_SELECT_MASK) >> BANK_SELECT_SHIFT;
-    return M->cart[bank][addr & BANK_ADDR_MASK];
+    return M->cart[1][addr & BANK_ADDR_MASK];
   }
 }
 

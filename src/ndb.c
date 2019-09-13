@@ -25,7 +25,7 @@
 // The number of cpu cycles that will be emulated per emulation cycle.
 // Setting this too low will cause speed issues.
 // Setting this too high will cause timing issues.
-#define EMU_CYCLE_SIZE 9944
+#define EMU_CYCLE_SIZE 29830
 
 // Global running variable. Available to other files through ndb.h.
 // Setting this value to false closes the program.
@@ -74,43 +74,19 @@ int main(int argc, char *argv[]) {
   input_load(NULL);
   start_emulation(rom_file, pal_file);
 
-  // Init the timing variables.
-  emutime_t current_time, sdl_wait, emu_wait, fps_wait;
-  emutime_get(&sdl_wait);
-  emutime_get(&emu_wait);
-  emutime_get(&fps_wait);
-  time_t last_fps_display = time(NULL);
-  double frames_drawn = 0;
-
   // Main emulation loop.
   while (ndb_running) {
-    // Get the clock time for this loop.
-    emutime_get(&current_time);
+    // Syncs the emulation to 60 FPS, when possible.
+    //emutime_sync_frame_rate(NES_FRAME_RATE);
 
-    // Process any events on the SDL event queue.
-    if (emutime_gt(&current_time, &sdl_wait)) {
-      window_process_events();
-      emutime_update(&current_time, &sdl_wait, FRAME_LENGTH);
-    }
+    // Process any events on the SDL queue.
+    window_process_events();
 
     // Update the frame rate display.
-    if (emutime_gt(&current_time, &fps_wait)) {
-      time_t now = time(NULL);
-      window_display_fps(((double) frames_drawn) /
-                         difftime(now, last_fps_display));
-      last_fps_display = now;
-      frames_drawn = 0;
-      emutime_update(&current_time, &fps_wait, NSECS_PER_SEC);
-    }
+    // TODO
 
-    // Update the timing for the emulation.
-    if (render_has_drawn()) {
-      emutime_update(&current_time, &emu_wait, FRAME_LENGTH);
-      frames_drawn++;
-    }
-
-    // Executes the next cycle.
-    if (emutime_gt(&current_time, &emu_wait)) { run_emulation_cycle(); }
+    // Execute the next frame of emulation.
+    run_emulation_cycle();
   }
 
   // Clean up any allocated memory.

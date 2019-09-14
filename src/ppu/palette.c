@@ -20,6 +20,9 @@
 // The number of different NES colors in a given palette.
 #define PALETTE_SIZE 0x40U
 
+// The number of NES palettes.
+#define PALETTE_DIMS 8U
+
 // The files size of an NES palette.
 #define PALETTE_FILE_SIZE 1536U
 
@@ -64,12 +67,12 @@ void palette_init(char *file) {
   }
 
   // Load the palette file into the decoded palette array.
-  decoded_palette = xcalloc(PALETTE_SIZE, sizeof(uint32_t));
+  decoded_palette = xcalloc(PALETTE_SIZE * PALETTE_DIMS, sizeof(uint32_t));
   uint32_t red, green, blue;
   if (pal_file != NULL) {
     // Load the file the user provided.
     fseek(pal_file, 0, SEEK_SET);
-    for (size_t i = 0; i < PALETTE_SIZE; i++) {
+    for (size_t i = 0; i < (PALETTE_SIZE * PALETTE_DIMS); i++) {
       red = (word_t) fgetc(pal_file);
       green = (word_t) fgetc(pal_file);
       blue = (word_t) fgetc(pal_file);
@@ -77,7 +80,7 @@ void palette_init(char *file) {
     }
   } else {
     // If the file was invalid (or not provided), load the default instead.
-    for (size_t i = 0; i < PALETTE_SIZE; i++) {
+    for (size_t i = 0; i < (PALETTE_SIZE * PALETTE_DIMS); i++) {
       red = _binary_bins_nes_palette_bin_start[3 * i + 0];
       green = _binary_bins_nes_palette_bin_start[3 * i + 1];
       blue = _binary_bins_nes_palette_bin_start[3 * i + 2];

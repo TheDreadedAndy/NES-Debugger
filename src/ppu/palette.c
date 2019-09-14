@@ -61,8 +61,12 @@ void palette_init(char *file) {
   FILE *pal_file = NULL;
   if (file != NULL) {
     pal_file = fopen(file, "rb");
-    if ((pal_file == NULL) || palette_invalid(pal_file)) {
-      fprintf(stderr, "Invalid palette file.\n");
+    if (pal_file == NULL) {
+      fprintf(stderr, "WARNING: Could not open the specified palette file\n");
+    } else if (palette_invalid(pal_file)) {
+      fprintf(stderr, "WARNING: The specified palette file was invalid.\n");
+      fclose(pal_file);
+      pal_file = NULL;
     }
   }
 

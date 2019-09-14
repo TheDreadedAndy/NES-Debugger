@@ -79,11 +79,11 @@ int main(int argc, char *argv[]) {
     // Syncs the emulation to 60 FPS, when possible.
     emutime_sync_frame_rate(NES_FRAME_RATE);
 
+    // Update the frame rate display.
+    emutime_update_frame_counter(NES_FRAME_RATE);
+
     // Process any events on the SDL queue.
     window_process_events();
-
-    // Update the frame rate display.
-    // TODO
 
     // Execute the next frame of emulation.
     run_emulation_cycle();

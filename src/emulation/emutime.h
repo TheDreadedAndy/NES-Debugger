@@ -15,4 +15,8 @@
 // times per second.
 void emutime_sync_frame_rate(long tic_rate);
 
+// Updates the frame rate counter in the SDL window once per second, assuming
+// the program is supposed to run at tic_rate frames per second.
+void emutime_update_frame_counter(long tic_rate);
+
 #endif

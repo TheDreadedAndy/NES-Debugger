@@ -293,12 +293,10 @@ void apu_run_cycle(void) {
     return;
   }
 
-  // If we're on the start of a frame step, run the frame counters action
-  // for that step.
-  if (frame_clock == 0) { apu_run_frame_step(); }
-
-  // Increment the frame clock and step.
+  // Update the frame counter. Must be done in this order to prevent
+  // issues with frame counter resets.
   apu_inc_frame();
+  if (frame_clock == 0) { apu_run_frame_step(); }
 
   // Update the channels for this cycle.
   apu_update_pulse(pulse_a);

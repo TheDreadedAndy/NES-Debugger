@@ -77,7 +77,7 @@ int main(int argc, char *argv[]) {
   // Main emulation loop.
   while (ndb_running) {
     // Syncs the emulation to 60 FPS, when possible.
-    //emutime_sync_frame_rate(NES_FRAME_RATE);
+    emutime_sync_frame_rate(NES_FRAME_RATE);
 
     // Process any events on the SDL queue.
     window_process_events();

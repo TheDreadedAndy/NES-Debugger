@@ -239,9 +239,6 @@ static size_t frame_step = 0;
 // Most functions only update every other cycle. This flag tracks that.
 static bool cycle_even = false;
 
-// Tracks when a sample should be played to the audio system.
-static word_t sample_clock;
-
 /*
  * The triangle channel can output at frequencies outside the human range of
  * hearing, causing clicking. Setting this flag enables these outputs.
@@ -691,6 +688,9 @@ void apu_update_dmc(void) {
  * Assumes the APU has been initialized.
  */
 void apu_play_sample(void) {
+  // Tracks when the next sample should be played.
+  static float sample_clock = 0;
+
   // Increment the sample clock if a sample is not to be played this cycle.
   if (sample_clock < 37) {
     sample_clock++;
@@ -707,7 +707,7 @@ void apu_play_sample(void) {
   audio_add_sample(output);
 
   // Reset the sample clock.
-  sample_clock = 0;
+  sample_clock -= 36.2869375;
 
   return;
 }
@@ -830,6 +830,10 @@ void apu_write(dword_t reg_addr, word_t val) {
       // Reset the frame timer.
       // TODO: Add delay.
       frame_clock = 0;
+      if (frame_control & FLAG_MODE) {
+        frame_step = 1;
+        apu_run_frame_step();
+      }
       frame_step = 0;
       break;
     default:

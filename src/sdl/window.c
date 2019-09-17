@@ -79,6 +79,12 @@ bool window_init(void) {
   // Disable RLE acceleration on the render surface.
   SDL_SetSurfaceRLE(render, 0);
 
+#ifdef _NES_OSLIN
+  // Force the IBus IME to handle text composing.
+  // Work around for a known SDL2 crash.
+  SDL_SetHint(SDL_HINT_IME_INTERNAL_EDITING, "1");
+#endif
+
   // Return success.
   return true;
 }

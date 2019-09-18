@@ -35,6 +35,7 @@ typedef struct sxrom {
   // Cart memory.
   word_t *prg_rom[MAX_ROM_BANK_PLANES][MAX_ROM_BANKS];
   word_t *prg_ram[MAX_RAM_BANKS];
+  word_t num_prg_ram_banks;
 
   // PPU memory.
   word_t *pattern_table[MAX_CHR_BANKS];
@@ -46,7 +47,8 @@ typedef struct sxrom {
   word_t control;
   word_t chr_bank_a;
   word_t chr_bank_b;
-  word_t prg_bank;
+  word_t prg_rom_bank;
+  word_t prg_ram_bank;
   word_t bus;
 } sxrom_t;
 
@@ -81,9 +83,11 @@ void sxrom_new(FILE *rom_file, memory_t *M) {
   sxrom_load_chr(rom_file, M);
 
   // Setup the nametable in vram. The header mirroring bit is ignored in
-  // this mapper.
+  // this mapper, so we set the mirrored banks to a default value for now.
   map->nametable[0] = rand_alloc(sizeof(word_t) * SCREEN_SIZE);
   map->nametable[3] = rand_alloc(sizeof(word_t) * SCREEN_SIZE);
+  map->nametable[1] = map->nametable[0];
+  map->nametable[2] = map->nametable[3];
 
   return;
 }
@@ -99,13 +103,33 @@ void sxrom_new(FILE *rom_file, memory_t *M) {
 void sxrom_load_prg_ram(memory_t *M) {
   // Cast back from the generic structure.
   sxrom_t *map = (sxrom_t*) M->map;
-  (void)map;
+
+  // Determine if the rom supplied a valid PRG-RAM size.
+  if (M->header->header_type != NES2) {
+    // Assume that the rom needs 32KB of PRG-RAM.
+    map->num_prg_ram_banks = MAX_RAM_BANKS;
+  } else {
+    // The mapper is NES 2.0, so we can use the specified PRG-RAM size.
+    map->num_prg_ram_banks = M->header->prg_ram_size / RAM_BANK_SIZE;
+  }
+
+  // Allocate the PRG-RAM banks.
+  for (size_t i = 0; i < map->num_prg_ram_banks; i++) {
+    map->prg_ram[i] = rand_alloc(RAM_BANK_SIZE * sizeof(word_t));
+  }
 
   return;
 }
 
 /*
- * TODO
+ * Loads the given rom file into the sxrom memory structure.
+ * Note that while this implementation assumes the banks will boot in mode 3,
+ * with the upper half of rom fixed to the last bank and the lower half on bank
+ * 0, this is not specified in original hardware.
+ *
+ * Assumes the provided rom_file is valid.
+ * Assumes the provided memory structure and its mapper field are non-null.
+ * Assumes the mapper field points to an sxrom mapper structure.
  */
 void sxrom_load_prg_rom(FILE *rom_file, memory_t *M) {
   // Cast back from the generic structure.

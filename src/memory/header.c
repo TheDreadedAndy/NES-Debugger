@@ -217,8 +217,9 @@ void decode_ines(header_t *header, char *file_header) {
   header->prg_rom_size = get_ines_prg_rom_size(file_header);
   header->chr_rom_size = get_ines_chr_rom_size(file_header);
 
-  // When an INES header does not specify a size for CHR-ROM, 8K of CHR-RAM
-  // is assumed to be present.
+  // When an INES header does not specify a size for CHR-ROM, CHR-RAM
+  // is assumed to be present. This ram size is not specified, but here we
+  // assume it to be 8KB.
   if (header->chr_rom_size == 0) {
     header->chr_ram_size = INES_CHR_RAM_SIZE;
   }
@@ -295,6 +296,7 @@ void decode_nes2(header_t *header, char *file_header) {
   // TODO: Implement NES 2.0 header decoding.
   fprintf(stderr,
           "Warning: NES 2.0 headers are not implemented. Decoding as INES\n");
+  header->header_type = INES;
   decode_ines(header, file_header);
   return;
 }

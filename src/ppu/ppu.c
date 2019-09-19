@@ -17,8 +17,9 @@
 
 // Object Attribute Memory size.
 #define PRIMARY_OAM_SIZE 256U
-#define SECONDARY_OAM_SIZE 32U
-#define SPRITE_DATA_SIZE 8U
+#define SOAM_BUFFER_SIZE 256U
+#define NUM_SOAM_BUFFERS 2U
+#define OAM_BUFFER_SIZE 96U
 
 // The number of planes in a sprite or tile.
 #define BIT_PLANES 2U
@@ -63,13 +64,12 @@
 #define PATTERN_TABLE_HIGH 0x1000U
 
 // Used to form a pattern table address, for a sprite, from sprite memory.
+#define SPRITE_PLANE_HIGH_MASK 0x08U
 #define X16_INDEX_OFFSET 0x10U
-#define X16_PLANE_SHIFT 3
 #define X16_TILE_MASK 0xFEU
 #define X16_TILE_SHIFT 4
 #define X16_TABLE_MASK 0x01U
 #define X16_TABLE_SHIFT 12
-#define X8_PLANE_SHIFT 3
 #define X8_TILE_SHIFT 4
 #define X8_TABLE_SHIFT 9
 
@@ -144,12 +144,12 @@
 #define TOGGLE_HNT_SHIFT 5
 
 /*
- * Sprite evaluation may perform several different actions independent of the
- * current cycle counter. These enums track which action should be performed.
+ * Flags used to access the SOAM buffer for sprites.
  */
-typedef enum eval_state {
-  SCAN, COPY_TILE, COPY_ATTR, COPY_X, OVERFLOW, DONE
-} eval_t;
+#define FLAG_SOAM_BUFFER_ZERO 0x80U
+#define FLAG_SOAM_BUFFER_PRIORITY 0x40U
+#define FLAG_SOAM_BUFFER_PALETTE 0x1FU
+#define FLAG_SOAM_BUFFER_PATTERN 0x03U
 
 /*
  * Contains the registers and memory internal to the PPU.
@@ -172,14 +172,10 @@ typedef struct ppu {
   // Working memory for the ppu.
   word_t oam_mask;
   word_t primary_oam[PRIMARY_OAM_SIZE];
-  word_t secondary_oam[SECONDARY_OAM_SIZE];
-  word_t sprite_memory[SECONDARY_OAM_SIZE];
-  word_t sprite_data[SPRITE_DATA_SIZE][BIT_PLANES];
-  word_t sprite_count;
-  word_t next_sprite_count;
-  word_t zero_index;
-  bool zero_in_soam;
-  bool zero_in_mem;
+  word_t soam_eval_buf;
+  word_t soam_render_buf;
+  word_t soam_buffer[NUM_SOAM_BUFFERS][SOAM_BUFFER_SIZE];
+  word_t oam_buffer[OAM_BUFFER_SIZE];
 
   // Temporary storage used in rendering.
   mword_t tile_scroll[BIT_PLANES];
@@ -187,11 +183,6 @@ typedef struct ppu {
   word_t palette_scroll[BIT_PLANES];
   word_t palette_latch[BIT_PLANES];
   word_t next_palette[BIT_PLANES];
-
-  // Temporary storage used in sprite evaluation.
-  word_t eval_buf;
-  eval_t eval_state;
-  word_t soam_addr;
 
   // MDR and write toggle, used for 2-cycle r/w system.
   word_t mdr;
@@ -223,15 +214,10 @@ void ppu_render_update_frame(bool output);
 void ppu_render_draw_pixel(void);
 word_t ppu_render_get_tile_pattern(void);
 word_t ppu_render_get_tile_palette(void);
-word_t ppu_render_get_sprite_index(void);
-word_t ppu_render_get_sprite_pattern(word_t sprite_index);
-word_t ppu_render_get_sprite_palette(word_t sprite_attribute);
 void ppu_render_update_registers(void);
 void ppu_render_get_attribute(void);
 word_t ppu_render_get_tile(word_t index, bool plane_high);
 void ppu_render_update_hori(void);
-void ppu_render_prepare_sprites(void);
-word_t ppu_render_get_sprite(void);
 void ppu_render_prepare_bg(void);
 void ppu_render_dummy_nametable_access(void);
 void ppu_render_xinc(void);
@@ -242,8 +228,9 @@ void ppu_render_update_vert(void);
 void ppu_eval_clear_soam(void);
 void ppu_eval_sprites(void);
 word_t ppu_oam_read(void);
-void ppu_eval_write_soam(void);
-bool ppu_eval_in_range(void);
+bool ppu_eval_in_range(word_t sprite_y);
+void ppu_eval_fill_soam_buffer(word_t *sprite_data, bool is_zero);
+void ppu_eval_get_sprite(word_t *sprite_data, word_t *pat_lo, word_t *pat_hi);
 void ppu_eval_fetch_sprites(void);
 void ppu_signal(void);
 void ppu_inc(void);
@@ -260,6 +247,7 @@ void ppu_mmio_vram_addr_inc(void);
 bool ppu_init(char *file) {
   // Prepare the ppu structure.
   ppu = xcalloc(1, sizeof(ppu_t));
+  ppu->soam_eval_buf = 1;
 
   // Load in the palette.
   palette_init(file);
@@ -309,16 +297,6 @@ bool ppu_is_disabled(void) {
 void ppu_disabled(void) {
   // The OAM mask should not be active when rendering is disabled.
   ppu->oam_mask = 0;
-
-  // Prevents the PPU from making out of range SOAM accesses (and other issues)
-  // if the PPU gets enabled in the middle of a frame.
-  ppu->eval_state = SCAN;
-  ppu->soam_addr = 0;
-  ppu->zero_index = ppu->oam_addr;
-  ppu->zero_in_soam = false;
-  ppu->zero_in_mem = false;
-  ppu->next_sprite_count = 0;
-  ppu->sprite_count = 0;
 
   // Determine which action should be performed.
   if ((current_scanline >= 8) && (current_scanline < 232)) {
@@ -411,12 +389,15 @@ void ppu_render_visible(void) {
     ppu_eval_sprites();
   } else if (current_cycle <= 320) {
     // On cycle 257, the horizontal vram position is loaded from the temp vram
-    // address register.
-    if (current_cycle == 257) { ppu_render_update_hori(); }
-    // Fetch the sprite data for the next scanline.
-    ppu_eval_fetch_sprites();
-    // Fetch next sprite tile data.
-    ppu_render_prepare_sprites();
+    // address register. As an optmization, sprite fetching is run only on this
+    // cycle.
+    if (current_cycle == 257) {
+      ppu_render_update_hori();
+      ppu_eval_fetch_sprites();
+    }
+    // The OAM addr is reset to zero during sprite prep, which has been
+    // optimized out.
+    ppu->oam_addr = 0;
   } else if (current_cycle <= 336) {
     // Fetch the background tile data for the next cycle.
     ppu_render_update_registers();
@@ -469,7 +450,6 @@ void ppu_render_draw_pixel(void) {
 
   // Holds the background and sprite palette color index.
   word_t bg_pattern = 0;
-  word_t sprite_pattern = 0;
 
   // Flags whether the background or sprite pixel should be rendered.
   bool sprite_on_top = false;
@@ -481,22 +461,21 @@ void ppu_render_draw_pixel(void) {
   }
 
   // Get the sprite pattern.
-  word_t sprite_index, sprite_attribute;
+  word_t sprite_buf = 0xFF;
   if ((ppu->mask & FLAG_RENDER_SPRITES)
      && ((screen_x >= 8) || (ppu->mask & FLAG_LEFT_SPRITES))
-     && ((sprite_index = ppu_render_get_sprite_index()) < ppu->sprite_count)) {
-    sprite_attribute = ppu->sprite_memory[4 * sprite_index + 2];
+     && ((sprite_buf = ppu->soam_buffer[ppu->soam_render_buf][screen_x])
+     != 0xFF)) {
 
     // Check if the pixel should be rendered on top of the background.
-    sprite_pattern = ppu_render_get_sprite_pattern(sprite_index);
-    if (((bg_pattern == 0) || !(sprite_attribute & FLAG_SPRITE_PRIORITY))
-                           && (sprite_pattern != 0)) {
+    if (((bg_pattern == 0) || !(sprite_buf & FLAG_SOAM_BUFFER_PRIORITY))
+                           && (sprite_buf & FLAG_SOAM_BUFFER_PATTERN)) {
       sprite_on_top = true;
     }
 
     // Check if this counts as a sprite 0 hit.
-    if ((sprite_index == 0) && (ppu->zero_in_mem) && (bg_pattern != 0)
-                            && (screen_x != 255) && (sprite_pattern != 0)) {
+    if ((sprite_buf & FLAG_SOAM_BUFFER_ZERO) && (bg_pattern != 0)
+         && (screen_x != 255) && (sprite_buf & FLAG_SOAM_BUFFER_PATTERN)) {
       ppu->status |= FLAG_HIT;
     }
   }
@@ -504,8 +483,7 @@ void ppu_render_draw_pixel(void) {
   // Calculate the address of the pixel to be drawn.
   dword_t pixel_addr;
   if (sprite_on_top) {
-    pixel_addr = PALETTE_BASE_ADDR | sprite_pattern
-               | ppu_render_get_sprite_palette(sprite_attribute);
+    pixel_addr = PALETTE_BASE_ADDR | (sprite_buf & FLAG_SOAM_BUFFER_PALETTE);
   } else if (bg_pattern != 0) {
     pixel_addr = PALETTE_BASE_ADDR | bg_pattern
                | ppu_render_get_tile_palette();
@@ -551,57 +529,6 @@ word_t ppu_render_get_tile_palette(void) {
   word_t tile_palette = (((ppu->palette_scroll[0] << ppu->fine_x) >> 7U) & 1U)
                       | (((ppu->palette_scroll[1] << ppu->fine_x) >> 6U) & 2U);
   return tile_palette << 2U;
-}
-
-/*
- * Gets the index of the first sprite in sprite memory for the given pixel.
- * Returns the value of ppu->sprite_count when no sprite is found.
- *
- * Assumes the PPU has been initialized and is drawing a visible pixel.
- */
-word_t ppu_render_get_sprite_index(void) {
-  // Find the first visible sprite.
-  dword_t sprite_index = 0;
-  dword_t screen_x = current_cycle - 1;
-  for (; sprite_index < ppu->sprite_count; sprite_index++) {
-    dword_t sprite_x = ppu->sprite_memory[4 * sprite_index + 3];
-    if ((sprite_x <= screen_x) && ((sprite_x + 8) > screen_x)
-              && ppu_render_get_sprite_pattern(sprite_index)) {
-      break;
-    }
-  }
-  return sprite_index;
-}
-
-/*
- * Gets the bit pattern of the current pixel of a sprite, given its index
- * in sprite memory.
- *
- * Assumes the ppu has been initialized.
- * Assumes the current cycle is between 1 and 256 inclusive.
- */
-word_t ppu_render_get_sprite_pattern(word_t sprite_index) {
-  // Determine which pixel of the sprite is to be rendered from its x position.
-  size_t screen_x = current_cycle - 1;
-  word_t sprite_x = ppu->sprite_memory[(sprite_index << 2) | 3];
-  word_t sprite_dx = screen_x - sprite_x;
-
-  // Get the sprite pattern.
-  word_t sprite_pattern = (((ppu->sprite_data[sprite_index][0]
-                        << sprite_dx) >> 7U) & 1U)
-                        | (((ppu->sprite_data[sprite_index][1]
-                        << sprite_dx) >> 6U) & 2U);
-
-  return sprite_pattern;
-}
-
-/*
- * Pulls the sprite palette from the given attribute byte.
- */
-word_t ppu_render_get_sprite_palette(word_t sprite_attribute) {
-  // Caclulate the sprite palette using the attribute byte.
-  word_t sprite_palette = sprite_attribute & FLAG_SPRITE_PALETTE;
-  return SPRITE_PALETTE_BASE | (sprite_palette << 2);
 }
 
 /*
@@ -718,105 +645,6 @@ void ppu_render_update_hori(void) {
   ppu->vram_addr = (ppu->vram_addr & (SCROLL_Y_MASK | SCROLL_VNT_MASK))
                  | (ppu->temp_vram_addr & (SCROLL_X_MASK | SCROLL_HNT_MASK));
   return;
-}
-
-/*
- * Fetches the tile data for the sprites on the next scanline.
- *
- * Assumes the PPU has been initialized.
- */
-void ppu_render_prepare_sprites(void) {
-  // The OAM address is reset to zero to prepare for sprite evaluation
-  // on the next scanline.
-  ppu->oam_addr = 0;
-
-  // Determine if rendering has control of memory accesses,
-  // or if evaluation is using it; since they share during these cycles.
-  if ((current_cycle - 1) & 0x04) {
-    // Determine which sprite's pattern is being fetched.
-    word_t sprite_index = (current_cycle - 257) / 8;
-    word_t pattern_plane = ((current_cycle - 1) >> 1) & 1;
-    CONTRACT(sprite_index < 8);
-
-    // Check if we're on the first or second cycle of the read.
-    if (ppu->mdr_write) {
-      // Write to sprite data. If there are no more sprites, a transparent
-      // pattern is read (0).
-      ppu->sprite_data[sprite_index][pattern_plane] = ppu->mdr;
-      ppu->mdr_write = false;
-    } else {
-      // Read the tile from the pattern table into the mdr.
-      ppu->mdr = ppu_render_get_sprite();
-      ppu->mdr_write = true;
-    }
-  }
-
-  return;
-}
-
-/*
- * Fetches the pattern byte for a sprite on the next scanline.
- *
- * Assumes the ppu has been initialized and is in the sprite preparation
- * phase of a visible scanline.
- */
-word_t ppu_render_get_sprite(void) {
-  // Get some basic information about the current sprite being prepared.
-  word_t sprite_index = (current_cycle - 257) / 8;
-  CONTRACT(sprite_index < 8);
-  word_t screen_y = current_scanline;
-  word_t sprite_y = ppu->sprite_memory[4 * sprite_index];
-
-  // If the data read did not actually belong to a sprite, we return an empty
-  // pattern.
-  if (sprite_index >= ppu->sprite_count) { return 0; }
-
-  // Calculate position and offset from the sprite.
-  dword_t tile_index = ppu->sprite_memory[4 * sprite_index + 1];
-  // If the sprite is 8x16, and the bottom half is being rendered,
-  // we need to move to the next tile. An offset is calculated to do this.
-  dword_t index_offset = 0;
-  if ((ppu->ctrl & FLAG_SPRITE_SIZE) && (screen_y >= (sprite_y + 8U))) {
-    index_offset = X16_INDEX_OFFSET;
-    sprite_y += 8;
-  }
-  // This tile offset determines which of the 8 rows of the tile will be
-  // returned.
-  dword_t tile_offset = screen_y - sprite_y;
-  CONTRACT(tile_offset < 8);
-  // Each tile has two planes, which are used to denote its color in a palette.
-  dword_t tile_plane = ((current_cycle - 1) >> 1) & 1;
-
-  // Check if the sprite is being flipped vertically.
-  if (ppu->sprite_memory[4 * sprite_index + 2] & FLAG_SPRITE_VFLIP) {
-    tile_offset = (~tile_offset) & 0x07U;
-    if (ppu->ctrl & FLAG_SPRITE_SIZE) { index_offset ^= X16_INDEX_OFFSET; }
-  }
-
-  // Determine which size of sprites are being used and then
-  // calculate the pattern address.
-  dword_t tile_pattern;
-  if (ppu->ctrl & FLAG_SPRITE_SIZE) {
-    tile_pattern = tile_offset | (tile_plane << X16_PLANE_SHIFT)
-                 | ((tile_index & X16_TILE_MASK) << X16_TILE_SHIFT)
-                 | ((tile_index & X16_TABLE_MASK) << X16_TABLE_SHIFT)
-                 | index_offset;
-  } else {
-    dword_t tile_table = (ppu->ctrl & FLAG_SPRITE_TABLE) ? PATTERN_TABLE_HIGH
-                                                         : PATTERN_TABLE_LOW;
-    tile_pattern = tile_offset | (tile_plane << X8_PLANE_SHIFT)
-                 | (tile_index << X8_TILE_SHIFT) | tile_table;
-  }
-
-  // Use the calculated pattern address to get the tile byte.
-  word_t tile = memory_vram_read(tile_pattern);
-
-  // Check if the byte should be horizontally flipped.
-  if (ppu->sprite_memory[4 * sprite_index + 2] & FLAG_SPRITE_HFLIP) {
-    tile = reverse_word(tile);
-  }
-
-  return tile;
 }
 
 /*
@@ -956,8 +784,8 @@ void ppu_eval_clear_soam(void) {
   // In the real PPU, SOAM is cleared by writing 0xFF every even cycle.
   // It is more cache efficient, however, to do it all at once here.
   if (current_cycle == 1) {
-    for (size_t i = 0; i < SECONDARY_OAM_SIZE; i++) {
-      ppu->secondary_oam[i] = 0xFF;
+    for (size_t i = 0; i < SOAM_BUFFER_SIZE; i++) {
+      ppu->soam_buffer[ppu->soam_eval_buf][i] = 0xFF;
     }
   }
 
@@ -973,92 +801,53 @@ void ppu_eval_clear_soam(void) {
  * Assumes the first call on a scanline will happen on cycle 65.
  */
 void ppu_eval_sprites(void) {
-  // The evaluation state should be reset on its first cycle.
-  if (current_cycle == 65) {
-    ppu->eval_state = SCAN;
-    ppu->soam_addr = 0;
-    ppu->zero_index = ppu->oam_addr;
-    ppu->zero_in_soam = false;
-    ppu->next_sprite_count = 0;
-    return;
-  }
+  // As an optimization, sprite evaluation is run only once per scanline.
+  if (current_cycle != 65) { return; }
 
-  // The PPU is idle on odd cycles here, despite the read occuring during
-  // this cycle in real hardware. We also idle if evaluation is done.
-  if ((current_cycle & 1U) || (ppu->eval_state == DONE)) { return; }
-
-  // We need to check for overflow to determine if evaluation has finished.
-  word_t old_oam_addr = ppu->oam_addr;
-
-  // On even cycles, the evaluation state determines the action.
-  ppu->eval_buf = ppu->primary_oam[ppu->oam_addr];
-  switch(ppu->eval_state) {
-    case SCAN:
-      // Copy the Y cord to secondary OAM and change state if the sprite
-      // is visible on this scan line.
-      ppu->secondary_oam[ppu->soam_addr] = ppu->eval_buf;
-      if (ppu_eval_in_range()) {
-        // If this is sprite zero, we mark it as in soam.
-        if (ppu->oam_addr == ppu->zero_index) { ppu->zero_in_soam = true; }
-        // Increment and prepare to copy the sprite data to secondary OAM.
-        ppu->eval_state = COPY_TILE;
-        ppu->oam_addr++;
-        ppu->soam_addr++;
-        ppu->next_sprite_count++;
-      } else {
-        // Skip to next Y cord.
-        ppu->oam_addr += 4;
-      }
-      break;
-    case COPY_TILE:
-      // Copy tile data from the buffer to secondary OAM, then update the state.
-      ppu_eval_write_soam();
-      ppu->eval_state = COPY_ATTR;
-      break;
-    case COPY_ATTR:
-      // Copy attribute data to secondary OAM, then update the state.
-      ppu_eval_write_soam();
-      ppu->eval_state = COPY_X;
-      break;
-    case COPY_X:
-      // Copy the X cord to secondary OAM, then update the state.
-      ppu_eval_write_soam();
-      if (ppu->soam_addr >= SECONDARY_OAM_SIZE) {
-        ppu->eval_state = OVERFLOW;
-      } else {
-        ppu->eval_state = SCAN;
-      }
-      break;
-    case OVERFLOW:
-      // Run the broken overflow behavior until the end of OAM is reached.
-      if (ppu_eval_in_range()) {
+  // Run sprite evaluation. This loop fills both the OAM read buffer,
+  // which returns the correct values read from OAM each cycle on request
+  // from the CPU. Additionally, this loop fills the SOAM scanline buffer,
+  // which contains one byte of sprite data for each pixel to be rendered.
+  size_t i = ppu->oam_addr;
+  size_t sim_cycle = 0;
+  size_t sprites_found = 0;
+  while (i < PRIMARY_OAM_SIZE) {
+    // Read in the sprite and check if it was in range.
+    ppu->oam_buffer[sim_cycle] = ppu->primary_oam[i];
+    if (sprites_found >= 8) {
+      // More than 8 sprites have been found, so spirte overflow begins.
+      if (ppu_eval_in_range(ppu->oam_buffer[sim_cycle])) {
+        // Flag that overflow occured, and fill the rest of the OAM buffer.
+        // FIXME: Should not be set immediately.
         ppu->status |= FLAG_OVERFLOW;
-        ppu->eval_state = DONE;
+        for (; sim_cycle < OAM_BUFFER_SIZE; sim_cycle++) {
+          ppu->oam_buffer[sim_cycle] = ppu->primary_oam[i];
+        }
+        break;
       } else {
-        // The NES incorrectly increments the OAM address by 5 instead of 4,
-        // which results in broken sprite overflow behavior.
-        ppu->oam_addr += 5;
+        // Sprite overflow is bugged, and does not increment correctly.
+        sim_cycle++;
+        i += 5;
       }
-      break;
-    default:
-      break;
+    } else if (ppu_eval_in_range(ppu->oam_buffer[sim_cycle])) {
+      // If it was, read it into the OAM buffer and add it to the scanline
+      // buffer.
+      sprites_found++;
+      for (int j = 0; j < 4; j++) {
+        ppu->oam_buffer[sim_cycle] = ppu->primary_oam[i];
+        i++;
+      }
+      ppu_eval_fill_soam_buffer(&(ppu->primary_oam[i - 4]),
+                                 (i - 4) == ppu->oam_addr);
+    } else {
+      // Otherwise, the sprite was out of range, so we move on.
+      i += 4;
+      sim_cycle++;
+    }
   }
-
-  // If the primary OAM address overflows, evaluation is complete.
-  if (old_oam_addr > ppu->oam_addr) { ppu->eval_state = DONE; }
+  ppu->oam_addr = i;
 
   return;
-}
-
-/*
- * Performs a write to secondary OAM during sprite evaluation.
- *
- * Assumes the ppu has been initialized.
- */
-void ppu_eval_write_soam(void) {
-  ppu->secondary_oam[ppu->soam_addr] = ppu->eval_buf;
-  ppu->oam_addr++;
-  ppu->soam_addr++;
 }
 
 /*
@@ -1067,12 +856,11 @@ void ppu_eval_write_soam(void) {
  *
  * Assumes the PPU has been initialized.
  */
-bool ppu_eval_in_range(void) {
+bool ppu_eval_in_range(word_t sprite_y) {
   // Get the current size of sprites (8x8 or 8x16) from the control register
-  // and the Y cord of the sprite from the eval buffer.
+  // and the screen y coordinate from the current scanline.
   word_t sprite_size = (ppu->ctrl & FLAG_SPRITE_SIZE) ? 16 : 8;
   word_t screen_y = current_scanline;
-  word_t sprite_y = ppu->eval_buf;
 
   // Check if the sprite is visible on this scanline.
   bool in_range = (sprite_y <= screen_y) && (sprite_y < 240)
@@ -1081,23 +869,115 @@ bool ppu_eval_in_range(void) {
 }
 
 /*
- * Copies all the sprites in secondary OAM to sprite memory.
+ * Adds the given sprite to the soam sprite buffer, setting its sprite zero
+ * bit if is_zero is set.
+ *
+ * Assumes the PPU has been initialized.
+ */
+void ppu_eval_fill_soam_buffer(word_t *sprite_data, bool is_zero) {
+  // Setup the information that will be contained in each scanline buffer byte
+  // for this sprite. This byte contains whether or not the pixel belongs to
+  // sprite zero, the sprites priority, and its palette index.
+  word_t base_byte = SPRITE_PALETTE_BASE;
+  if (is_zero) { base_byte |= FLAG_SOAM_BUFFER_ZERO; }
+  if (sprite_data[2] & FLAG_SPRITE_PRIORITY) {
+    base_byte |= FLAG_SOAM_BUFFER_PRIORITY;
+  }
+  base_byte |= (sprite_data[2] & FLAG_SPRITE_PALETTE) << 2;
+
+  // Get the individual pixels for the sprite.
+  word_t pat_lo, pat_hi;
+  ppu_eval_get_sprite(sprite_data, &pat_lo, &pat_hi);
+
+  // Add the sprite to the soam buffer.
+  word_t sprite_x = sprite_data[3];
+  for (size_t i = sprite_x; (i < sprite_x + 8U)
+                         && (i < SOAM_BUFFER_SIZE); i++) {
+    // The sprite pixel should only be added to the buffer if no other sprite
+    // has been rendered to that pixel.
+    word_t buf_byte = ppu->soam_buffer[ppu->soam_eval_buf][i];
+    if ((buf_byte == 0xFF) || !(buf_byte & FLAG_SOAM_BUFFER_PATTERN))  {
+      ppu->soam_buffer[ppu->soam_eval_buf][i] = base_byte
+                                              | ((pat_hi >> 6U) & 2U)
+                                              | ((pat_lo >> 7U) & 1U);
+    }
+
+    // Shift the data to the next sprite pixel.
+    pat_lo <<= 1U;
+    pat_hi <<= 1U;
+  }
+
+  return;
+}
+
+/*
+ * Fetches the pattern bytes for a given sprite.
+ *
+ * Assumes the PPU has been initialized.
+ */
+void ppu_eval_get_sprite(word_t *sprite_data, word_t *pat_lo, word_t *pat_hi) {
+  // Get some basic information about the current sprite being prepared.
+  word_t screen_y = current_scanline;
+  word_t sprite_y = sprite_data[0];
+
+  // Calculate position and offset from the sprite.
+  dword_t tile_index = sprite_data[1];
+  // If the sprite is 8x16, and the bottom half is being rendered,
+  // we need to move to the next tile. An offset is calculated to do this.
+  dword_t index_offset = 0;
+  if ((ppu->ctrl & FLAG_SPRITE_SIZE) && (screen_y >= (sprite_y + 8U))) {
+    index_offset = X16_INDEX_OFFSET;
+    sprite_y += 8;
+  }
+  // This tile offset determines which of the 8 rows of the tile will be
+  // returned.
+  dword_t tile_offset = screen_y - sprite_y;
+  CONTRACT(tile_offset < 8);
+
+  // Check if the sprite is being flipped vertically.
+  if (sprite_data[2] & FLAG_SPRITE_VFLIP) {
+    tile_offset = (~tile_offset) & 0x07U;
+    if (ppu->ctrl & FLAG_SPRITE_SIZE) { index_offset ^= X16_INDEX_OFFSET; }
+  }
+
+  // Determine which size of sprites are being used and then
+  // calculate the pattern address.
+  dword_t tile_addr;
+  if (ppu->ctrl & FLAG_SPRITE_SIZE) {
+    tile_addr = tile_offset
+              | ((tile_index & X16_TILE_MASK) << X16_TILE_SHIFT)
+              | ((tile_index & X16_TABLE_MASK) << X16_TABLE_SHIFT)
+              | index_offset;
+  } else {
+    dword_t tile_table = (ppu->ctrl & FLAG_SPRITE_TABLE) ? PATTERN_TABLE_HIGH
+                                                         : PATTERN_TABLE_LOW;
+    tile_addr = tile_offset | (tile_index << X8_TILE_SHIFT) | tile_table;
+  }
+
+  // Use the calculated pattern address to get the tile bytes.
+  *pat_lo = memory_vram_read(tile_addr);
+  *pat_hi = memory_vram_read(tile_addr | SPRITE_PLANE_HIGH_MASK);
+
+  // Check if the bytes should be horizontally flipped.
+  if (sprite_data[2] & FLAG_SPRITE_HFLIP) {
+    *pat_lo = reverse_word(*pat_lo);
+    *pat_hi = reverse_word(*pat_hi);
+  }
+
+  return;
+}
+
+/*
+ * Switches the active sprite scanline buffers once per scanline.
  *
  * Assumes the PPU has been initialized.
  */
 void ppu_eval_fetch_sprites(void) {
-  // Resets the address the first time this function is called for a scanline.
-  // Flags if sprite zero is in slot 0.
   if (current_cycle == 257) {
-    ppu->zero_in_mem = ppu->zero_in_soam;
-    ppu->sprite_count = ppu->next_sprite_count;
-    CONTRACT(ppu->sprite_count <= 8);
-    // Sprite evaluation and rendering alternate access to sprite data every 4
-    // cycles between 257 and 320. However, it is more efficiant to copy all the
-    // data at once.
-    for (size_t i = 0; i < SECONDARY_OAM_SIZE; i++) {
-      ppu->sprite_memory[i] = ppu->secondary_oam[i];
-    }
+    // In place switch.
+    ppu->soam_eval_buf ^= ppu->soam_render_buf;
+    ppu->soam_render_buf ^= ppu->soam_eval_buf;
+    ppu->soam_eval_buf ^= ppu->soam_render_buf;
   }
 
   return;
@@ -1314,13 +1194,11 @@ word_t ppu_read(dword_t reg_addr) {
  * Assumes the ppu has been initialized.
  */
 void ppu_oam_dma(word_t val) {
+  // Writes during rendering are ignored.
   if (ppu_is_disabled() || (current_scanline >= 240
                         && current_scanline <= 260)) {
     ppu->primary_oam[ppu->oam_addr] = val;
     ppu->oam_addr++;
-  } else {
-    // Writes during rendering cause a bad increment and ignore the write.
-    ppu->oam_addr += 4;
   }
 
   // The PPU bus is filled with the value, incase we are coming from a CPU DMA.
@@ -1335,7 +1213,15 @@ void ppu_oam_dma(word_t val) {
  * Assumes the ppu has been initialized.
  */
 word_t ppu_oam_read(void) {
-  return ppu->primary_oam[ppu->oam_addr] | ppu->oam_mask;
+  // If the PPU is in the middle of sprite rendering, we return the buffered
+  // value that would of been read on this cycle.
+  if ((current_scanline < 240) && (current_cycle > 64)
+                               && (current_cycle <= 256)) {
+    return ppu->oam_buffer[(current_cycle - 1) >> 1];
+  } else {
+    // Otherwise, we return the value in OAM at the current address.
+    return ppu->primary_oam[ppu->oam_addr] | ppu->oam_mask;
+  }
 }
 
 /*

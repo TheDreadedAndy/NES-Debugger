@@ -74,6 +74,7 @@ void render_frame(void) {
   static SDL_Rect render_rect = { .x = NES_WIDTH_OFFSET, .y = NES_HEIGHT_OFFSET,
                                   .w = NES_WIDTH, .h = NES_TRUE_HEIGHT };
   static SDL_Rect window_rect;
+  (void)render_rect;
 
   // Get the window surface, and recalculate the rect, if the surface is invalid.
   if (!window_surface_valid) {

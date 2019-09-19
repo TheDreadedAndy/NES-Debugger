@@ -43,7 +43,7 @@ SDL_Window *window = NULL;
 SDL_Surface *render = NULL;
 
 /* Helper functions */
-void window_process_window_event(SDL_Event *event);
+static void window_process_window_event(SDL_Event *event);
 
 /*
  * Sets up the SDL window for rendering and gathering input.
@@ -123,7 +123,7 @@ void window_process_events(void) {
  * Assumes that the event holds a window event.
  * Assumes that SDL has been initialized.
  */
-void window_process_window_event(SDL_Event *event) {
+static void window_process_window_event(SDL_Event *event) {
   // Determine which window event is being thrown.
   switch (event->window.event) {
     case SDL_WINDOWEVENT_CLOSE:

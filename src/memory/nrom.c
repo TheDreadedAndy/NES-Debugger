@@ -51,8 +51,8 @@ typedef struct nrom {
 } nrom_t;
 
 /* Helper functions */
-void nrom_load_prg(FILE *rom_file, memory_t *M);
-void nrom_load_chr(FILE *rom_file, memory_t *M);
+static void nrom_load_prg(FILE *rom_file, memory_t *M);
+static void nrom_load_chr(FILE *rom_file, memory_t *M);
 
 /*
  * Uses the header within the provided memory structure to create
@@ -98,7 +98,7 @@ void nrom_new(FILE *rom_file, memory_t *M) {
  * Assumes the mapper structure has been allocated and is of type nrom_t.
  * Assumes the header within the memory structure is valid.
  */
-void nrom_load_prg(FILE *rom_file, memory_t *M) {
+static void nrom_load_prg(FILE *rom_file, memory_t *M) {
   // Cast back from the generic structure.
   nrom_t *map = (nrom_t*) M->map;
 
@@ -130,7 +130,7 @@ void nrom_load_prg(FILE *rom_file, memory_t *M) {
  * Assumes the mapper structure has been allocated and is of type nrom_t.
  * Assumes the header within the memory structure is valid.
  */
-void nrom_load_chr(FILE *rom_file, memory_t *M) {
+static void nrom_load_chr(FILE *rom_file, memory_t *M) {
   // Cast the mapper back from the generic structure.
   nrom_t *map = (nrom_t*) M->map;
 

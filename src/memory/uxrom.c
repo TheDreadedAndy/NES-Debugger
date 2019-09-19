@@ -57,8 +57,8 @@ typedef struct uxrom {
 } uxrom_t;
 
 /* Helper functions */
-void uxrom_load_prg(FILE *rom_file, memory_t *M);
-void uxrom_load_chr(FILE *rom_file, memory_t *M);
+static void uxrom_load_prg(FILE *rom_file, memory_t *M);
+static void uxrom_load_chr(FILE *rom_file, memory_t *M);
 
 /*
  * Uses the header within the provided memory structure to create
@@ -104,7 +104,7 @@ void uxrom_new(FILE *rom_file, memory_t *M) {
  * Assumes the mapper structure has been allocated and is of type uxrom_t.
  * Assumes the header within the memory structure is valid.
  */
-void uxrom_load_prg(FILE *rom_file, memory_t *M) {
+static void uxrom_load_prg(FILE *rom_file, memory_t *M) {
   // Cast back from the generic structure.
   uxrom_t *map = (uxrom_t*) M->map;
 
@@ -135,7 +135,7 @@ void uxrom_load_prg(FILE *rom_file, memory_t *M) {
  * Assumes the mapper structure has been allocated and is of type uxrom_t.
  * Assumes the header within the memory structure is valid.
  */
-void uxrom_load_chr(FILE *rom_file, memory_t *M) {
+static void uxrom_load_chr(FILE *rom_file, memory_t *M) {
   // Cast the mapper back from the generic structure.
   uxrom_t *map = (uxrom_t*) M->map;
 

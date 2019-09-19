@@ -205,38 +205,38 @@ static bool frame_odd = false;
 static ppu_t *ppu = NULL;
 
 /* Helper functions */
-bool ppu_is_disabled(void);
-void ppu_disabled(void);
-void ppu_draw_background(void);
-void ppu_render(void);
-void ppu_render_visible(void);
-void ppu_render_update_frame(bool output);
-void ppu_render_draw_pixel(void);
-word_t ppu_render_get_tile_pattern(void);
-word_t ppu_render_get_tile_palette(void);
-void ppu_render_update_registers(void);
-void ppu_render_get_attribute(void);
-word_t ppu_render_get_tile(word_t index, bool plane_high);
-void ppu_render_update_hori(void);
-void ppu_render_prepare_bg(void);
-void ppu_render_dummy_nametable_access(void);
-void ppu_render_xinc(void);
-void ppu_render_yinc(void);
-void ppu_render_blank(void);
-void ppu_render_pre(void);
-void ppu_render_update_vert(void);
-void ppu_eval_clear_soam(void);
-void ppu_eval_sprites(void);
-word_t ppu_oam_read(void);
-bool ppu_eval_in_range(word_t sprite_y);
-void ppu_eval_fill_soam_buffer(word_t *sprite_data, bool is_zero);
-void ppu_eval_get_sprite(word_t *sprite_data, word_t *pat_lo, word_t *pat_hi);
-void ppu_eval_fetch_sprites(void);
-void ppu_signal(void);
-void ppu_inc(void);
-void ppu_mmio_scroll_write(word_t val);
-void ppu_mmio_addr_write(word_t val);
-void ppu_mmio_vram_addr_inc(void);
+static bool ppu_is_disabled(void);
+static void ppu_disabled(void);
+static void ppu_draw_background(void);
+static void ppu_render(void);
+static void ppu_render_visible(void);
+static void ppu_render_update_frame(bool output);
+static void ppu_render_draw_pixel(void);
+static word_t ppu_render_get_tile_pattern(void);
+static word_t ppu_render_get_tile_palette(void);
+static void ppu_render_update_registers(void);
+static void ppu_render_get_attribute(void);
+static word_t ppu_render_get_tile(word_t index, bool plane_high);
+static void ppu_render_update_hori(void);
+static void ppu_render_dummy_nametable_access(void);
+static void ppu_render_xinc(void);
+static void ppu_render_yinc(void);
+static void ppu_render_blank(void);
+static void ppu_render_pre(void);
+static void ppu_render_update_vert(void);
+static void ppu_eval_clear_soam(void);
+static void ppu_eval_sprites(void);
+static word_t ppu_oam_read(void);
+static bool ppu_eval_in_range(word_t sprite_y);
+static void ppu_eval_fill_soam_buffer(word_t *sprite_data, bool is_zero);
+static void ppu_eval_get_sprite(word_t *sprite_data, word_t *pat_lo,
+                                                     word_t *pat_hi);
+static void ppu_eval_fetch_sprites(void);
+static void ppu_signal(void);
+static void ppu_inc(void);
+static void ppu_mmio_scroll_write(word_t val);
+static void ppu_mmio_addr_write(word_t val);
+static void ppu_mmio_vram_addr_inc(void);
 
 /*
  * Initializes the PPU and palette, using the given file, then creates an
@@ -285,7 +285,7 @@ void ppu_run_cycle(void) {
  *
  * Assumes the ppu has been initialized.
  */
-bool ppu_is_disabled(void) {
+static bool ppu_is_disabled(void) {
   return !(ppu->mask & FLAG_RENDER_BG) && !(ppu->mask & FLAG_RENDER_SPRITES);
 }
 
@@ -294,7 +294,7 @@ bool ppu_is_disabled(void) {
  *
  * Assumes the PPU has been initialized.
  */
-void ppu_disabled(void) {
+static void ppu_disabled(void) {
   // The OAM mask should not be active when rendering is disabled.
   ppu->oam_mask = 0;
 
@@ -318,7 +318,7 @@ void ppu_disabled(void) {
  *
  * Assumes the PPU has been initialized and rendering is disabled.
  */
-void ppu_draw_background(void) {
+static void ppu_draw_background(void) {
   // Get the universal background color address and the screen position.
   size_t screen_x = current_cycle - 1;
   size_t screen_y = current_scanline;
@@ -345,7 +345,7 @@ void ppu_draw_background(void) {
  *
  * Assumes the ppu has been initialized.
  */
-void ppu_render(void) {
+static void ppu_render(void) {
   // Determine which scanline we're on and render accordingly.
   if (current_scanline < 240) {
     ppu_render_visible();
@@ -363,7 +363,7 @@ void ppu_render(void) {
  *
  * Assumes the PPU has been initialized.
  */
-void ppu_render_visible(void) {
+static void ppu_render_visible(void) {
   // Sprite evaluation can raise an internal signal that forces OAM reads
   // to return 0xFF. In the emulation, this signal is reset each cycle and
   // set by ppu_eval_clear_soam() when it needs to be raised.
@@ -418,7 +418,7 @@ void ppu_render_visible(void) {
  * Assumes the ppu has been initialized and is currently between cycles
  * 1 and 256 (inclusive) of a visible scanline.
  */
-void ppu_render_update_frame(bool output) {
+static void ppu_render_update_frame(bool output) {
   // Render the pixel.
   if (output) { ppu_render_draw_pixel(); }
 
@@ -443,7 +443,7 @@ void ppu_render_update_frame(bool output) {
  * Assumes the PPU has been initialized and is currently running a cycle
  * between 1 and 256 (inclusive) of a visible scanline.
  */
-void ppu_render_draw_pixel(void) {
+static void ppu_render_draw_pixel(void) {
   // Get the screen position.
   size_t screen_x = current_cycle - 1;
   size_t screen_y = current_scanline;
@@ -508,7 +508,7 @@ void ppu_render_draw_pixel(void) {
  *
  * Assumes the PPU has been initialized.
  */
-word_t ppu_render_get_tile_pattern(void) {
+static word_t ppu_render_get_tile_pattern(void) {
   // Get the pattern of the background tile.
   word_t tile_pattern = (((ppu->tile_scroll[0].w[WORD_HI] << ppu->fine_x)
                       >> 7U) & 1U)
@@ -524,7 +524,7 @@ word_t ppu_render_get_tile_pattern(void) {
  * Assumes the PPU has been initialized.
  * Assumes the current tile pattern is non-zero.
  */
-word_t ppu_render_get_tile_palette(void) {
+static word_t ppu_render_get_tile_palette(void) {
   // Get the palette of the background tile.
   word_t tile_palette = (((ppu->palette_scroll[0] << ppu->fine_x) >> 7U) & 1U)
                       | (((ppu->palette_scroll[1] << ppu->fine_x) >> 6U) & 2U);
@@ -537,7 +537,7 @@ word_t ppu_render_get_tile_palette(void) {
  *
  * Assumes the PPU has been initialized.
  */
-void ppu_render_update_registers(void) {
+static void ppu_render_update_registers(void) {
   // Shift the tile registers.
   ppu->tile_scroll[0].dw = ppu->tile_scroll[0].dw << 1;
   ppu->tile_scroll[1].dw = ppu->tile_scroll[1].dw << 1;
@@ -584,7 +584,7 @@ void ppu_render_update_registers(void) {
  *
  * Assumes the PPU has been initialized.
  */
-void ppu_render_get_attribute(void) {
+static void ppu_render_get_attribute(void) {
   // Get the coarse x and y from vram.
   dword_t coarse_x = ppu->vram_addr & COARSE_X_MASK;
   dword_t coarse_y = (ppu->vram_addr & COARSE_Y_MASK) >> 5;
@@ -616,7 +616,7 @@ void ppu_render_get_attribute(void) {
  *
  * Assumes the PPU has been initialized.
  */
-word_t ppu_render_get_tile(word_t index, bool plane_high) {
+static word_t ppu_render_get_tile(word_t index, bool plane_high) {
   // Get the value of fine Y, to be used as a tile offset.
   dword_t tile_offset = (ppu->vram_addr & FINE_Y_MASK) >> FINE_Y_SHIFT;
 
@@ -640,7 +640,7 @@ word_t ppu_render_get_tile(word_t index, bool plane_high) {
  *
  * Assumes the PPU has been initialized.
  */
-void ppu_render_update_hori(void) {
+static void ppu_render_update_hori(void) {
   // Copies the coarse X and horizontal nametable bit from t to v.
   ppu->vram_addr = (ppu->vram_addr & (SCROLL_Y_MASK | SCROLL_VNT_MASK))
                  | (ppu->temp_vram_addr & (SCROLL_X_MASK | SCROLL_HNT_MASK));
@@ -652,7 +652,7 @@ void ppu_render_update_hori(void) {
  *
  * Assumes the PPU has been initialized.
  */
-void ppu_render_dummy_nametable_access(void) {
+static void ppu_render_dummy_nametable_access(void) {
   // Determine which cycle of the fetch we are on.
   if (ppu->mdr_write) {
     // Second cycle, thrown away internally.
@@ -673,7 +673,7 @@ void ppu_render_dummy_nametable_access(void) {
  *
  * Assumes the PPU has been initialized.
  */
-void ppu_render_xinc(void) {
+static void ppu_render_xinc(void) {
   // Increment the coarse X.
   dword_t xinc = (ppu->vram_addr & COARSE_X_MASK) + 1;
 
@@ -690,7 +690,7 @@ void ppu_render_xinc(void) {
  *
  * Assumes the PPU has been initialized.
  */
-void ppu_render_yinc(void) {
+static void ppu_render_yinc(void) {
   // Increment fine Y.
   ppu->vram_addr = (ppu->vram_addr & VRAM_ADDR_MASK) + FINE_Y_INC;
 
@@ -715,7 +715,7 @@ void ppu_render_yinc(void) {
  *
  * Assumes the PPU has been initialized.
  */
-void ppu_render_blank(void) {
+static void ppu_render_blank(void) {
   if (current_scanline == 241 && current_cycle == 1) {
     // TODO: Implement special case timing.
     ppu->status |= FLAG_VBLANK;
@@ -730,7 +730,7 @@ void ppu_render_blank(void) {
  *
  * Assumes the PPU has been initialized.
  */
-void ppu_render_pre(void) {
+static void ppu_render_pre(void) {
   // The status flags are reset at the begining of the pre-render scanline.
   if (current_cycle == 1) { ppu->status = 0; }
 
@@ -764,7 +764,7 @@ void ppu_render_pre(void) {
  *
  * Assumes the PPU has been initialized.
  */
-void ppu_render_update_vert(void) {
+static void ppu_render_update_vert(void) {
   // Copies the fine Y, coarse Y, and vertical nametable bit from t to v.
   ppu->vram_addr = (ppu->vram_addr & (SCROLL_X_MASK | SCROLL_HNT_MASK))
                  | (ppu->temp_vram_addr & (SCROLL_Y_MASK | SCROLL_VNT_MASK));
@@ -776,7 +776,7 @@ void ppu_render_update_vert(void) {
  *
  * Assumes the ppu has been initialized.
  */
-void ppu_eval_clear_soam(void) {
+static void ppu_eval_clear_soam(void) {
   // An internal signal which makes all primary OAM reads return 0xFF should
   // be raised during this phase of sprite evaluation.
   ppu->oam_mask = 0xFF;
@@ -800,7 +800,7 @@ void ppu_eval_clear_soam(void) {
  * Assumes the PPU has been initialized.
  * Assumes the first call on a scanline will happen on cycle 65.
  */
-void ppu_eval_sprites(void) {
+static void ppu_eval_sprites(void) {
   // As an optimization, sprite evaluation is run only once per scanline.
   if (current_cycle != 65) { return; }
 
@@ -856,7 +856,7 @@ void ppu_eval_sprites(void) {
  *
  * Assumes the PPU has been initialized.
  */
-bool ppu_eval_in_range(word_t sprite_y) {
+static bool ppu_eval_in_range(word_t sprite_y) {
   // Get the current size of sprites (8x8 or 8x16) from the control register
   // and the screen y coordinate from the current scanline.
   word_t sprite_size = (ppu->ctrl & FLAG_SPRITE_SIZE) ? 16 : 8;
@@ -874,7 +874,7 @@ bool ppu_eval_in_range(word_t sprite_y) {
  *
  * Assumes the PPU has been initialized.
  */
-void ppu_eval_fill_soam_buffer(word_t *sprite_data, bool is_zero) {
+static void ppu_eval_fill_soam_buffer(word_t *sprite_data, bool is_zero) {
   // Setup the information that will be contained in each scanline buffer byte
   // for this sprite. This byte contains whether or not the pixel belongs to
   // sprite zero, the sprites priority, and its palette index.
@@ -915,7 +915,8 @@ void ppu_eval_fill_soam_buffer(word_t *sprite_data, bool is_zero) {
  *
  * Assumes the PPU has been initialized.
  */
-void ppu_eval_get_sprite(word_t *sprite_data, word_t *pat_lo, word_t *pat_hi) {
+static void ppu_eval_get_sprite(word_t *sprite_data, word_t *pat_lo,
+                                                     word_t *pat_hi) {
   // Get some basic information about the current sprite being prepared.
   word_t screen_y = current_scanline;
   word_t sprite_y = sprite_data[0];
@@ -972,7 +973,7 @@ void ppu_eval_get_sprite(word_t *sprite_data, word_t *pat_lo, word_t *pat_hi) {
  *
  * Assumes the PPU has been initialized.
  */
-void ppu_eval_fetch_sprites(void) {
+static void ppu_eval_fetch_sprites(void) {
   if (current_cycle == 257) {
     // In place switch.
     ppu->soam_eval_buf ^= ppu->soam_render_buf;
@@ -988,7 +989,7 @@ void ppu_eval_fetch_sprites(void) {
  *
  * Assumes the PPU has been initialized.
  */
-void ppu_signal(void) {
+static void ppu_signal(void) {
   // NMIs should be generated when they are enabled in ppuctrl and
   // the ppu is in vblank.
   nmi_line = (ppu->ctrl & FLAG_ENABLE_VBLANK) && (ppu->status & FLAG_VBLANK);
@@ -999,7 +1000,7 @@ void ppu_signal(void) {
  * Increments the scanline, cycle, and frame type and correctly wraps them.
  * Each ppu frame has 341 cycles and 262 scanlines.
  */
-void ppu_inc(void) {
+static void ppu_inc(void) {
   // Increment the cycle.
   current_cycle++;
 
@@ -1073,7 +1074,7 @@ void ppu_write(dword_t reg_addr, word_t val) {
  *
  * Assumes the PPU has been initialized.
  */
-void ppu_mmio_scroll_write(word_t val) {
+static void ppu_mmio_scroll_write(word_t val) {
   // Determine which write should be done.
   if (ppu->write_toggle) {
     // Update scroll Y.
@@ -1099,7 +1100,7 @@ void ppu_mmio_scroll_write(word_t val) {
  *
  * Assumes the PPU has been initialized.
  */
-void ppu_mmio_addr_write(word_t val) {
+static void ppu_mmio_addr_write(word_t val) {
   // Determine which write should be done.
   if (ppu->write_toggle) {
     // Write the low byte and update v.
@@ -1122,7 +1123,7 @@ void ppu_mmio_addr_write(word_t val) {
  *
  * Assumes the PPU has been initialized.
  */
-void ppu_mmio_vram_addr_inc(void) {
+static void ppu_mmio_vram_addr_inc(void) {
   // Determine how the increment should work.
   if (ppu_is_disabled() || (current_scanline >= 240
                             && current_scanline <= 260)) {
@@ -1212,7 +1213,7 @@ void ppu_oam_dma(word_t val) {
  *
  * Assumes the ppu has been initialized.
  */
-word_t ppu_oam_read(void) {
+static word_t ppu_oam_read(void) {
   // If the PPU is in the middle of sprite rendering, we return the buffered
   // value that would of been read on this cycle.
   if ((current_scanline < 240) && (current_cycle > 64)

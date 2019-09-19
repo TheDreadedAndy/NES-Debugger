@@ -41,7 +41,8 @@ static bool frame_output = false;
 static bool window_surface_valid = false;
 
 /* Helper functions */
-void render_get_window_rect(SDL_Surface *window_surface, SDL_Rect *window_rect);
+static void render_get_window_rect(SDL_Surface *window_surface,
+                                   SDL_Rect *window_rect);
 
 /*
  * Draws a pixel to the render surface.
@@ -74,7 +75,6 @@ void render_frame(void) {
   static SDL_Rect render_rect = { .x = NES_WIDTH_OFFSET, .y = NES_HEIGHT_OFFSET,
                                   .w = NES_WIDTH, .h = NES_TRUE_HEIGHT };
   static SDL_Rect window_rect;
-  (void)render_rect;
 
   // Get the window surface, and recalculate the rect, if the surface is invalid.
   if (!window_surface_valid) {
@@ -102,7 +102,7 @@ void render_frame(void) {
  *
  * Assumes the given surface and rect are non-null.
  */
-void render_get_window_rect(SDL_Surface *window_surface,
+static void render_get_window_rect(SDL_Surface *window_surface,
                             SDL_Rect *window_rect) {
   // Determine which dimension the destination window should be padded in.
   if ((NES_TRUE_H_TO_W * window_surface->w) > window_surface->h) {

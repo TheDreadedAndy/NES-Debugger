@@ -246,21 +246,21 @@ static bool cycle_even = false;
 bool enable_high_freqs = false;
 
 /* Helper functions. */
-void apu_run_frame_step(void);
-void apu_update_sweep(pulse_t *pulse);
-dword_t apu_get_pulse_target(pulse_t *pulse);
-void apu_update_pulse_envelope(pulse_t *pulse);
-void apu_update_noise_envelope(void);
-void apu_update_triangle_linear(void);
-void apu_update_length(void);
-void apu_inc_frame(void);
-void apu_update_pulse(pulse_t *pulse);
-void apu_update_triangle(void);
-void apu_update_noise(void);
-void apu_update_noise_shift(void);
-void apu_update_dmc(void);
-void apu_status_write(word_t val);
-void apu_play_sample(void);
+static void apu_run_frame_step(void);
+static void apu_update_sweep(pulse_t *pulse);
+static dword_t apu_get_pulse_target(pulse_t *pulse);
+static void apu_update_pulse_envelope(pulse_t *pulse);
+static void apu_update_noise_envelope(void);
+static void apu_update_triangle_linear(void);
+static void apu_update_length(void);
+static void apu_inc_frame(void);
+static void apu_update_pulse(pulse_t *pulse);
+static void apu_update_triangle(void);
+static void apu_update_noise(void);
+static void apu_update_noise_shift(void);
+static void apu_update_dmc(void);
+static void apu_status_write(word_t val);
+static void apu_play_sample(void);
 
 /*
  * Initializes the APU structures.
@@ -320,7 +320,7 @@ void apu_run_cycle(void) {
  *
  * Assumes the APU has been initialized.
  */
-void apu_run_frame_step(void) {
+static void apu_run_frame_step(void) {
   // Clock envelopes.
   if (!((frame_step == 3) && (frame_control & FLAG_MODE))) {
     apu_update_pulse_envelope(pulse_a);
@@ -353,7 +353,7 @@ void apu_run_frame_step(void) {
  *
  * Assumes the provided channel is non-null.
  */
-void apu_update_pulse_envelope(pulse_t *pulse) {
+static void apu_update_pulse_envelope(pulse_t *pulse) {
   // Check if it is time to update the envelope.
   if (pulse->env_clock == 0) {
     // Reset the envelope clock.
@@ -377,7 +377,7 @@ void apu_update_pulse_envelope(pulse_t *pulse) {
  *
  * Assumes the APU has been initialized.
  */
-void apu_update_noise_envelope(void) {
+static void apu_update_noise_envelope(void) {
   // Check if it is time to update the envelope.
   if (noise->env_clock == 0) {
     // Reset the envelope clock.
@@ -401,7 +401,7 @@ void apu_update_noise_envelope(void) {
  *
  * Assumes the APU has been initialized.
  */
-void apu_update_triangle_linear(void) {
+static void apu_update_triangle_linear(void) {
   // Reload the linear counter if the flag has been set.
   if (triangle->linear_reload) {
     triangle->linear = triangle->control & LINEAR_MASK;
@@ -423,7 +423,7 @@ void apu_update_triangle_linear(void) {
  *
  * Assumes the APU has been initialized.
  */
-void apu_update_length(void) {
+static void apu_update_length(void) {
   // Decrement pulse A length counter.
   if ((pulse_a->length > 0) && !(pulse_a->control & FLAG_PULSE_HALT)) {
     pulse_a->length--;
@@ -453,7 +453,7 @@ void apu_update_length(void) {
  *
  * Assumes the APU has been initialized.
  */
-void apu_update_sweep(pulse_t *pulse) {
+static void apu_update_sweep(pulse_t *pulse) {
   // Update the pulses period, if able.
   dword_t target_period = apu_get_pulse_target(pulse);
   if ((pulse->sweep_counter == 0) && (pulse->sweep & PULSE_SWEEP_ENABLE)
@@ -481,7 +481,7 @@ void apu_update_sweep(pulse_t *pulse) {
  *
  * Assumes the pulse channel is non-null.
  */
-dword_t apu_get_pulse_target(pulse_t *pulse) {
+static dword_t apu_get_pulse_target(pulse_t *pulse) {
   // Use the shift amount to get the period change form the timer,
   // then negate it if necessary.
   dword_t period_change = pulse->timer >> (pulse->sweep
@@ -504,7 +504,7 @@ dword_t apu_get_pulse_target(pulse_t *pulse) {
  *
  * Assumes the APU has been initialized.
  */
-void apu_inc_frame(void) {
+static void apu_inc_frame(void) {
   frame_clock++;
 
   // Reset the clock if a step has been completed.
@@ -527,7 +527,7 @@ void apu_inc_frame(void) {
  *
  * Assumes the pulse channel is non-null.
  */
-void apu_update_pulse(pulse_t *pulse) {
+static void apu_update_pulse(pulse_t *pulse) {
   // Determine what the pulse channel is outputting audio on this cycle.
   word_t sequence = (pulse_waves[(pulse->control & PULSE_DUTY_MASK)
                   >> PULSE_DUTY_SHIFT] << pulse->pos) & PULSE_SEQUENCE_MASK;
@@ -558,7 +558,7 @@ void apu_update_pulse(pulse_t *pulse) {
  *
  * Assumes the APU has been initialized.
  */
-void apu_update_triangle(void) {
+static void apu_update_triangle(void) {
   // Update the triangle waves output for this cycle.
   // The triangle wave cannot be silenced, it simply
   // stops updating its position.
@@ -585,7 +585,7 @@ void apu_update_triangle(void) {
  *
  * Assumes the APU has been initialized.
  */
-void apu_update_noise(void) {
+static void apu_update_noise(void) {
   // Determine what sound should be output this cycle.
   if ((noise->length > 0) && !(noise->shift & 0x01U)) {
     noise->output = (noise->control & FLAG_CONST_VOL)
@@ -611,7 +611,7 @@ void apu_update_noise(void) {
  *
  * Assumes the APU has been initialized.
  */
-void apu_update_noise_shift(void) {
+static void apu_update_noise_shift(void) {
   // Calculate the new feedback bit of the noise channel using the noise mode.
   dword_t feedback;
   if (noise->period & FLAG_NOISE_MODE) {
@@ -635,7 +635,7 @@ void apu_update_noise_shift(void) {
  * Assumes the APU has been initialized.
  * Assumes CPU memory has been initialized.
  */
-void apu_update_dmc(void) {
+static void apu_update_dmc(void) {
   // Check if it is time for the DMC channel to update.
   if (dmc->clock >= dmc_rates[dmc->rate]) {
     dmc->clock = 0;
@@ -685,7 +685,7 @@ void apu_update_dmc(void) {
  *
  * Assumes the APU has been initialized.
  */
-void apu_play_sample(void) {
+static void apu_play_sample(void) {
   // Tracks when the next sample should be played.
   static float sample_clock = 0;
 
@@ -848,7 +848,7 @@ void apu_write(dword_t reg_addr, word_t val) {
  *
  * Assumes the APU has been initialized.
  */
-void apu_status_write(word_t val) {
+static void apu_status_write(word_t val) {
   // Store the enable status of each channel.
   channel_status = val;
 

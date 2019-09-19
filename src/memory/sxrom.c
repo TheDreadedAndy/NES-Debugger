@@ -53,9 +53,9 @@ typedef struct sxrom {
 } sxrom_t;
 
 /* Helper functions */
-void sxrom_load_prg_ram(memory_t *M);
-void sxrom_load_prg_rom(FILE *rom_file, memory_t *M);
-void sxrom_load_chr(FILE *rom_file, memory_t *M);
+static void sxrom_load_prg_ram(memory_t *M);
+static void sxrom_load_prg_rom(FILE *rom_file, memory_t *M);
+static void sxrom_load_chr(FILE *rom_file, memory_t *M);
 
 /*
  * Uses the header within the provided memory structure to create
@@ -100,7 +100,7 @@ void sxrom_new(FILE *rom_file, memory_t *M) {
  * Assumes the memory structure and its mapper field are non-null.
  * Assumes the header provided by the memory structure is valid.
  */
-void sxrom_load_prg_ram(memory_t *M) {
+static void sxrom_load_prg_ram(memory_t *M) {
   // Cast back from the generic structure.
   sxrom_t *map = (sxrom_t*) M->map;
 
@@ -131,7 +131,7 @@ void sxrom_load_prg_ram(memory_t *M) {
  * Assumes the provided memory structure and its mapper field are non-null.
  * Assumes the mapper field points to an sxrom mapper structure.
  */
-void sxrom_load_prg_rom(FILE *rom_file, memory_t *M) {
+static void sxrom_load_prg_rom(FILE *rom_file, memory_t *M) {
   // Cast back from the generic structure.
   sxrom_t *map = (sxrom_t*) M->map;
   (void)map;
@@ -143,7 +143,7 @@ void sxrom_load_prg_rom(FILE *rom_file, memory_t *M) {
 /*
  * TODO
  */
-void sxrom_load_chr(FILE *rom_file, memory_t *M) {
+static void sxrom_load_chr(FILE *rom_file, memory_t *M) {
   // Cast the mapper back from the generic structure.
   sxrom_t *map = (sxrom_t*) M->map;
   (void)map;

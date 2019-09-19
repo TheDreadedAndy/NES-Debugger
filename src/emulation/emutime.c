@@ -18,10 +18,9 @@
 typedef struct timespec emutime_t;
 
 /* Helper functions */
-void emutime_diff(emutime_t *time1, emutime_t *time2, emutime_t *res);
-void emutime_get(emutime_t *time);
-bool emutime_gt(emutime_t *time1, emutime_t *time2);
-void emutime_update(emutime_t *current_time, emutime_t *last_time, long wait);
+static void emutime_diff(emutime_t *time1, emutime_t *time2, emutime_t *res);
+static void emutime_get(emutime_t *time);
+static bool emutime_gt(emutime_t *time1, emutime_t *time2);
 
 /*
  * Ensures that the program waits at least 1 / tic_rate seconds between calls
@@ -93,7 +92,7 @@ void emutime_update_frame_counter(long tic_rate) {
 /*
  * Gets the current time and stores it in a time spec structure.
  */
-void emutime_get(emutime_t *time) {
+static void emutime_get(emutime_t *time) {
 #ifdef _NES_OSLIN
   clock_gettime(CLOCK_MONOTONIC_RAW, time);
 #else
@@ -107,7 +106,7 @@ void emutime_get(emutime_t *time) {
  *
  * Assumes the timespec structures are non-null.
  */
-bool emutime_gt(emutime_t *time1, emutime_t *time2) {
+static bool emutime_gt(emutime_t *time1, emutime_t *time2) {
   return (time1->tv_sec > time2->tv_sec) || ((time1->tv_sec == time2->tv_sec)
                                          && (time1->tv_nsec > time2->tv_nsec));
 }
@@ -117,7 +116,7 @@ bool emutime_gt(emutime_t *time1, emutime_t *time2) {
  *
  * Assumes the first time is greater than the second time.
  */
-void emutime_diff(emutime_t *time1, emutime_t *time2, emutime_t *res) {
+static void emutime_diff(emutime_t *time1, emutime_t *time2, emutime_t *res) {
   CONTRACT(emutime_gt(time1, time2));
 
   // Borrow from seconds in nanoseconds, if needed.

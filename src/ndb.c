@@ -32,9 +32,8 @@
 bool ndb_running = true;
 
 /* Helper functions */
-void start_emulation(char *rom, char *pal);
-clock_t get_delay(clock_t last_time);
-void run_emulation_cycle(void);
+static void start_emulation(char *rom, char *pal);
+static void run_emulation_cycle(void);
 
 /*
  * Loads in the users arguments and starts ndb.
@@ -105,7 +104,7 @@ int main(int argc, char *argv[]) {
  *
  * Assumes the file location is valid.
  */
-void start_emulation(char *rom, char *pal) {
+static void start_emulation(char *rom, char *pal) {
   // Open the rom. Prompt the user to select one if they did not already provide
   // one.
   FILE *rom_file = NULL;
@@ -140,7 +139,7 @@ void start_emulation(char *rom, char *pal) {
  *
  * Assumes the emulation has been initialized.
  */
-void run_emulation_cycle(void) {
+static void run_emulation_cycle(void) {
   for (size_t i = 0; i < EMU_CYCLE_SIZE; i++) {
     // The PPU is clocked at 3x the rate of the CPU, the APU is clocked
     // at 1/2 the rate of the CPU.

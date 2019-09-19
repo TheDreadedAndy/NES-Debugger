@@ -46,7 +46,7 @@ word_t color_tint = 0;
 bool grayscale_colors = false;
 
 /* Helper Functions */
-bool palette_invalid(FILE *pal_file);
+static bool palette_invalid(FILE *pal_file);
 
 /*
  * Initializes the palette using the given file.
@@ -101,7 +101,7 @@ void palette_init(char *file) {
  * Checks if the given file is in the 8-bit rgb palette format
  * for NES colors (exactly 192 bytes long).
  */
-bool palette_invalid(FILE *pal_file) {
+static bool palette_invalid(FILE *pal_file) {
   return get_file_size(pal_file) != PALETTE_FILE_SIZE;
 }
 

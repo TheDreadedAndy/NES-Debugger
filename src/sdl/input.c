@@ -47,20 +47,20 @@
  * These strings represent configuration options which can be used to change
  * the input map.
  */
-const char *button_names[] = { "BUTTON_A", "BUTTON_B", "BUTTON_SELECT",
+static const char *button_names[] = { "BUTTON_A", "BUTTON_B", "BUTTON_SELECT",
                                "BUTTON_START", "PAD_UP", "PAD_DOWN",
                                "PAD_LEFT", "PAD_RIGHT" };
 
 /*
  * These variables hold the current/default mapping for the NES controller.
  */
-SDL_Keycode button_map[] = { SDLK_x, SDLK_z, SDLK_BACKSPACE, SDLK_RETURN,
+static SDL_Keycode button_map[] = { SDLK_x, SDLK_z, SDLK_BACKSPACE, SDLK_RETURN,
                             SDLK_UP, SDLK_DOWN, SDLK_LEFT, SDLK_RIGHT };
 
 /*
  * The name of the default configuration file.
  */
-const char *default_config = "ndb.cfg";
+static const char *default_config = "ndb.cfg";
 
 /*
  * This word stores the current input status. Each bit represents a button
@@ -70,7 +70,7 @@ const char *default_config = "ndb.cfg";
  * This word is not directly given to the emulator, as some inputs will be
  * ignored in some circumstances.
  */
-word_t input_status = 0;
+static word_t input_status = 0;
 
 /*
  * With original NES controllers, it is not physically possible to press
@@ -78,14 +78,14 @@ word_t input_status = 0;
  * pressed of these buttons is tracked and the least recent is masked out
  * when the emulator requests the input status.
  */
-bool dpad_priority_up = false;
-bool dpad_priority_left = false;
+static bool dpad_priority_up = false;
+static bool dpad_priority_left = false;
 
 /* Helper functions */
-void input_create_config(FILE *config);
-void input_load_config(FILE *config);
-bool input_file_read_chunk(char *buffer, FILE *file, int max_size, char term);
-void input_set_map(char *cfg, char *key);
+static void input_create_config(FILE *config);
+static void input_load_config(FILE *config);
+static bool input_file_read_chunk(char *buffer, FILE *file, int max_size, char term);
+static void input_set_map(char *cfg, char *key);
 
 /*
  * Loads the input mapping, allowing for key presses and releases to be used
@@ -118,7 +118,7 @@ void input_load(char *file) {
  *
  * Assumes the provided file is open, valid, and empty.
  */
-void input_create_config(FILE *config) {
+static void input_create_config(FILE *config) {
   CONTRACT(config != NULL);
 
   // Write the default mapping for each button.
@@ -138,7 +138,7 @@ void input_create_config(FILE *config) {
  *
  * Assumes the provided file is open and valid.
  */
-void input_load_config(FILE *config) {
+static void input_load_config(FILE *config) {
   CONTRACT(config != NULL);
 
   // Reset the file to the begining.
@@ -174,7 +174,7 @@ void input_load_config(FILE *config) {
  *
  * Assumes the array and file are non-null.
  */
-bool input_file_read_chunk(char *buffer, FILE *file, int max_size, char term) {
+static bool input_file_read_chunk(char *buffer, FILE *file, int max_size, char term) {
   CONTRACT(buffer != NULL && file != NULL);
 
   // Read from the file into the buffer until a termination byte is reached
@@ -208,7 +208,7 @@ bool input_file_read_chunk(char *buffer, FILE *file, int max_size, char term) {
  * Assumes the strings are non-null.
  * Assumes SDL has been initialized.
  */
-void input_set_map(char *cfg_name, char *key_name) {
+static void input_set_map(char *cfg_name, char *key_name) {
   CONTRACT(cfg_name != NULL && key_name != NULL);
 
   // Get the map index of the specified config string, if it exists.

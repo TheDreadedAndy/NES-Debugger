@@ -7,7 +7,7 @@
 
 // Main window and rendering surface, used by render.c.
 extern SDL_Window *window;
-extern SDL_Surface *render;
+extern SDL_Renderer *render;
 
 // Creates the SDL window.
 bool window_init(void);

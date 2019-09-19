@@ -40,10 +40,10 @@ SDL_Window *window = NULL;
 
 // Global SDL surface that pixels are rendered to before being drawn in the
 // window. Cannot be directly accessed outside this file.
-SDL_Surface *render = NULL;
+SDL_Renderer *render = NULL;
 
 /* Helper functions */
-static void window_process_window_event(SDL_Event *event);
+void window_process_window_event(SDL_Event *event);
 
 /*
  * Sets up the SDL window for rendering and gathering input.
@@ -66,24 +66,14 @@ bool window_init(void) {
     return false;
   }
 
-  // Create the rendering surface.
-  render = SDL_CreateRGBSurface(0, NES_WIDTH, NES_HEIGHT, PALETTE_DEPTH,
-                                PALETTE_RMASK, PALETTE_GMASK, PALETTE_BMASK, 0);
+  // Create the renderer
+  render = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
 
-  // Verify that the surface was created successfully.
+  // Verify that the renderer was created successfully.
   if (render == NULL) {
-    fprintf(stderr, "Failed to create SDL rendering surface.\n");
+    fprintf(stderr, "Failed to create SDL renderer.\n");
     return false;
   }
-
-  // Disable RLE acceleration on the render surface.
-  SDL_SetSurfaceRLE(render, 0);
-
-#ifdef _NES_OSLIN
-  // Force the IBus IME to handle text composing.
-  // Work around for a known SDL2 crash.
-  SDL_SetHint(SDL_HINT_IME_INTERNAL_EDITING, "1");
-#endif
 
   // Return success.
   return true;
@@ -123,7 +113,7 @@ void window_process_events(void) {
  * Assumes that the event holds a window event.
  * Assumes that SDL has been initialized.
  */
-static void window_process_window_event(SDL_Event *event) {
+void window_process_window_event(SDL_Event *event) {
   // Determine which window event is being thrown.
   switch (event->window.event) {
     case SDL_WINDOWEVENT_CLOSE:
@@ -162,8 +152,8 @@ void window_close(void) {
   CONTRACT(window != NULL);
   CONTRACT(render != NULL);
 
+  SDL_DestroyRenderer(render);
   SDL_DestroyWindow(window);
-  SDL_FreeSurface(render);
   SDL_Quit();
 
   return;

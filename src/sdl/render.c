@@ -54,7 +54,7 @@ static uint32_t *pixels = NULL;
 static SDL_Texture *frame_texture = NULL;
 
 /* Helper functions */
-void render_get_window_rect(SDL_Rect *window_rect);
+static void render_get_window_rect(SDL_Rect *window_rect);
 
 /*
  * Allocates the buffer used to render a frame of video.
@@ -132,7 +132,7 @@ void render_frame(void) {
  *
  * Assumes the given surface and rect are non-null.
  */
-void render_get_window_rect(SDL_Rect *window_rect) {
+static void render_get_window_rect(SDL_Rect *window_rect) {
   // Get the size of the window, to be used in the following calculation.
   int w, h;
   SDL_GetWindowSize(window, &w, &h);

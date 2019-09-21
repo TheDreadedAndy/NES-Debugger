@@ -14,7 +14,6 @@
 #include "../util/data.h"
 
 // Constants used to size and access memory.
-#define MAX_ROM_BANK_PLANES 2
 #define MAX_ROM_BANKS 16U
 #define ROM_BANK_SIZE 0x4000U
 #define MAX_RAM_BANKS 4U
@@ -33,7 +32,7 @@
 // Nes virtual memory data structure for sxrom (mapper 2).
 typedef struct sxrom {
   // Cart memory.
-  word_t *prg_rom[MAX_ROM_BANK_PLANES][MAX_ROM_BANKS];
+  word_t *prg_rom[MAX_ROM_BANKS];
   word_t *prg_ram[MAX_RAM_BANKS];
   word_t num_prg_ram_banks;
   word_t num_prg_rom_banks;
@@ -142,9 +141,9 @@ static void sxrom_load_prg_rom(FILE *rom_file, memory_t *M) {
   map->num_prg_rom_banks = M->header->prg_rom_size / ROM_BANK_SIZE;
   fseek(rom_file, HEADER_SIZE, SEEK_SET);
   for (size_t i = 0; i < map->num_prg_rom_banks; i++) {
-    map->cart[i] = xmalloc(ROM_BANK_SIZE * sizeof(word_t));
+    map->prg_rom[i] = xmalloc(ROM_BANK_SIZE * sizeof(word_t));
     for (size_t j = 0; j < ROM_BANK_SIZE; j++) {
-      map->cart[i][j] = fgetc(rom_file);
+      map->prg_rom[i][j] = fgetc(rom_file);
     }
   }
 
@@ -172,7 +171,7 @@ static void sxrom_load_chr(FILE *rom_file, memory_t *M) {
     map->is_chr_ram = true;
     map->num_chr_banks = M->header->chr_ram_size / CHR_BANK_SIZE;
     for (size_t i = 0; i < map->num_chr_banks; i++) {
-      map->palette_table[i] = xmalloc(sizeof(word_t) * CHR_BANK_SIZE);
+      map->pattern_table[i] = xmalloc(sizeof(word_t) * CHR_BANK_SIZE);
     }
   }
 

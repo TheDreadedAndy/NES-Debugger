@@ -252,9 +252,6 @@ bool ppu_init(char *file) {
   // Load in the palette.
   palette_init(file);
 
-  // Initialize rendering.
-  render_init();
-
   // Return success.
   return true;
 }
@@ -337,7 +334,7 @@ static void ppu_draw_background(void) {
   uint32_t pixel = memory_palette_read(color_addr);
 
   // Render the pixel.
-  render_pixel(screen_y, screen_x, pixel);
+  render->pixel(screen_y, screen_x, pixel);
 
   return;
 }
@@ -500,7 +497,7 @@ static void ppu_render_draw_pixel(void) {
     uint32_t pixel = memory_palette_read(pixel_addr);
 
     // Render the pixel.
-    render_pixel(screen_y, screen_x, pixel);
+    render->pixel(screen_y, screen_x, pixel);
   }
 
   return;
@@ -722,7 +719,7 @@ static void ppu_render_blank(void) {
   if (current_scanline == 241 && current_cycle == 1) {
     // TODO: Implement special case timing.
     ppu->status |= FLAG_VBLANK;
-    render_frame();
+    render->frame();
   }
   return;
 }
@@ -1239,9 +1236,6 @@ void ppu_free(void) {
 
   // Free the NES palette data.
   palette_free();
-
-  // Free the rendering structures.
-  render_free();
 
   return;
 }

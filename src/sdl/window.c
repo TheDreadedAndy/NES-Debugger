@@ -38,17 +38,13 @@ const char *window_name = "NES, I guess?";
 // and collect input. Cannot be directly accessed outside this file.
 SDL_Window *window = NULL;
 
-// Global SDL surface that pixels are rendered to before being drawn in the
-// window. Cannot be directly accessed outside this file.
-SDL_Renderer *render = NULL;
-
 /* Helper functions */
 void window_process_window_event(SDL_Event *event);
 
 /*
  * Sets up the SDL window for rendering and gathering input.
  */
-bool window_init(void) {
+bool window_init(bool use_surface_rendering) {
   // Init SDL's video system.
   if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_EVENTS) != 0) {
     fprintf(stderr, "Failed to initialize SDL.\n");
@@ -66,12 +62,15 @@ bool window_init(void) {
     return false;
   }
 
-  // Create the renderer
-  render = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
+#ifdef _NES_OSLIN
+  // Force the IBus IME to handle text composing.
+  // Work around for a known SDL2 crash.
+  SDL_SetHint(SDL_HINT_IME_INTERNAL_EDITING, "1");
+#endif
 
-  // Verify that the renderer was created successfully.
-  if (render == NULL) {
-    fprintf(stderr, "Failed to create SDL renderer.\n");
+  // Initialize the requested rendering system.
+  if (!render_init(use_surface_rendering)) {
+    fprintf(stderr, "Failed to initialize rendering.\n");
     return false;
   }
 
@@ -152,7 +151,7 @@ void window_close(void) {
   CONTRACT(window != NULL);
   CONTRACT(render != NULL);
 
-  SDL_DestroyRenderer(render);
+  render->free();
   SDL_DestroyWindow(window);
   SDL_Quit();
 

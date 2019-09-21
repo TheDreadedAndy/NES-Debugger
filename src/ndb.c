@@ -47,9 +47,10 @@ int main(int argc, char *argv[]) {
   // Parses the users command line input.
   char *rom_file = NULL;
   char *pal_file = NULL;
+  bool use_surface_rendering = false;
   signed char opt;
 
-  while ((opt = getopt(argc, argv, "hf:p:t")) != -1) {
+  while ((opt = getopt(argc, argv, "hf:p:ts")) != -1) {
     switch (opt) {
       case 'f':
         rom_file = optarg;
@@ -60,6 +61,9 @@ int main(int argc, char *argv[]) {
       case 't':
         enable_high_freqs = true;
         break;
+      case 's':
+        use_surface_rendering = true;
+        break;
       default:
         printf("usage: ndb -f <FILE> -p <PALETTE FILE>\n");
         exit(0);
@@ -68,7 +72,7 @@ int main(int argc, char *argv[]) {
   }
 
   // Prepares the NES emulation for execution.
-  window_init();
+  window_init(use_surface_rendering);
   audio_init();
   input_load(NULL);
   start_emulation(rom_file, pal_file);

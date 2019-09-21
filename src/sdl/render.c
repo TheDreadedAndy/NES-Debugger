@@ -31,6 +31,12 @@
 #define NES_TRUE_H_TO_W (224.0 / 280.0)
 
 /*
+ * Used to expose the functions necessary to access the active implementaion
+ * of rendering to the caller.
+ */
+render_t *render = NULL;
+
+/*
  * Set whenever the ppu draws a frame (which happens at vblank).
  * Reset whenever render_has_drawn() is called.
  * Used to track the frame rate of the emulator and, thus, throttle it.
@@ -42,42 +48,115 @@ static bool frame_output = false;
  */
 static bool window_size_valid = false;
 
+/* Hardware rendering globals */
+
 /*
  * Holds the next frame of pixels to be streamed to the texture and rendered
  * to the window.
  */
-static uint32_t *pixels = NULL;
+static uint32_t *pixel_buffer = NULL;
 
 /*
  * Used to stream the pixel changes to the window renderer.
  */
 static SDL_Texture *frame_texture = NULL;
 
+/*
+ * The SDL hardware renderer tied to the window.
+ */
+static SDL_Renderer *hardware_renderer = NULL;
+
+/* Software rendering globals */
+
+/*
+ * Used to hold the next frame to be drawn to the screen.
+ */
+static SDL_Surface *render_surface = NULL;
+
 /* Helper functions */
 static void render_get_window_rect(SDL_Rect *window_rect);
 
 /*
- * Allocates the buffer used to render a frame of video.
+ * Initializes the structures and buffers necessary to access the requested
+ * rendering system. Returns true on successful initialization.
+ *
+ * This function must be called before using other rendering fuctions, and
+ * the returned free function must be called before switching implemenations.
  */
-void render_init(void) {
-  pixels = xcalloc(NES_WIDTH * NES_HEIGHT, sizeof(uint32_t));
-  frame_texture = SDL_CreateTexture(render, SDL_PIXELFORMAT_RGB888,
-                  SDL_TEXTUREACCESS_STREAMING, NES_WIDTH, NES_HEIGHT);
+bool render_init(bool use_surface_rendering) {
+  // Allocate the structure which will hold the functions used to access
+  // the rendering implementation.
+  render = xcalloc(1, sizeof(render_t));
+
+  // Initialize surface rendering.
+  if (use_surface_rendering) {
+    // Create and verify the surface.
+    render_surface = SDL_CreateRGBSurface(0, NES_WIDTH, NES_HEIGHT,
+                     PALETTE_DEPTH, PALETTE_RMASK, PALETTE_GMASK,
+                     PALETTE_BMASK, 0);
+    if (render_surface == NULL) { return false; }
+
+    // Disable RLE acceleration on the render surface.
+    SDL_SetSurfaceRLE(render_surface, 0);
+
+    // Assign the implementation functions to the structure.
+    render->free = &render_free_surface;
+    render->pixel = &render_pixel_surface;
+    render->frame = &render_frame_surface;
+  } else {
+    // Create the hardware renderer.
+    hardware_renderer = SDL_CreateRenderer(window, -1,
+                        SDL_RENDERER_ACCELERATED);
+
+    // Verify that the renderer was created successfully.
+    if (hardware_renderer == NULL) { return false; }
+
+    // Allocate the rendering buffers.
+    pixel_buffer = xcalloc(NES_WIDTH * NES_HEIGHT, sizeof(uint32_t));
+    frame_texture = SDL_CreateTexture(hardware_renderer, SDL_PIXELFORMAT_RGB888,
+                    SDL_TEXTUREACCESS_STREAMING, NES_WIDTH, NES_HEIGHT);
+
+    // Assign the implementation functions to the structure.
+    render->free = &render_free_hardware;
+    render->pixel = &render_pixel_hardware;
+    render->frame = &render_frame_hardware;
+  }
+
+  // Rendering was successfully initalized.
+  return true;
+}
+
+/*
+ * Draws the given pixel to the rendering surface.
+ *
+ * Assumes that surface rendering has been initialized.
+ * Assumes that the row and column are in range of the surface size.
+ */
+void render_pixel_surface(size_t row, size_t col, uint32_t pixel) {
+  CONTRACT(row < (size_t) NES_HEIGHT);
+  CONTRACT(col < (size_t) NES_WIDTH);
+  CONTRACT(render_surface != NULL);
+
+  // Write the given pixel to the given location in the rendering surface.
+  uint32_t *pixels = (uint32_t*) render_surface->pixels;
+  pixels[row * NES_WIDTH + col] = pixel;
+
   return;
 }
 
 /*
- * Draws a pixel to the render surface.
+ * Draws a pixel to the pixel buffer.
  *
- * Assumes the render surface has been initialized.
- * Assumes the row and column are in range of the surface size.
+ * Assumes that hardware rendering has been initialized.
+ * Assumes the row and column are in range of the buffer size.
  */
-void render_pixel(size_t row, size_t col, uint32_t pixel) {
+void render_pixel_hardware(size_t row, size_t col, uint32_t pixel) {
   CONTRACT(row < (size_t) NES_HEIGHT);
   CONTRACT(col < (size_t) NES_WIDTH);
+  CONTRACT(pixel_buffer != NULL);
 
   // Write the given pixel to the given location.
-  pixels[row * NES_WIDTH + col] = pixel;
+  pixel_buffer[row * NES_WIDTH + col] = pixel;
 
   return;
 }
@@ -85,11 +164,50 @@ void render_pixel(size_t row, size_t col, uint32_t pixel) {
 /*
  * Copies the rendering surface to the window.
  *
- * Assumes the window and render surface have been initialized.
+ * Assumes the window has been initialized.
+ * Assumes that software rendering has been initialized.
  */
-void render_frame(void) {
+void render_frame_surface(void) {
   CONTRACT(window != NULL);
-  CONTRACT(render != NULL);
+  CONTRACT(render_surface != NULL);
+
+  // Setup the window surface.
+  static SDL_Surface *window_surface = NULL;
+  static SDL_Rect render_rect = { .x = NES_WIDTH_OFFSET, .y = NES_HEIGHT_OFFSET,
+                                  .w = NES_WIDTH, .h = NES_TRUE_HEIGHT };
+  static SDL_Rect window_rect;
+
+  // Get the window surface, and recalculate the rect, if the surface is invalid.
+  if (!window_size_valid) {
+    window_surface = SDL_GetWindowSurface(window);
+    render_get_window_rect(&window_rect);
+    SDL_FillRect(window_surface, NULL, 0);
+    window_size_valid = true;
+  }
+
+  // Copy the render surface to the window surface.
+  SDL_BlitScaled(render_surface, &render_rect, window_surface, &window_rect);
+
+  // Update the window.
+  SDL_UpdateWindowSurface(window);
+
+  // Signal that a frame was drawn.
+  frame_output = true;
+
+  return;
+}
+
+/*
+ * Renders the pixel buffer to the screen using hardware accelaration.
+ *
+ * Assumes the window has been initialized.
+ * Assumes that rendering has been initialized with hardware acceleration.
+ */
+void render_frame_hardware(void) {
+  CONTRACT(window != NULL);
+  CONTRACT(pixel_buffer != NULL);
+  CONTRACT(frame_texture != NULL);
+  CONTRACT(hardware_renderer != NULL);
 
   // Setup the rendering rects.
   static SDL_Rect frame_rect = { .x = NES_WIDTH_OFFSET, .y = NES_HEIGHT_OFFSET,
@@ -101,8 +219,8 @@ void render_frame(void) {
   if (!window_size_valid) {
     render_get_window_rect(&window_rect);
     window_size_valid = true;
-    SDL_SetRenderDrawColor(render, 0, 0, 0, 0);
-    SDL_RenderClear(render);
+    SDL_SetRenderDrawColor(hardware_renderer, 0, 0, 0, 0);
+    SDL_RenderClear(hardware_renderer);
   }
 
   // Update the texture with the latest pixel data.
@@ -110,15 +228,15 @@ void render_frame(void) {
   int pitch;
   SDL_LockTexture(frame_texture, NULL, &texture_pixels, &pitch);
   for (int i = 0; i < (NES_WIDTH * NES_HEIGHT); i++) {
-    ((uint32_t*) texture_pixels)[i] = pixels[i];
+    ((uint32_t*) texture_pixels)[i] = pixel_buffer[i];
   }
   SDL_UnlockTexture(frame_texture);
 
   // Copy the render surface to the window surface.
-  SDL_RenderCopy(render, frame_texture, &frame_rect, &window_rect);
+  SDL_RenderCopy(hardware_renderer, frame_texture, &frame_rect, &window_rect);
 
   // Update the window.
-  SDL_RenderPresent(render);
+  SDL_RenderPresent(hardware_renderer);
 
   // Signal that a frame was drawn.
   frame_output = true;
@@ -173,10 +291,32 @@ void render_invalidate_window_surface(void) {
 }
 
 /*
- * Frees the pixel buffer that was created when render_init() was called.
+ * Frees the rendering surface and render structure.
+ *
+ * Assumes software rendering has been initialized.
  */
-void render_free(void) {
-  free(pixels);
+void render_free_surface(void) {
+  CONTRACT(render_surface != NULL);
+
+  SDL_FreeSurface(render_surface);
+  free(render);
+  return;
+}
+
+/*
+ * Frees the pixel buffer, frame texture, and renderer used for hardware
+ * accelerated rendering.
+ */
+void render_free_hardware(void) {
+  CONTRACT(pixel_buffer != NULL);
+  CONTRACT(frame_texture != NULL);
+  CONTRACT(hardware_renderer != NULL);
+  CONTRACT(render != NULL);
+
+  // Free all hardware rendering structures and buffers.
+  free(pixel_buffer);
   SDL_DestroyTexture(frame_texture);
+  SDL_DestroyRenderer(hardware_renderer);
+  free(render);
   return;
 }

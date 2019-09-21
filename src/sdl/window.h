@@ -5,12 +5,11 @@
 #ifndef _NES_SDL
 #define _NES_SDL
 
-// Main window and rendering surface, used by render.c.
+// Main window, used by render.c.
 extern SDL_Window *window;
-extern SDL_Renderer *render;
 
 // Creates the SDL window.
-bool window_init(void);
+bool window_init(bool use_surface_rendering);
 
 // Processes all relevent events on the SDL event queue.
 void window_process_events(void);

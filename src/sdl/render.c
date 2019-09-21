@@ -104,7 +104,7 @@ bool render_init(bool use_surface_rendering) {
     render->pixel = &render_pixel_surface;
     render->frame = &render_frame_surface;
   } else {
-    // Create the hardware renderer.
+    // Otherwise, create the hardware renderer.
     hardware_renderer = SDL_CreateRenderer(window, -1,
                         SDL_RENDERER_ACCELERATED);
 
@@ -297,6 +297,7 @@ void render_invalidate_window_surface(void) {
  */
 void render_free_surface(void) {
   CONTRACT(render_surface != NULL);
+  CONTRACT(render != NULL);
 
   SDL_FreeSurface(render_surface);
   free(render);

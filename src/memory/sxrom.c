@@ -36,9 +36,11 @@ typedef struct sxrom {
   word_t *prg_rom[MAX_ROM_BANK_PLANES][MAX_ROM_BANKS];
   word_t *prg_ram[MAX_RAM_BANKS];
   word_t num_prg_ram_banks;
+  word_t num_prg_rom_banks;
 
   // PPU memory.
   word_t *pattern_table[MAX_CHR_BANKS];
+  word_t num_chr_banks;
   bool is_chr_ram;
   word_t *nametable[MAX_SCREENS];
 
@@ -47,7 +49,8 @@ typedef struct sxrom {
   word_t control;
   word_t chr_bank_a;
   word_t chr_bank_b;
-  word_t prg_rom_bank;
+  word_t prg_rom_bank_a;
+  word_t prg_rom_bank_b;
   word_t prg_ram_bank;
   word_t bus;
 } sxrom_t;
@@ -134,20 +137,55 @@ static void sxrom_load_prg_ram(memory_t *M) {
 static void sxrom_load_prg_rom(FILE *rom_file, memory_t *M) {
   // Cast back from the generic structure.
   sxrom_t *map = (sxrom_t*) M->map;
-  (void)map;
-  (void)rom_file;
+
+  // Get the number of PRG-ROM banks, then load the rom into memory.
+  map->num_prg_rom_banks = M->header->prg_rom_size / ROM_BANK_SIZE;
+  fseek(rom_file, HEADER_SIZE, SEEK_SET);
+  for (size_t i = 0; i < map->num_prg_rom_banks; i++) {
+    map->cart[i] = xmalloc(ROM_BANK_SIZE * sizeof(word_t));
+    for (size_t j = 0; j < ROM_BANK_SIZE; j++) {
+      map->cart[i][j] = fgetc(rom_file);
+    }
+  }
+
+  // Setup the default bank mode.
+  map->prg_rom_bank_a = 0;
+  map->prg_rom_bank_b = map->num_prg_rom_banks - 1;
 
   return;
 }
 
 /*
- * TODO
+ * Determine if the given rom is using CHR-ROM or CHR-RAM, then creates
+ * the necessary banks. Loads in the CHR data if the board is using CHR-ROM.
+ *
+ * Assumes the provided rom file is valid.
+ * Assumes the provided memory structure and its mapper field are non-null.
+ * Assumes the mapper field points to a sxrom structure.
  */
 static void sxrom_load_chr(FILE *rom_file, memory_t *M) {
   // Cast the mapper back from the generic structure.
   sxrom_t *map = (sxrom_t*) M->map;
-  (void)map;
-  (void)rom_file;
+
+  // Check if the rom is using CHR-RAM, and allocate it if so.
+  if (M->header->chr_ram_size > 0) {
+    map->is_chr_ram = true;
+    map->num_chr_banks = M->header->chr_ram_size / CHR_BANK_SIZE;
+    for (size_t i = 0; i < map->num_chr_banks; i++) {
+      map->palette_table[i] = xmalloc(sizeof(word_t) * CHR_BANK_SIZE);
+    }
+  }
+
+  // Otherwise, the rom is using CHR-ROM and we must load it into the mapper.
+  map->is_chr_ram = false;
+  map->num_chr_banks = M->header->chr_rom_size / CHR_BANK_SIZE;
+  fseek(rom_file, HEADER_SIZE + M->header->prg_rom_size, SEEK_SET);
+  for (size_t i = 0; i < map->num_chr_banks; i++) {
+    map->pattern_table[i] = xmalloc(sizeof(word_t) * CHR_BANK_SIZE);
+    for (size_t j = 0; j < CHR_BANK_SIZE; j++) {
+      map->pattern_table[i][j] = fgetc(rom_file);
+    }
+  }
 
   return;
 }

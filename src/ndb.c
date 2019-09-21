@@ -23,8 +23,8 @@
 #include "./apu/apu.h"
 
 // The number of cpu cycles that will be emulated per emulation cycle.
-// Setting this too low will cause speed issues.
-// Setting this too high will cause timing issues.
+// With the current timing system, this must be set to one 60th of the
+// 2A03 clock rate.
 #define EMU_CYCLE_SIZE 29830
 
 // Global running variable. Available to other files through ndb.h.
@@ -44,22 +44,26 @@ int main(int argc, char *argv[]) {
   extern char *optarg;
   extern int optind, opterr, optopt;
 
+  // Long option array, used to parse input.
+  struct option long_opts[] = {
+    { .name="surface", .has_arg=0, .flag=NULL, .val='s' },
+    { .name="file", .has_arg=1, .flag=NULL, .val='f' },
+    { .name="palette", .has_arg=1, .flag=NULL, .val='p' }
+  };
+
   // Parses the users command line input.
   char *rom_file = NULL;
   char *pal_file = NULL;
   bool use_surface_rendering = false;
   signed char opt;
 
-  while ((opt = getopt(argc, argv, "hf:p:ts")) != -1) {
+  while ((opt = getopt_long(argc, argv, "hf:p:s", long_opts, NULL)) != -1) {
     switch (opt) {
       case 'f':
         rom_file = optarg;
         break;
       case 'p':
         pal_file = optarg;
-        break;
-      case 't':
-        enable_high_freqs = true;
         break;
       case 's':
         use_surface_rendering = true;

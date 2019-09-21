@@ -239,12 +239,6 @@ static size_t frame_step = 0;
 // Most functions only update every other cycle. This flag tracks that.
 static bool cycle_even = false;
 
-/*
- * The triangle channel can output at frequencies outside the human range of
- * hearing, causing clicking. Setting this flag enables these outputs.
- */
-bool enable_high_freqs = false;
-
 /* Helper functions. */
 static void apu_run_frame_step(void);
 static void apu_update_sweep(pulse_t *pulse);
@@ -559,10 +553,11 @@ static void apu_update_pulse(pulse_t *pulse) {
  * Assumes the APU has been initialized.
  */
 static void apu_update_triangle(void) {
-  // Update the triangle waves output for this cycle.
-  // The triangle wave cannot be silenced, it simply
-  // stops updating its position.
-  triangle->output = triangle_wave[triangle->pos];
+  // Update the triangle waves output for this cycle. The triangle wave cannot
+  // be silenced, it simply stops updating its position. However, the wave can
+  // be given a frequency outside the human range of hearing, in which case we
+  // force it to zero.
+  triangle->output = (triangle->timer > 1) ? triangle_wave[triangle->pos] : 0U;
 
   // Update the triangle clock and output wave form using the timer period.
   if (triangle->clock > 0) {
@@ -570,9 +565,7 @@ static void apu_update_triangle(void) {
   } else {
     triangle->clock = triangle->timer;
     // Determine if the position should be updated.
-    if ((triangle->linear > 0) && (triangle->length > 0)
-                               && ((triangle->timer > 1)
-                               || enable_high_freqs)) {
+    if ((triangle->linear > 0) && (triangle->length > 0)) {
       triangle->pos = (triangle->pos + 1) & 0x1FU;
     }
   }

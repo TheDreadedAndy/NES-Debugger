@@ -18,10 +18,16 @@
 #define ROM_BANK_SIZE 0x4000U
 #define MAX_RAM_BANKS 4U
 #define RAM_BANK_SIZE 0x2000U
-#define INES_RAM_SIZE 0x8000U
+#define PRG_RAM_OFFSET 0x6000U
+#define PRG_ROM_A_OFFSET 0x8000U
+#define PRG_ROM_B_OFFSET 0xC000U
+#define PRG_RAM_MASK 0x1FFFU
+#define PRG_ROM_MASK 0x3FFFU
 
 // Constants used to control accesses to memory.
+#define FLAG_CONTROL_RESET 0x80U
 #define SHIFT_BASE 0x10U
+#define CONTROL_RESET_MASK 0x0CU
 
 // Constants used to size and access VRAM.
 #define MAX_CHR_BANKS 8U
@@ -44,13 +50,20 @@ typedef struct sxrom {
   word_t *nametable[MAX_SCREENS];
 
   // Controlling registers.
-  word_t shift;
-  word_t control;
+  word_t shift_reg;
+  word_t control_reg;
+  word_t chr_a_reg;
+  word_t chr_b_reg;
+  word_t prg_reg;
+
+  // Bank selection registers.
   word_t chr_bank_a;
   word_t chr_bank_b;
   word_t prg_rom_bank_a;
   word_t prg_rom_bank_b;
   word_t prg_ram_bank;
+
+  // Read/write value on data bus.
   word_t bus;
 } sxrom_t;
 
@@ -58,6 +71,7 @@ typedef struct sxrom {
 static void sxrom_load_prg_ram(memory_t *M);
 static void sxrom_load_prg_rom(FILE *rom_file, memory_t *M);
 static void sxrom_load_chr(FILE *rom_file, memory_t *M);
+static void sxrom_update_registers(word_t val, dword_t addr, sxrom_t *M);
 
 /*
  * Uses the header within the provided memory structure to create
@@ -190,26 +204,84 @@ static void sxrom_load_chr(FILE *rom_file, memory_t *M) {
 }
 
 /*
- * TODO
+ * Reads the word at the specified address from memory using the profided mapper
+ * structure.
+ *
+ * Assumes the provided pointer is non-null and points to a valid sxrom
+ * structure.
  */
 word_t sxrom_read(dword_t addr, void *map) {
   // Cast back from generic pointer to the memory structure.
   sxrom_t *M = (sxrom_t*) map;
-  (void)M;
-  (void)addr;
 
-  return 0;
+  // Determine which part of memory is being accessed, read the value,
+  // and place it on the bus.
+  if ((PRG_RAM_OFFSET <= addr) && (addr < PRG_ROM_A_OFFSET)
+                               && (M->num_prg_ram_banks > 0)) {
+    // Read from PRG-RAM.
+    M->bus = M->prg_ram[M->prg_ram_bank][addr & PRG_RAM_MASK];
+  } else if ((PRG_ROM_A_OFFSET <= addr) && (addr < PRG_ROM_B_OFFSET)) {
+    // Read from the low half of PRG-ROM.
+    M->bus = M->prg_rom[M->prg_rom_bank_a][addr & PRG_ROM_MASK];
+  } else if (addr >= PRG_ROM_B_OFFSET) {
+    // Read from the high half of PRG-ROM.
+    M->bus = M->prg_rom[M->prg_rom_bank_b][addr & PRG_ROM_MASK];
+  }
+
+  return map->bus;
 }
 
 /*
- * TODO
+ * Attempts to write the given value to requested address, updating
+ * the controlling registers if PRG-ROM was written to.
+ *
+ * Assumes the provided pointer is non-null and points to a valid sxrom
+ * structure.
  */
 void sxrom_write(word_t val, dword_t addr, void *map) {
   // Cast back from generic pointer to the memory structure.
   sxrom_t *M = (sxrom_t*) map;
-  (void)M;
-  (void)val;
-  (void)addr;
+
+  // Load the bus with the requested value, and attempt to write that value to
+  // memory.
+  M->bus = val;
+  if ((PRG_RAM_OFFSET <= addr) && (addr < PRG_ROM_A_OFFSET)
+                               && (M->num_prg_ram_banks > 0)) {
+    M->prg_ram[M->prg_ram_bank][addr & PRG_RAM_MASK] = val;
+  } else if (addr >= PRG_ROM_A_MASK) {
+    sxrom_update_registers(val, addr, M);
+  }
+
+  return;
+}
+
+/*
+ * Updates the controlling registers for the provided sxrom structure
+ * using the given address and values.
+ *
+ * Assumes the provided sxrom structure is non-null and valid.
+ */
+static void sxrom_update_registers(word_t val, dword_t addr, sxrom_t *M) {
+  // Check if this update requested to reset the shift register and PRG-ROM
+  // bank selection.
+  if (val & FLAG_CONTROL_RESET) {
+    M->shift_reg = SHIFT_BASE;
+    M->control_reg = M->control_reg | CONTROL_RESET_MASK;
+    return;
+  }
+
+  // If this update does not fill the shift register, we simply apply it
+  // and return.
+  if ((M->shift_reg & 1) != 1) {
+    // Shift the LSB of the value into the MSB of the 5-bit shift register.
+    M->shift_reg = ((M->shift_reg >> 1U) & 0xFU) | ((val & 1U) << 4U);
+    return;
+  }
+
+  // Otherwise, we reset the shift register and apply the requested update.
+  word_t update = ((M->shift_reg >> 1U) & 0xFU) | ((val & 1U) << 4U);
+  M->shift_reg = SHIFT_BASE;
+  // TODO
 
   return;
 }

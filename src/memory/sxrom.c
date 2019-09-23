@@ -228,7 +228,7 @@ word_t sxrom_read(dword_t addr, void *map) {
     M->bus = M->prg_rom[M->prg_rom_bank_b][addr & PRG_ROM_MASK];
   }
 
-  return map->bus;
+  return M->bus;
 }
 
 /*
@@ -248,7 +248,7 @@ void sxrom_write(word_t val, dword_t addr, void *map) {
   if ((PRG_RAM_OFFSET <= addr) && (addr < PRG_ROM_A_OFFSET)
                                && (M->num_prg_ram_banks > 0)) {
     M->prg_ram[M->prg_ram_bank][addr & PRG_RAM_MASK] = val;
-  } else if (addr >= PRG_ROM_A_MASK) {
+  } else if (addr >= PRG_ROM_A_OFFSET) {
     sxrom_update_registers(val, addr, M);
   }
 
@@ -281,6 +281,8 @@ static void sxrom_update_registers(word_t val, dword_t addr, sxrom_t *M) {
   // Otherwise, we reset the shift register and apply the requested update.
   word_t update = ((M->shift_reg >> 1U) & 0xFU) | ((val & 1U) << 4U);
   M->shift_reg = SHIFT_BASE;
+  (void)update;
+  (void)addr;
   // TODO
 
   return;

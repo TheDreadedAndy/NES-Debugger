@@ -28,6 +28,10 @@
 #define FLAG_CONTROL_RESET 0x80U
 #define SHIFT_BASE 0x10U
 #define CONTROL_RESET_MASK 0x0CU
+#define CONTROL_UPDATE_OFFSET 0x8000U
+#define CHR_A_UPDATE_OFFSET 0xA000U
+#define CHR_B_UPDATE_OFFSET 0xC000U
+#define PRG_UPDATE_OFFSET 0xE000U
 
 // Constants used to size and access VRAM.
 #define MAX_CHR_BANKS 8U
@@ -35,8 +39,15 @@
 #define MAX_SCREENS 4U
 #define SCREEN_SIZE 0x400U
 
+// Enumerates which sub-type of MMC1 (SxROM) the given mapper is.
+// Necessary to properly update registers.
+typedef enum MMC1 { SXROM, SNROM, SZROM } mmc1_t;
+
 // Nes virtual memory data structure for sxrom (mapper 2).
 typedef struct sxrom {
+  // Mapper sub-type.
+  mmc1_t type;
+
   // Cart memory.
   word_t *prg_rom[MAX_ROM_BANKS];
   word_t *prg_ram[MAX_RAM_BANKS];
@@ -47,6 +58,8 @@ typedef struct sxrom {
   word_t *pattern_table[MAX_CHR_BANKS];
   word_t num_chr_banks;
   bool is_chr_ram;
+  word_t *nametable_bank_a;
+  word_t *nametable_bank_b;
   word_t *nametable[MAX_SCREENS];
 
   // Controlling registers.
@@ -72,6 +85,10 @@ static void sxrom_load_prg_ram(memory_t *M);
 static void sxrom_load_prg_rom(FILE *rom_file, memory_t *M);
 static void sxrom_load_chr(FILE *rom_file, memory_t *M);
 static void sxrom_update_registers(word_t val, dword_t addr, sxrom_t *M);
+static void sxrom_update_control(word_t update, sxrom_t *M);
+static void sxrom_update_chr_a(word_t update, sxrom_t *M);
+static void sxrom_update_chr_b(word_t update, sxrom_t *M);
+static void sxrom_update_prg(word_t update, sxrom_t *M);
 
 /*
  * Uses the header within the provided memory structure to create
@@ -100,10 +117,12 @@ void sxrom_new(FILE *rom_file, memory_t *M) {
 
   // Setup the nametable in vram. The header mirroring bit is ignored in
   // this mapper, so we set the mirrored banks to a default value for now.
-  map->nametable[0] = rand_alloc(sizeof(word_t) * SCREEN_SIZE);
-  map->nametable[3] = rand_alloc(sizeof(word_t) * SCREEN_SIZE);
-  map->nametable[1] = map->nametable[0];
-  map->nametable[2] = map->nametable[3];
+  map->nametable_bank_a = rand_alloc(sizeof(word_t) * SCREEN_SIZE);
+  map->nametable_bank_b = rand_alloc(sizeof(word_t) * SCREEN_SIZE);
+  map->nametable[0] = map->nametable_bank_a;
+  map->nametable[1] = map->nametable_bank_a;
+  map->nametable[2] = map->nametable_bank_b;
+  map->nametable[3] = map->nametable_bank_b;
 
   return;
 }
@@ -281,10 +300,59 @@ static void sxrom_update_registers(word_t val, dword_t addr, sxrom_t *M) {
   // Otherwise, we reset the shift register and apply the requested update.
   word_t update = ((M->shift_reg >> 1U) & 0xFU) | ((val & 1U) << 4U);
   M->shift_reg = SHIFT_BASE;
-  (void)update;
-  (void)addr;
-  // TODO
+  if ((CONTROL_UPDATE_OFFSET <= addr) && (addr < CHR_A_UPDATE_OFFSET)) {
+    // Update the control register.
+    sxrom_update_control(update, M);
+  } else if ((CHR_A_UPDATE_OFFSET <= addr) && (addr < CHR_B_UPDATE_OFFSET)) {
+    // Update the CHR0 register.
+    sxrom_update_chr_a(update, M);
+  } else if ((CHR_B_UPDATE_OFFSET <= addr) && (addr < PRG_UPDATE_OFFSET)) {
+    // Update the CHR1 register.
+    sxrom_update_chr_b(update, M);
+  } else if (addr >= PRG_UPDATE_OFFSET) {
+    // Update the PRG register.
+    sxrom_update_prg(update, M);
+  }
 
+  return;
+}
+
+/*
+ * Updates the nametable, program rom, and chr addressing mode using the given
+ * 5-bit control register update value.
+ *
+ * Assumes the provided sxrom structure is non-null and valid.
+ */
+static void sxrom_update_control(word_t update, sxrom_t *M) {
+  (void)update;
+  (void)M;
+  return;
+}
+
+/*
+ * TODO
+ */
+static void sxrom_update_chr_a(word_t update, sxrom_t *M) {
+  (void)update;
+  (void)M;
+  return;
+}
+
+/*
+ * TODO
+ */
+static void sxrom_update_chr_b(word_t update, sxrom_t *M) {
+  (void)update;
+  (void)M;
+  return;
+}
+
+/*
+ * TODO
+ */
+static void sxrom_update_prg(word_t update, sxrom_t *M) {
+  (void)update;
+  (void)M;
   return;
 }
 

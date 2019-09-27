@@ -32,6 +32,16 @@
 #define CHR_A_UPDATE_OFFSET 0xA000U
 #define CHR_B_UPDATE_OFFSET 0xC000U
 #define PRG_UPDATE_OFFSET 0xE000U
+#define NAMETABLE_CONTROL_MASK 0x03U
+#define NAMETABLE_MIRROR_LOW 0U
+#define NAMETABLE_MIRROR_HIGH 1U
+#define NAMETABLE_MIRROR_VERT 2U
+#define NAMETABLE_MIRROR_HORI 3U
+#define PRG_ROM_CONTROL_MASK 0x0CU
+#define PRG_ROM_MODE_32K 0x00U
+#define PRG_ROM_MODE_32K_ALT 0x04U
+#define PRG_ROM_MODE_FIX_LOW 0x08U
+#define PRG_ROM_MODE_FIX_HIGH 0x0CU
 
 // Constants used to size and access VRAM.
 #define MAX_CHR_BANKS 8U
@@ -324,8 +334,47 @@ static void sxrom_update_registers(word_t val, dword_t addr, sxrom_t *M) {
  * Assumes the provided sxrom structure is non-null and valid.
  */
 static void sxrom_update_control(word_t update, sxrom_t *M) {
-  (void)update;
-  (void)M;
+  // Update the control register.
+  M->control_reg = update;
+
+  // Update the nametable mirroring using the low two bits in the 5-bit update.
+  switch(update & NAMETABLE_CONTROL_MASK) {
+    case NAMETABLE_MIRROR_LOW:
+      for (int i = 0; i < 4; i++) { M->nametable[i] = M->nametable_bank_a; }
+      break;
+    case NAMETABLE_MIRROR_HIGH:
+      for (int i = 0; i < 4; i++) { M->nametable[i] = M->nametable_bank_b; }
+      break;
+    case NAMETABLE_MIRROR_VERT:
+      M->nametable[0] = M->nametable_bank_a;
+      M->nametable[1] = M->nametable_bank_b;
+      M->nametable[2] = M->nametable_bank_a;
+      M->nametable[3] = M->nametable_bank_b;
+      break;
+    case NAMETABLE_MIRROR_HORI:
+      M->nametable[0] = M->nametable_bank_a;
+      M->nametable[1] = M->nametable_bank_a;
+      M->nametable[2] = M->nametable_bank_b;
+      M->nametable[3] = M->nametable_bank_b;
+      break;
+  }
+
+  // Update the PRG-ROM bank selection using the method specified in the control
+  // update and the current value of the PRG-ROM bank selection register.
+  // TODO
+  switch(update & PRG_ROM_CONTROL_MASK) {
+    case PRG_ROM_MODE_32K:
+    case PRG_ROM_MODE_32K_ALT:
+      break;
+    case PRG_ROM_MODE_FIX_LOW:
+      break;
+    case PRG_ROM_MODE_FIX_HIGH:
+      break;
+  }
+
+  // Update the CHR bank selection using the high bit of the control register.
+  // TODO
+
   return;
 }
 

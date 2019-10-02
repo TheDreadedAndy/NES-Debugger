@@ -26,4 +26,7 @@ typedef union multi_word {
 // Reverses a word.
 word_t reverse_word(word_t word);
 
+// Gets the MSB of a word.
+word_t msb_word(word_t word);
+
 #endif

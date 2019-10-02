@@ -42,6 +42,7 @@
 #define PRG_ROM_MODE_32K_ALT 0x04U
 #define PRG_ROM_MODE_FIX_LOW 0x08U
 #define PRG_ROM_MODE_FIX_HIGH 0x0CU
+#define FLAG_CHR_MODE 0x10U
 
 // Constants used to size and access VRAM.
 #define MAX_CHR_BANKS 8U
@@ -49,15 +50,8 @@
 #define MAX_SCREENS 4U
 #define SCREEN_SIZE 0x400U
 
-// Enumerates which sub-type of MMC1 (SxROM) the given mapper is.
-// Necessary to properly update registers.
-typedef enum MMC1 { SXROM, SNROM, SZROM } mmc1_t;
-
 // Nes virtual memory data structure for sxrom (mapper 2).
 typedef struct sxrom {
-  // Mapper sub-type.
-  mmc1_t type;
-
   // Cart memory.
   word_t *prg_rom[MAX_ROM_BANKS];
   word_t *prg_ram[MAX_RAM_BANKS];
@@ -86,8 +80,12 @@ typedef struct sxrom {
   word_t prg_rom_bank_b;
   word_t prg_ram_bank;
 
-  // Read/write value on data bus.
-  word_t bus;
+  // Bank access masks.
+  word_t chr_bank_mask;
+  word_t prg_ram_bank_mask;
+  word_t prg_ram_bank_shift;
+  word_t prg_ram_disable_mask;
+  word_t prg_rom_high_mask;
 } sxrom_t;
 
 /* Helper functions */
@@ -118,12 +116,12 @@ void sxrom_new(FILE *rom_file, memory_t *M) {
   M->vram_write = &sxrom_vram_write;
   M->free = &sxrom_free;
 
-  // Set up the cart ram space.
-  sxrom_load_prg_ram(M);
-
   // Load the rom data into memory.
   sxrom_load_prg_rom(rom_file, M);
   sxrom_load_chr(rom_file, M);
+
+  // Set up the cart ram space.
+  sxrom_load_prg_ram(M);
 
   // Setup the nametable in vram. The header mirroring bit is ignored in
   // this mapper, so we set the mirrored banks to a default value for now.
@@ -131,37 +129,8 @@ void sxrom_new(FILE *rom_file, memory_t *M) {
   map->nametable_bank_b = rand_alloc(sizeof(word_t) * SCREEN_SIZE);
   map->nametable[0] = map->nametable_bank_a;
   map->nametable[1] = map->nametable_bank_a;
-  map->nametable[2] = map->nametable_bank_b;
-  map->nametable[3] = map->nametable_bank_b;
-
-  return;
-}
-
-/*
- * Creates a ram space with the amount of memory requested by the mapper.
- * If an INES header is used, the size is not defined and is assumed to be
- * 32K.
- *
- * Assumes the memory structure and its mapper field are non-null.
- * Assumes the header provided by the memory structure is valid.
- */
-static void sxrom_load_prg_ram(memory_t *M) {
-  // Cast back from the generic structure.
-  sxrom_t *map = (sxrom_t*) M->map;
-
-  // Determine if the rom supplied a valid PRG-RAM size.
-  if (M->header->header_type != NES2) {
-    // Assume that the rom needs 32KB of PRG-RAM.
-    map->num_prg_ram_banks = MAX_RAM_BANKS;
-  } else {
-    // The mapper is NES 2.0, so we can use the specified PRG-RAM size.
-    map->num_prg_ram_banks = M->header->prg_ram_size / RAM_BANK_SIZE;
-  }
-
-  // Allocate the PRG-RAM banks.
-  for (size_t i = 0; i < map->num_prg_ram_banks; i++) {
-    map->prg_ram[i] = rand_alloc(RAM_BANK_SIZE * sizeof(word_t));
-  }
+  map->nametable[2] = map->nametable_bank_a;
+  map->nametable[3] = map->nametable_bank_a;
 
   return;
 }
@@ -190,6 +159,11 @@ static void sxrom_load_prg_rom(FILE *rom_file, memory_t *M) {
     }
   }
 
+  // Determine if the requested PRG-ROM size needs a fifth selection bit.
+  if (M->header->prg_rom_size > (ROM_BANK_SIZE * 16)) {
+    map->prg_rom_high_mask = 0x10;
+  }
+
   // Setup the default bank mode.
   map->prg_rom_bank_a = 0;
   map->prg_rom_bank_b = map->num_prg_rom_banks - 1;
@@ -200,10 +174,14 @@ static void sxrom_load_prg_rom(FILE *rom_file, memory_t *M) {
 /*
  * Determine if the given rom is using CHR-ROM or CHR-RAM, then creates
  * the necessary banks. Loads in the CHR data if the board is using CHR-ROM.
+ * Creates a mask for accessing the CHR control register.
+ *
+ * This function aborts if the created mask conflicts with the PRG-ROM mask.
  *
  * Assumes the provided rom file is valid.
  * Assumes the provided memory structure and its mapper field are non-null.
  * Assumes the mapper field points to a sxrom structure.
+ * Assumes that the provided sxrom structure has had its PRG-ROM initialized.
  */
 static void sxrom_load_chr(FILE *rom_file, memory_t *M) {
   // Cast the mapper back from the generic structure.
@@ -227,6 +205,57 @@ static void sxrom_load_chr(FILE *rom_file, memory_t *M) {
     for (size_t j = 0; j < CHR_BANK_SIZE; j++) {
       map->pattern_table[i][j] = fgetc(rom_file);
     }
+  }
+
+  // Calculate the mask to be used to select the CHR banks in the CHR control
+  // register.
+  map->chr_bank_mask = msb_word(map->num_chr_banks) - 1;
+
+  // Check if the requested rom size conflicts with the requested number of
+  // CHR banks.
+  if (map->chr_bank_mask & map->prg_rom_high_mask) {
+    fprintf(stderr, "Error: The given rom size is invalid for MMC1.\n");
+    abort();
+  }
+
+  // Determine if the high CHR control bit is unused and should, thus,
+  // be used to disable PRG-RAM.
+  if (!map->prg_rom_high_mask && !(map->chr_bank_mask & 0x10)) {
+    map->prg_ram_disable_mask = 0x10;
+  }
+
+  return;
+}
+
+/*
+ * Creates a ram space with the amount of memory requested by the mapper.
+ * If an INES header is used, the size is not defined and is created
+ * based on the number of free bits in the CHR bank mask.
+ *
+ * If a NES2.0 header is specified, and the requested amount of PRG-RAM
+ * conflicts with the CHR bank mask, this function aborts.
+ *
+ * Assumes the memory structure and its mapper field are non-null.
+ * Assumes the header provided by the memory structure is valid.
+ * Assumes CHR data has been initialized for the given SxROM structure.
+ */
+static void sxrom_load_prg_ram(memory_t *M) {
+  //TODO
+  // Cast back from the generic structure.
+  sxrom_t *map = (sxrom_t*) M->map;
+
+  // Determine if the rom supplied a valid PRG-RAM size.
+  if (M->header->header_type != NES2) {
+    // Assume that the rom needs 32KB of PRG-RAM.
+    map->num_prg_ram_banks = MAX_RAM_BANKS;
+  } else {
+    // The mapper is NES 2.0, so we can use the specified PRG-RAM size.
+    map->num_prg_ram_banks = M->header->prg_ram_size / RAM_BANK_SIZE;
+  }
+
+  // Allocate the PRG-RAM banks.
+  for (size_t i = 0; i < map->num_prg_ram_banks; i++) {
+    map->prg_ram[i] = rand_alloc(RAM_BANK_SIZE * sizeof(word_t));
   }
 
   return;
@@ -359,21 +388,55 @@ static void sxrom_update_control(word_t update, sxrom_t *M) {
       break;
   }
 
-  // Update the PRG-ROM bank selection using the method specified in the control
-  // update and the current value of the PRG-ROM bank selection register.
+  // Update the CHR/PRG bank selections.
+  sxrom_update_chr_banks(M);
+  sxrom_update_prg_rom_banks(M);
+
+  return;
+}
+
+/*
+ * Updates the current bank selections using the regsiters in the provided
+ * SxROM memory structure.
+ *
+ * Assumes the provided memory structure is non-null and valid.
+ */
+static void sxrom_update_prg_rom_banks(sxrom_t *M) {
+  // Caculate the current PRG-ROM bank selection.
   // TODO
-  switch(update & PRG_ROM_CONTROL_MASK) {
+  word_t prg_bank = 0;
+
+  // Update the PRG-ROM bank selection using the method specified in the control
+  // register and the current value of the PRG-ROM bank selection registers.
+  switch(M->control_reg & PRG_ROM_CONTROL_MASK) {
     case PRG_ROM_MODE_32K:
     case PRG_ROM_MODE_32K_ALT:
+      M->prg_rom_bank_a = prg_bank & (~1U);
+      M->prg_rom_bank_b = prg_bank | 1U;
       break;
     case PRG_ROM_MODE_FIX_LOW:
+      M->prg_rom_bank_a = 0;
+      M->prg_rom_bank_b = prg_bank;
       break;
     case PRG_ROM_MODE_FIX_HIGH:
+      M->prg_rom_bank_a = prg_bank;
+      M->Prg_rom_Bank_b = num_prg_rom_banks - 1U;
       break;
   }
 
+  return;
+}
+
+/*
+ * TODO
+ */
+static void sxrom_update_chr_banks(sxrom_t *M) {
   // Update the CHR bank selection using the high bit of the control register.
-  // TODO
+  if (M->control_reg & FLAG_CHR_MODE) {
+    ;
+  } else {
+    ;
+  }
 
   return;
 }

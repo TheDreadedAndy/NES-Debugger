@@ -10,3 +10,12 @@ word_t reverse_word(word_t word) {
   word = ((word & 0x0FU) << 4) | ((word & 0xF0U) >> 4);
   return word;
 }
+
+/*
+ * Takes in a word and returns its MSB.
+ */
+word_t msb_word(word_t word) {
+  // Flip the word, get the LSB, then flip it again.
+  word_t rev = reverse_word(word);
+  return reverse_word((~rev) & (-rev));
+}

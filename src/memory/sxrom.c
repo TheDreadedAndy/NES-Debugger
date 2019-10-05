@@ -14,7 +14,7 @@
 #include "../util/data.h"
 
 // Constants used to size and access memory.
-#define MAX_ROM_BANKS 16U
+#define MAX_ROM_BANKS 32U
 #define ROM_BANK_SIZE 0x4000U
 #define MAX_RAM_BANKS 4U
 #define RAM_BANK_SIZE 0x2000U
@@ -44,14 +44,21 @@
 #define PRG_ROM_MODE_FIX_HIGH 0x0CU
 #define FLAG_CHR_MODE 0x10U
 #define PRG_ROM_BANK_LOW_MASK 0x0FU
+#define FLAG_PRG_RAM_DISABLE 0x10U
 
 // Constants used to size and access VRAM.
-#define MAX_CHR_BANKS 8U
+#define MAX_CHR_BANKS 32U
 #define CHR_BANK_SIZE 0x1000U
 #define MAX_SCREENS 4U
 #define SCREEN_SIZE 0x400U
+#define NAMETABLE_ACCESS_BIT 0x2000U
+#define NAMETABLE_SELECT_MASK 0x0C00U
+#define NAMETABLE_SELECT_SHIFT 10U
+#define NAMETABLE_ADDR_MASK 0x03FFU
+#define PATTERN_TABLE_HIGH_ACCESS_BIT 0x1000U
+#define PATTERN_TABLE_MASK 0x0FFFU
 
-// Nes virtual memory data structure for sxrom (mapper 2).
+// Nes virtual memory data structure for sxrom (mapper 1).
 typedef struct sxrom {
   // Cart memory.
   word_t *prg_rom[MAX_ROM_BANKS];
@@ -85,7 +92,6 @@ typedef struct sxrom {
   word_t chr_bank_mask;
   word_t prg_ram_bank_mask;
   word_t prg_ram_bank_shift;
-  word_t prg_ram_disable_mask;
   word_t prg_rom_high_mask;
 } sxrom_t;
 
@@ -93,13 +99,11 @@ typedef struct sxrom {
 static void sxrom_load_prg_ram(memory_t *M);
 static void sxrom_load_prg_rom(FILE *rom_file, memory_t *M);
 static void sxrom_load_chr(FILE *rom_file, memory_t *M);
+static word_t sxrom_create_mask(word_t items);
 static void sxrom_update_registers(word_t val, dword_t addr, sxrom_t *M);
 static void sxrom_update_control(word_t update, sxrom_t *M);
 static void sxrom_update_prg_rom_banks(sxrom_t *M);
 static void sxrom_update_chr_banks(sxrom_t *M);
-static void sxrom_update_chr_a(word_t update, sxrom_t *M);
-static void sxrom_update_chr_b(word_t update, sxrom_t *M);
-static void sxrom_update_prg(word_t update, sxrom_t *M);
 
 /*
  * Uses the header within the provided memory structure to create
@@ -134,6 +138,9 @@ void sxrom_new(FILE *rom_file, memory_t *M) {
   map->nametable[1] = map->nametable_bank_a;
   map->nametable[2] = map->nametable_bank_a;
   map->nametable[3] = map->nametable_bank_a;
+
+  // Reset the shift register.
+  map->shift_reg = SHIFT_BASE;
 
   return;
 }
@@ -195,24 +202,24 @@ static void sxrom_load_chr(FILE *rom_file, memory_t *M) {
     map->is_chr_ram = true;
     map->num_chr_banks = M->header->chr_ram_size / CHR_BANK_SIZE;
     for (size_t i = 0; i < map->num_chr_banks; i++) {
-      map->pattern_table[i] = xmalloc(sizeof(word_t) * CHR_BANK_SIZE);
+      map->pattern_table[i] = rand_alloc(sizeof(word_t) * CHR_BANK_SIZE);
     }
-  }
-
-  // Otherwise, the rom is using CHR-ROM and we must load it into the mapper.
-  map->is_chr_ram = false;
-  map->num_chr_banks = M->header->chr_rom_size / CHR_BANK_SIZE;
-  fseek(rom_file, HEADER_SIZE + M->header->prg_rom_size, SEEK_SET);
-  for (size_t i = 0; i < map->num_chr_banks; i++) {
-    map->pattern_table[i] = xmalloc(sizeof(word_t) * CHR_BANK_SIZE);
-    for (size_t j = 0; j < CHR_BANK_SIZE; j++) {
-      map->pattern_table[i][j] = fgetc(rom_file);
+  } else {
+    // Otherwise, the rom is using CHR-ROM and we must load it into the mapper.
+    map->is_chr_ram = false;
+    map->num_chr_banks = M->header->chr_rom_size / CHR_BANK_SIZE;
+    fseek(rom_file, HEADER_SIZE + M->header->prg_rom_size, SEEK_SET);
+    for (size_t i = 0; i < map->num_chr_banks; i++) {
+      map->pattern_table[i] = xmalloc(sizeof(word_t) * CHR_BANK_SIZE);
+      for (size_t j = 0; j < CHR_BANK_SIZE; j++) {
+        map->pattern_table[i][j] = fgetc(rom_file);
+      }
     }
   }
 
   // Calculate the mask to be used to select the CHR banks in the CHR control
   // register.
-  map->chr_bank_mask = msb_word(map->num_chr_banks) - 1;
+  map->chr_bank_mask = sxrom_create_mask(map->num_chr_banks);
 
   // Check if the requested rom size conflicts with the requested number of
   // CHR banks.
@@ -222,13 +229,21 @@ static void sxrom_load_chr(FILE *rom_file, memory_t *M) {
     abort();
   }
 
-  // Determine if the high CHR control bit is unused and should, thus,
-  // be used to disable PRG-RAM.
-  if (!map->prg_rom_high_mask && !(map->chr_bank_mask & 0x10)) {
-    map->prg_ram_disable_mask = 0x10;
-  }
-
   return;
+}
+
+/*
+ * Creates a bitmask that can select the provided number of elements.
+ */
+static word_t sxrom_create_mask(word_t items) {
+  word_t msb = msb_word(items);
+  if ((msb != 0) && (msb == items)) {
+    return msb - 1U;
+  } else if (msb != 0) {
+    return (msb << 1U) - 1U;
+  } else {
+    return 0U;
+  }
 }
 
 /*
@@ -255,7 +270,7 @@ static void sxrom_load_prg_ram(memory_t *M) {
       map->num_prg_ram_banks = MAX_RAM_BANKS;
     } else if (map->chr_bank_mask <= 0x07U) {
       map->num_prg_ram_banks = MAX_RAM_BANKS / 2U;
-    } else if (map->chr_bank_mask <= 0x0fU) {
+    } else {
       map->num_prg_ram_banks = 1U;
     }
   } else {
@@ -265,7 +280,7 @@ static void sxrom_load_prg_ram(memory_t *M) {
 
   // Create the bank mask/shift from the number of banks.
   // The bank mask will use bits 3/2 of the chr registers, depending on space.
-  map->prg_ram_bank_mask = msb_word(map->num_prg_ram_banks) - 1U;
+  map->prg_ram_bank_mask = sxrom_create_mask(map->num_prg_ram_banks);
   map->prg_ram_bank_shift = (map->num_prg_ram_banks > 2U) ? 2U : 3U;
   map->prg_ram_bank_mask <<= map->prg_ram_bank_shift;
 
@@ -298,7 +313,8 @@ word_t sxrom_read(dword_t addr, void *map) {
   // Determine which part of memory is being accessed, read the value,
   // and place it on the bus.
   if ((PRG_RAM_OFFSET <= addr) && (addr < PRG_ROM_A_OFFSET)
-                               && (M->num_prg_ram_banks > 0)) {
+                               && (M->num_prg_ram_banks > 0)
+                               && !(M->prg_reg & FLAG_PRG_RAM_DISABLE)) {
     // Read from PRG-RAM.
     return M->prg_ram[M->prg_ram_bank][addr & PRG_RAM_MASK];
   } else if ((PRG_ROM_A_OFFSET <= addr) && (addr < PRG_ROM_B_OFFSET)) {
@@ -326,7 +342,8 @@ void sxrom_write(word_t val, dword_t addr, void *map) {
   // Load the bus with the requested value, and attempt to write that value to
   // memory.
   if ((PRG_RAM_OFFSET <= addr) && (addr < PRG_ROM_A_OFFSET)
-                               && (M->num_prg_ram_banks > 0)) {
+                               && (M->num_prg_ram_banks > 0)
+                               && !(M->prg_reg & FLAG_PRG_RAM_DISABLE)) {
     M->prg_ram[M->prg_ram_bank][addr & PRG_RAM_MASK] = val;
   } else if (addr >= PRG_ROM_A_OFFSET) {
     sxrom_update_registers(val, addr, M);
@@ -365,14 +382,29 @@ static void sxrom_update_registers(word_t val, dword_t addr, sxrom_t *M) {
     // Update the control register.
     sxrom_update_control(update, M);
   } else if ((CHR_A_UPDATE_OFFSET <= addr) && (addr < CHR_B_UPDATE_OFFSET)) {
-    // Update the CHR0 register.
-    sxrom_update_chr_a(update, M);
+    // Update the CHR0 register and copy the PRG selections to CHR1.
+    M->chr_a_reg = update;
+    M->chr_b_reg = (M->chr_b_reg & M->chr_bank_mask) | (M->chr_a_reg
+                 & (M->prg_ram_bank_mask | M->prg_rom_high_mask));
+
+    // Update the bank selections.
+    sxrom_update_chr_banks(M);
+    M->prg_ram_bank = (M->chr_a_reg & M->prg_ram_bank_mask)
+                    >> M->prg_ram_bank_shift;
   } else if ((CHR_B_UPDATE_OFFSET <= addr) && (addr < PRG_UPDATE_OFFSET)) {
-    // Update the CHR1 register.
-    sxrom_update_chr_b(update, M);
+    // Update the CHR1 register and copy the PRG selections to CHR0.
+    M->chr_b_reg = update;
+    M->chr_a_reg = (M->chr_a_reg & M->chr_bank_mask) | (M->chr_b_reg
+                 & (M->prg_ram_bank_mask | M->prg_rom_high_mask));
+
+    // Update the bank selections.
+    sxrom_update_chr_banks(M);
+    M->prg_ram_bank = (M->chr_b_reg & M->prg_ram_bank_mask)
+                    >> M->prg_ram_bank_shift;
   } else if (addr >= PRG_UPDATE_OFFSET) {
     // Update the PRG register.
-    sxrom_update_prg(update, M);
+    M->prg_reg = update;
+    sxrom_update_prg_rom_banks(M);
   }
 
   return;
@@ -450,78 +482,100 @@ static void sxrom_update_prg_rom_banks(sxrom_t *M) {
 }
 
 /*
- * TODO
+ * Reloads the CHR bank selections from the CHR registers using the currently
+ * selected bank switching mode in the control register.
+ *
+ * Assumes the provided SxROM structure is non-null and valid.
  */
 static void sxrom_update_chr_banks(sxrom_t *M) {
   // Update the CHR bank selection using the high bit of the control register.
   if (M->control_reg & FLAG_CHR_MODE) {
-    ;
+    // 4KB bank mode.
+    M->chr_bank_a = M->chr_a_reg & M->chr_bank_mask;
+    M->chr_bank_b = M->chr_b_reg & M->chr_bank_mask;
   } else {
-    ;
+    // 8KB bank mode.
+    M->chr_bank_a = M->chr_a_reg & M->chr_bank_mask & (~1U);
+    M->chr_bank_b = M->chr_bank_a | 1U;
   }
 
   return;
 }
 
 /*
- * TODO
- */
-static void sxrom_update_chr_a(word_t update, sxrom_t *M) {
-  (void)update;
-  (void)M;
-  return;
-}
-
-/*
- * TODO
- */
-static void sxrom_update_chr_b(word_t update, sxrom_t *M) {
-  (void)update;
-  (void)M;
-  return;
-}
-
-/*
- * TODO
- */
-static void sxrom_update_prg(word_t update, sxrom_t *M) {
-  (void)update;
-  (void)M;
-  return;
-}
-
-/*
- * TODO
+ * Reads a word from VRAM using the bank selection registers.
+ *
+ * Assumes the provided pointer is non-null.
+ * Assumes the provided pointer is of type sxrom_t and is valid.
  */
 word_t sxrom_vram_read(dword_t addr, void *map) {
   // Cast back from the generic structure.
   sxrom_t *M = (sxrom_t*) map;
-  (void)M;
-  (void)addr;
 
-  return 0;
+  // Determine which part of VRAM is being accessed.
+  if (addr & NAMETABLE_ACCESS_BIT) {
+    // Nametable is being accessed.
+    word_t table = (addr & NAMETABLE_SELECT_MASK) >> NAMETABLE_SELECT_SHIFT;
+    return M->nametable[table][addr & NAMETABLE_ADDR_MASK];
+  } else if (addr & PATTERN_TABLE_HIGH_ACCESS_BIT) {
+    // CHR1 is being accessed.
+    return M->pattern_table[M->chr_bank_b][addr & PATTERN_TABLE_MASK];
+  } else {
+    // CHR0 is being accessed.
+    return M->pattern_table[M->chr_bank_a][addr & PATTERN_TABLE_MASK];
+  }
 }
 
 /*
- * TODO
+ * Writes a word to VRAM at the requested memory location, if possible.
+ * Uses the bank selection registers to address VRAM.
+ *
+ * Assumes the provided pointer is non-null.
+ * Assumes the provided pointer is of type sxrom_t and is valid.
  */
 void sxrom_vram_write(word_t val, dword_t addr, void *map) {
   // Cast back from the generic structure.
   sxrom_t *M = (sxrom_t*) map;
-  (void)M;
-  (void)val;
-  (void)addr;
+
+  // Determine which part of VRAM is being accessed.
+  if (addr & NAMETABLE_ACCESS_BIT) {
+    // Nametable is being accessed.
+    word_t table = (addr & NAMETABLE_SELECT_MASK) >> NAMETABLE_SELECT_SHIFT;
+    M->nametable[table][addr & NAMETABLE_ADDR_MASK] = val;
+  } else if ((addr & PATTERN_TABLE_HIGH_ACCESS_BIT) && M->is_chr_ram) {
+    // CHR1 is being accessed.
+    M->pattern_table[M->chr_bank_b][addr & PATTERN_TABLE_MASK] = val;
+  } else if (M->is_chr_ram) {
+    // CHR0 is being accessed.
+    M->pattern_table[M->chr_bank_a][addr & PATTERN_TABLE_MASK] = val;
+  }
 
   return;
 }
 
 /*
- * TODO
+ * Frees the provided SxROM structure.
+ *
+ * Assumes the provided pointer is non-null.
+ * Assumes the provided pointer is of type sxrom_t and is valid.
  */
 void sxrom_free(void *map) {
   // Cast back from the generic structure.
   sxrom_t *M = (sxrom_t*) map;
-  (void)M;
+
+  // Free the cartridge rom and ram.
+  for (size_t i = 0; i < M->num_prg_rom_banks; i++) { free(M->prg_rom[i]); }
+  for (size_t i = 0; i < M->num_prg_ram_banks; i++) { free(M->prg_ram[i]); }
+
+  // Free the nametables.
+  free(M->nametable_bank_a);
+  free(M->nametable_bank_b);
+
+  // Free the CHR data.
+  for (size_t i = 0; i < M->num_chr_banks; i++) { free(M->pattern_table[i]); }
+
+  // Free the structure itself.
+  free(M);
 
   return;
 }

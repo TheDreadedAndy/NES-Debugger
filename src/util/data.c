@@ -17,5 +17,5 @@ word_t reverse_word(word_t word) {
 word_t msb_word(word_t word) {
   // Flip the word, get the LSB, then flip it again.
   word_t rev = reverse_word(word);
-  return reverse_word((~rev) & (-rev));
+  return reverse_word((rev) & (-rev));
 }

@@ -62,6 +62,12 @@
 memory_t *system_memory = NULL;
 
 /*
+ * Holds the last value read from/written to memory.
+ * Used to emulate open-bus behavior.
+ */
+word_t memory_bus = 0;
+
+/*
  * Initializes all system memory for the NES emulation.
  *
  * Assumes the system memory has not already been initialized.
@@ -106,23 +112,26 @@ word_t memory_read(dword_t addr) {
   // Determine if the NES address space or the mapper should be accessed.
   if (addr < PPU_OFFSET) {
     // Access standard ram.
-    return system_memory->ram[addr & RAM_MASK];
+    memory_bus = system_memory->ram[addr & RAM_MASK];
   } else if (addr < IO_OFFSET) {
     // Access PPU MMIO.
-    return ppu_read(addr);
+    memory_bus = ppu_read(addr);
   } else if (addr < MAPPER_OFFSET) {
     // Access APU and IO registers.
     if ((addr == IO_JOY1_ADDR) || (addr == IO_JOY2_ADDR)) {
       // Read from controller register.
-      return controller_read(addr);
+      memory_bus = controller_read(addr);
     } else {
       // Read from APU register.
-      return apu_read(addr);
+      memory_bus = apu_read(addr);
     }
   } else {
     // Access cartridge space using the mapper.
-    return system_memory->read(addr, system_memory->map);
+    memory_bus = system_memory->read(addr, system_memory->map);
   }
+
+  // Read the value from the bus.
+  return memory_bus;
 }
 
 /*
@@ -132,6 +141,9 @@ word_t memory_read(dword_t addr) {
  * Assumes the memory structure is valid.
  */
 void memory_write(word_t val, dword_t addr) {
+  // Put the value being written on the bus.
+  memory_bus = val;
+
   // Determine if the NES address space or the mapper should be accessed.
   if (addr < PPU_OFFSET) {
     // Access standard ram.

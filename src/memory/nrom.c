@@ -165,8 +165,7 @@ word_t nrom_read(dword_t addr, void *map) {
 
   // Detect where in memory we need to access and do so.
   if (addr < BAT_OFFSET) {
-    fprintf(stderr, "WARNING: Memory not implemented.\n");
-    return 0;
+    return memory_bus;
   } else if (addr < BANK_OFFSET) {
     return M->bat[addr & BAT_MASK];
   } else if (addr < BANK_OPT_OFFSET) {
@@ -187,10 +186,8 @@ void nrom_write(word_t val, dword_t addr, void *map) {
   // Cast back from generic pointer to the memory structure.
   nrom_t *M = (nrom_t*) map;
 
-  // Detect where in memory we need to access and do so.
-  if (addr < BAT_OFFSET) {
-    fprintf(stderr, "WARNING: Memory not implemented.\n");
-  } else if (addr < BANK_OFFSET) {
+  // Perform the write if the location was valid.
+  if ((BAT_OFFSET <= addr) && (addr < BANK_OFFSET)) {
     M->bat[addr & BAT_MASK] = val;
   }
 

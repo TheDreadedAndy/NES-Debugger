@@ -20,7 +20,7 @@ typedef void memory_free_t(void *map);
 
 // Generic memory data structure.
 // Includes a pointer to a specific memory implementation and
-// the function necessary to interact with said implementation.
+// the functions necessary to interact with said implementation.
 typedef struct memory {
   // NES system RAM and VRAM palette data.
   // Mappers do not change this or any MMIO.
@@ -40,6 +40,9 @@ typedef struct memory {
   memory_free_t *free;
   header_t *header;
 } memory_t;
+
+// The last value read/written to memory. Used to emulate open-bus behavior.
+extern word_t memory_bus;
 
 /* Tools for using NES virtual memory */
 

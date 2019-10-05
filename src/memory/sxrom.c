@@ -43,6 +43,7 @@
 #define PRG_ROM_MODE_FIX_LOW 0x08U
 #define PRG_ROM_MODE_FIX_HIGH 0x0CU
 #define FLAG_CHR_MODE 0x10U
+#define PRG_ROM_BANK_LOW_MASK 0x0FU
 
 // Constants used to size and access VRAM.
 #define MAX_CHR_BANKS 8U
@@ -94,6 +95,8 @@ static void sxrom_load_prg_rom(FILE *rom_file, memory_t *M);
 static void sxrom_load_chr(FILE *rom_file, memory_t *M);
 static void sxrom_update_registers(word_t val, dword_t addr, sxrom_t *M);
 static void sxrom_update_control(word_t update, sxrom_t *M);
+static void sxrom_update_prg_rom_banks(sxrom_t *M);
+static void sxrom_update_chr_banks(sxrom_t *M);
 static void sxrom_update_chr_a(word_t update, sxrom_t *M);
 static void sxrom_update_chr_b(word_t update, sxrom_t *M);
 static void sxrom_update_prg(word_t update, sxrom_t *M);
@@ -160,7 +163,7 @@ static void sxrom_load_prg_rom(FILE *rom_file, memory_t *M) {
   }
 
   // Determine if the requested PRG-ROM size needs a fifth selection bit.
-  if (M->header->prg_rom_size > (ROM_BANK_SIZE * 16)) {
+  if (map->num_prg_rom_banks > 16) {
     map->prg_rom_high_mask = 0x10;
   }
 
@@ -214,7 +217,8 @@ static void sxrom_load_chr(FILE *rom_file, memory_t *M) {
   // Check if the requested rom size conflicts with the requested number of
   // CHR banks.
   if (map->chr_bank_mask & map->prg_rom_high_mask) {
-    fprintf(stderr, "Error: The given rom size is invalid for MMC1.\n");
+    fprintf(stderr, "Error: The requested amount of PRG-ROM cannot be "
+                    "addressed with the given CHR size.\n");
     abort();
   }
 
@@ -240,17 +244,36 @@ static void sxrom_load_chr(FILE *rom_file, memory_t *M) {
  * Assumes CHR data has been initialized for the given SxROM structure.
  */
 static void sxrom_load_prg_ram(memory_t *M) {
-  //TODO
   // Cast back from the generic structure.
   sxrom_t *map = (sxrom_t*) M->map;
 
   // Determine if the rom supplied a valid PRG-RAM size.
   if (M->header->header_type != NES2) {
-    // Assume that the rom needs 32KB of PRG-RAM.
-    map->num_prg_ram_banks = MAX_RAM_BANKS;
+    // Determine the max amount of ram that can be given to the rom from
+    // the number of CHR banks used.
+    if (map->chr_bank_mask <= 0x03U) {
+      map->num_prg_ram_banks = MAX_RAM_BANKS;
+    } else if (map->chr_bank_mask <= 0x07U) {
+      map->num_prg_ram_banks = MAX_RAM_BANKS / 2U;
+    } else if (map->chr_bank_mask <= 0x0fU) {
+      map->num_prg_ram_banks = 1U;
+    }
   } else {
     // The mapper is NES 2.0, so we can use the specified PRG-RAM size.
     map->num_prg_ram_banks = M->header->prg_ram_size / RAM_BANK_SIZE;
+  }
+
+  // Create the bank mask/shift from the number of banks.
+  // The bank mask will use bits 3/2 of the chr registers, depending on space.
+  map->prg_ram_bank_mask = msb_word(map->num_prg_ram_banks) - 1U;
+  map->prg_ram_bank_shift = (map->num_prg_ram_banks > 2U) ? 2U : 3U;
+  map->prg_ram_bank_mask <<= map->prg_ram_bank_shift;
+
+  // Check for a conflict with CHR bank selection mask.
+  if (map->prg_ram_bank_mask & map->chr_bank_mask) {
+    fprintf(stderr, "Error: the requested amount of PRG-RAM cannot be"
+                    " addressed with the given CHR size.\n");
+    abort();
   }
 
   // Allocate the PRG-RAM banks.
@@ -277,16 +300,16 @@ word_t sxrom_read(dword_t addr, void *map) {
   if ((PRG_RAM_OFFSET <= addr) && (addr < PRG_ROM_A_OFFSET)
                                && (M->num_prg_ram_banks > 0)) {
     // Read from PRG-RAM.
-    M->bus = M->prg_ram[M->prg_ram_bank][addr & PRG_RAM_MASK];
+    return M->prg_ram[M->prg_ram_bank][addr & PRG_RAM_MASK];
   } else if ((PRG_ROM_A_OFFSET <= addr) && (addr < PRG_ROM_B_OFFSET)) {
     // Read from the low half of PRG-ROM.
-    M->bus = M->prg_rom[M->prg_rom_bank_a][addr & PRG_ROM_MASK];
+    return M->prg_rom[M->prg_rom_bank_a][addr & PRG_ROM_MASK];
   } else if (addr >= PRG_ROM_B_OFFSET) {
     // Read from the high half of PRG-ROM.
-    M->bus = M->prg_rom[M->prg_rom_bank_b][addr & PRG_ROM_MASK];
+    return M->prg_rom[M->prg_rom_bank_b][addr & PRG_ROM_MASK];
   }
 
-  return M->bus;
+  return memory_bus;
 }
 
 /*
@@ -302,7 +325,6 @@ void sxrom_write(word_t val, dword_t addr, void *map) {
 
   // Load the bus with the requested value, and attempt to write that value to
   // memory.
-  M->bus = val;
   if ((PRG_RAM_OFFSET <= addr) && (addr < PRG_ROM_A_OFFSET)
                                && (M->num_prg_ram_banks > 0)) {
     M->prg_ram[M->prg_ram_bank][addr & PRG_RAM_MASK] = val;
@@ -403,8 +425,8 @@ static void sxrom_update_control(word_t update, sxrom_t *M) {
  */
 static void sxrom_update_prg_rom_banks(sxrom_t *M) {
   // Caculate the current PRG-ROM bank selection.
-  // TODO
-  word_t prg_bank = 0;
+  word_t prg_bank = (M->chr_a_reg & M->prg_rom_high_mask)
+                  | (M->prg_reg & PRG_ROM_BANK_LOW_MASK);
 
   // Update the PRG-ROM bank selection using the method specified in the control
   // register and the current value of the PRG-ROM bank selection registers.
@@ -420,7 +442,7 @@ static void sxrom_update_prg_rom_banks(sxrom_t *M) {
       break;
     case PRG_ROM_MODE_FIX_HIGH:
       M->prg_rom_bank_a = prg_bank;
-      M->Prg_rom_Bank_b = num_prg_rom_banks - 1U;
+      M->prg_rom_bank_b = M->num_prg_rom_banks - 1U;
       break;
   }
 

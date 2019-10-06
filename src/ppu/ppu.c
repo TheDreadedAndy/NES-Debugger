@@ -1130,13 +1130,16 @@ static void ppu_mmio_vram_addr_inc(void) {
     // When the PPU is inactive, vram is incremented correctly.
     ppu->vram_addr = (ppu->ctrl & FLAG_VRAM_VINC) ? (ppu->vram_addr + 32)
                                                   : (ppu->vram_addr + 1);
-  } else if (!(((current_cycle > 0 && current_cycle <= 256)
-         || current_cycle > 320) && (current_cycle % 8) == 0)) {
+  } else {
     // Writing to PPU data during rendering causes a X and Y increment.
     // This only happens when the PPU would not otherwise be incrementing them.
-    // FIXME: May not be both at once.
-    ppu_render_yinc();
-    ppu_render_xinc();
+    if (!((((current_cycle > 0) && (current_cycle <= 256))
+         || (current_cycle > 320)) && ((current_cycle % 8) == 0))) {
+      ppu_render_xinc();
+    }
+    if (current_cycle != 256) {
+      ppu_render_yinc();
+    }
   }
 
   return;

@@ -660,15 +660,15 @@ static void apu_update_dmc(void) {
   }
 
   // Use the sample buffer to update the dmc level.
-  dmc->bits_remaining = (dmc->bits_remaining > 0) ? dmc->bits_remaining - 1 : 8;
+  dmc->bits_remaining = (dmc->bits_remaining > 0) ? dmc->bits_remaining - 1 : 7;
   if (!(dmc->silent)) {
     if ((dmc->sample_buffer & 1) && (dmc->level <= (DMC_LEVEL_MAX - 2))) {
       dmc->level += 2;
     } else if (!(dmc->sample_buffer & 1) && (dmc->level >= 2)) {
       dmc->level -= 2;
     }
-    dmc->sample_buffer >>= 1;
   }
+  dmc->sample_buffer >>= 1;
 
   return;
 }
@@ -852,7 +852,7 @@ static void apu_status_write(word_t val) {
   if (!(val & FLAG_PULSE_A_ACTIVE)) { pulse_a->length = 0; }
   if (!(val & FLAG_DMC_ACTIVE)) {
     dmc->bytes_remaining = 0;
-  } else if (dmc->bytes_remaining > 0) {
+  } else if (dmc->bytes_remaining == 0) {
     // If the DMC bit was set, the channel should be reset without changing
     // the contents of the delta buffer; but only when there are no bytes
     // remaining in the sample.

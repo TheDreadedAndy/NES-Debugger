@@ -974,5 +974,10 @@ void apu_free(void) {
   free(triangle);
   free(noise);
   free(dmc);
+
+  // Free the mixing tables.
+  free(pulse_table);
+  free(tndmc_table);
+
   return;
 }

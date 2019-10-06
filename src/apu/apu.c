@@ -91,6 +91,12 @@
 #define DMC_CURRENT_ADDR_BASE 0x8000U
 #define DMC_LEVEL_MAX 127U
 
+// These constants are used to size the APU mixing tables.
+#define PULSE_TABLE_SIZE 31U
+#define TRIANGLE_DIM_SHIFT 11U
+#define NOISE_DIM_SHIFT 7U
+#define TNDMC_SIZE 32768U
+
 /*
  * Contains the data related to the operation of an APU pulse channel.
  */
@@ -209,6 +215,16 @@ static word_t length_table[] = { 10, 254, 20, 2, 40, 4, 80, 6, 160, 8, 60, 10,
                                  22, 192, 24, 72, 26, 16, 28, 32, 30 };
 
 /*
+ * These tables are used to appropriately mix the output from the APU.
+ *
+ * The pulse table is indexed by the sum of the pulse output.
+ * The triangle/noise/dmc table is indexed as a 3d array with the levels
+ * of the channels as the respective indexes.
+ */
+static float *pulse_table = NULL;
+static float *tndmc_table = NULL;
+
+/*
  * These global variables control the different channels of the APU.
  * They are accessed through MMIO, and otherwise unavailable outside
  * of this file.
@@ -240,6 +256,8 @@ static size_t frame_step = 0;
 static bool cycle_even = false;
 
 /* Helper functions. */
+static void apu_init_pulse_table(void);
+static void apu_init_tndmc_table(void);
 static void apu_run_frame_step(void);
 static void apu_update_sweep(pulse_t *pulse);
 static dword_t apu_get_pulse_target(pulse_t *pulse);
@@ -267,8 +285,56 @@ void apu_init(void) {
   noise = xcalloc(1, sizeof(noise_t));
   dmc = xcalloc(1, sizeof(dmc_t));
 
+  // Load in the mixing tables for the APU channels.
+  apu_init_pulse_table();
+  apu_init_tndmc_table();
+
   // On power-up, the noise shifter is seeded with the value 1.
   noise->shift = 1;
+  return;
+}
+
+/*
+ * Loads the pulse mixing table from the binary into memory.
+ */
+static void apu_init_pulse_table(void) {
+  // Get the address of the pulse table.
+  extern const word_t _binary_bins_pulse_table_bin_start[];
+
+  // Convert the bytes of the table to floats and load them into memory.
+  pulse_table = xmalloc(sizeof(float) * PULSE_TABLE_SIZE);
+  float temp;
+  uint32_t *convert = (uint32_t*) &temp; // I'm sorry.
+  for (size_t i = 0; i < PULSE_TABLE_SIZE; i++) {
+    *convert = (_binary_bins_pulse_table_bin_start[(4 * i) + 0])
+             | (_binary_bins_pulse_table_bin_start[(4 * i) + 1] << 8)
+             | (_binary_bins_pulse_table_bin_start[(4 * i) + 2] << 16)
+             | (_binary_bins_pulse_table_bin_start[(4 * i) + 3] << 24);
+    pulse_table[i] = temp;
+  }
+
+  return;
+}
+
+/*
+ * Loads the triangle/noise/dmc table from the binary into memory.
+ */
+static void apu_init_tndmc_table(void) {
+  // Get the address of the tndmc table.
+  extern const word_t _binary_bins_tndmc_table_bin_start[];
+
+  // Convert the bytes of the table to floats and load them into memory.
+  tndmc_table = xmalloc(sizeof(float) * TNDMC_SIZE);
+  float temp;
+  uint32_t *convert = (uint32_t*) &temp;
+  for (size_t i = 0; i < TNDMC_SIZE; i++) {
+    *convert = (_binary_bins_tndmc_table_bin_start[(4 * i) + 0])
+             | (_binary_bins_tndmc_table_bin_start[(4 * i) + 1] << 8)
+             | (_binary_bins_tndmc_table_bin_start[(4 * i) + 2] << 16)
+             | (_binary_bins_tndmc_table_bin_start[(4 * i) + 3] << 24);
+    tndmc_table[i] = temp;
+  }
+
   return;
 }
 
@@ -688,11 +754,11 @@ static void apu_play_sample(void) {
     return;
   }
 
-  // Use NESDEV's formula to linearly approximate the output of the APU.
-  float output = (0.00752 * ((float) (pulse_a->output + pulse_b->output)))
-               + (0.00851 * ((float) triangle->output))
-               + (0.00494 * ((float) noise->output))
-               + (0.00335 * ((float) dmc->level));
+  // Pull the output of the APU from the mixing tables.
+  float pulse_output = pulse_table[pulse_a->output + pulse_b->output];
+  float tndmc_output = tndmc_table[(triangle->output << TRIANGLE_DIM_SHIFT)
+                     | (noise->output << NOISE_DIM_SHIFT) | dmc->level];
+  float output = pulse_output + tndmc_output;
 
   // Add the output to the sample buffer.
   audio_add_sample(output);

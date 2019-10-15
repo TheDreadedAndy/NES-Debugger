@@ -153,6 +153,8 @@
 
 /*
  * Contains the registers and memory internal to the PPU.
+ *
+ * TODO: Consider splitting into a register and OAM struct.
  */
 typedef struct ppu {
   // Internal ppu registers.
@@ -170,6 +172,7 @@ typedef struct ppu {
   word_t oam_addr;
 
   // Working memory for the ppu.
+  // TODO: Consider using pointers instead.
   word_t oam_mask;
   word_t primary_oam[PRIMARY_OAM_SIZE];
   word_t soam_eval_buf;
@@ -178,6 +181,8 @@ typedef struct ppu {
   word_t oam_buffer[OAM_BUFFER_SIZE];
 
   // Temporary storage used in rendering.
+  // TODO: Remove these in favor of a system which displays tiles as soon
+  // as they are recieved.
   mword_t tile_scroll[BIT_PLANES];
   word_t next_tile[BIT_PLANES];
   word_t palette_scroll[BIT_PLANES];

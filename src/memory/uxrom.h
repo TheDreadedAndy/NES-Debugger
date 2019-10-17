@@ -10,24 +10,44 @@
 // The defined mapper number that this memory system belongs to.
 #define UXROM_MAPPER 2
 
-/* Tools for using NES virtual memory */
+// The maximum number of cart banks supported by this mapper.
+#define UXROM_MAX_BANKS 16U
 
-// Memory data structure creation function.
-void uxrom_new(FILE *rom_file, memory_t *M);
+// The maximum number of nametable screens exposed by memory.
+#define UXROM_MAX_SCREENS 4U
 
-// Memory read function.
-word_t uxrom_read(dword_t addr, void *map);
+class Uxrom : public Memory {
+  private:
+    // Used to emulate open bus behavior. Stores the last value read
+    // from system memory.
+    word_t bus;
 
-// Memory write function. Handles bank switching.
-void uxrom_write(word_t val, dword_t addr, void *map);
+    // NES system ram.
+    word_t *ram;
 
-// VRAM read function.
-word_t uxrom_vram_read(dword_t addr, void *map);
+    // Cart memory.
+    word_t *bat;
+    word_t *cart[UXROM_MAX_BANKS];
+    word_t current_bank;
+    // Should always be fixed to the final bank used.
+    word_t fixed_bank;
+    word_t bank_mask;
 
-// VRAM write function.
-void uxrom_vram_write(word_t val, dword_t addr, void *map);
+    // PPU memory.
+    word_t *pattern_table;
+    bool is_chr_ram;
+    word_t *nametable[UXROM_MAX_SCREENS];
 
-// Memory free function.
-void uxrom_free(void *map);
+    // Used to expose colors to the rendering system as an optimization.
+    uint32_t *palette_data;
+
+    // Helper functions for this class.
+    void LoadPrg(FILE *rom_file);
+    void LoadChr(FILE *rom_file);
+
+  public:
+    Uxrom(FILE *rom_file, header_t *rom_header);
+    ~Uxrom();
+};
 
 #endif

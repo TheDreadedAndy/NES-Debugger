@@ -3,11 +3,7 @@
  *
  * Abstracts away memory mapping from the 2A03.
  *
- * Loading the rom and dealing with it's mapper is handled using
- * the generic memory structure. Memory_new creates a memory
- * structure which contains a pointer to the proper memory
- * structure for the mapper and the functions to interact with
- * said mapper. The structure also contains the parsed file header.
+ * TODO
  */
 
 #include <stdlib.h>
@@ -56,51 +52,47 @@
 #define VRAM_ADDR_MASK 0x3FFFU
 
 /*
- * Holds the global memory structure. Unavailable outside this file.
- * Manages mappers, RAM, MMIO, and VRAM
- */
-memory_t *system_memory = NULL;
-
-/*
- * Holds the last value read from/written to memory.
- * Used to emulate open-bus behavior.
- */
-word_t memory_bus = 0;
-
-/*
- * Initializes all system memory for the NES emulation.
+ * Uses the header to determine which memory mapper should be created, and
+ * creates it. The mapper is filled with the data from the provided rom file.
  *
- * Assumes the system memory has not already been initialized.
- * Assumes that the file is open and valid.
- * Assumes that the provided header is non-null and valid.
+ * On success, the returned value is the memory mapper class cast to Memory.
+ * On failure, returns NULL.
+ *
+ * Assumes the provided header is non-null and valid.
+ * Assumes the provided rom file is non-null and a valid NES rom.
+ * Assumes that the provided header was generated using the given rom file.
  */
-bool memory_init(FILE *rom_file, header_t *header) {
-  // Allocate the generic memory structure.
-  system_memory = xcalloc(1, sizeof(memory_t));
-  system_memory->ram = rand_alloc(sizeof(word_t) * RAM_SIZE);
-  system_memory->palette_data = rand_alloc(sizeof(uint32_t) * PALETTE_SIZE);
-  system_memory->header = header;
-
+Memory *MemoryCreate(FILE *rom_file, header_t *rom_header) {
   // Use the decoded header to decide which memory structure should be created.
+  Memory *mem = NULL;
   switch(header->mapper) {
     case NROM_MAPPER:
-      nrom_new(rom_file, system_memory);
+      mem = new Nrom(rom_file, rom_header);
       break;
     case SXROM_MAPPER:
-      sxrom_new(rom_file, system_memory);
+      mem = new Sxrom(rom_file, rom_header);
       break;
     case UXROM_MAPPER:
-      uxrom_new(rom_file, system_memory);
+      mem = new Uxrom(rom_file, rom_header);
       break;
     default:
       fprintf(stderr, "Error: Rom requires unimplemented mapper: %d\n",
               (unsigned int) header->mapper);
-      return false;
+      break;
   }
 
-  // Return the result of the mapper creation as a boolean.
-  return system_memory != NULL;
+  return mem;
 }
+
+/*
+ * This must be here to prevent issues with declaring a pure
+ * virtual constructor.
+ */
+Memory::Memory(void) {
+  return;
+}
+
+//TODO: Remove all below this line.
 
 /*
  * Uses the generic memory structures read function to read a word

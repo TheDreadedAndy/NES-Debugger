@@ -24,9 +24,9 @@ typedef union multi_word {
 #define WORD_MASK 0xFFU
 
 // Reverses a word.
-word_t reverse_word(word_t word);
+word_t ReverseWord(word_t word);
 
 // Gets the MSB of a word.
-word_t msb_word(word_t word);
+word_t MsbWord(word_t word);
 
 #endif

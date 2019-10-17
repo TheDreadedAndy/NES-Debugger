@@ -12,34 +12,38 @@
 #define MEMORY_RESET_ADDR 0xFFFCU
 #define MEMORY_NMI_ADDR 0xFFFAU
 
-// Function types, used in memory structure to point to the proper
-// mapper function.
-typedef word_t memory_read_t(dword_t addr, void *map);
-typedef void memory_write_t(word_t val, dword_t addr, void *map);
-typedef void memory_free_t(void *map);
+/*
+ * Abstract memory class. All memory mappers must implement these functions.
+ *
+ * The read and write functions allow access to the CPU's memory.
+ * The vram functions allow access to the PPU's memory.
+ * As an optimization, each mapper must provide someway to retrieve the
+ * xRGB color associated with any color in palette data.
+ *
+ * All memory classes are given access to the header structure associated with
+ * the loaded rom, should they require it in their implementation.
+ */
+class memory_t {
+  protected:
+    // Points the header structure asssociated with the loaded rom.
+    header_t *header;
 
-// Generic memory data structure.
-// Includes a pointer to a specific memory implementation and
-// the functions necessary to interact with said implementation.
-typedef struct memory {
-  // NES system RAM and VRAM palette data.
-  // Mappers do not change this or any MMIO.
-  word_t *ram;
+  public:
+    // Provides access to CPU memory.
+    virtual word_t read(dword_t addr) = 0;
+    virtual void write(dword_t addr, word_t val) = 0;
 
-  // As an optimization, palette data is stored with the MSB as the NES color
-  // and the lower three bytes as a decoded xRGB color. See ppu/palette.c for
-  // more details.
-  uint32_t *palette_data;
+    // Provides access to PPU memory.
+    virtual word_t vram_read(dword_t addr) = 0;
+    virtual void vram_write(dword_t addr, word_t val) = 0;
 
-  // Mapper information.
-  void *map;
-  memory_read_t *read;
-  memory_write_t *write;
-  memory_read_t *vram_read;
-  memory_write_t *vram_write;
-  memory_free_t *free;
-  header_t *header;
-} memory_t;
+    // Provides quick access to the colors in the palette.
+    virtual uint32_t palette_read(dword_t addr) = 0;
+    virtual void palette_update() = 0;
+
+    // Frees any structures used by the memory class.
+    virtual ~memory() = 0;
+};
 
 // The last value read/written to memory. Used to emulate open-bus behavior.
 extern word_t memory_bus;

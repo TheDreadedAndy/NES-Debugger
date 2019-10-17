@@ -14,6 +14,37 @@
 #define MEMORY_RESET_ADDR 0xFFFCU
 #define MEMORY_NMI_ADDR 0xFFFAU
 
+// CPU memory map offsets.
+#define PPU_OFFSET 0x2000U
+#define IO_OFFSET 0x4000U
+#define MAPPER_OFFSET 0x4020U
+
+// CPU memory accessing masks.
+#define RAM_MASK 0x7FFU
+#define BAT_MASK 0x1FFFU
+
+// CPU memory size values.
+#define RAM_SIZE 0x800U
+
+// PPU memory map offsets.
+#define NAMETABLE_OFFSET 0x2000U
+#define PALETTE_OFFSET 0x3F00U
+
+// PPU memory accessing masks.
+#define VRAM_ADDR_MASK 0x3FFFU
+#define NAMETABLE_SELECT_MASK 0x0C00U
+#define NAMETABLE_ADDR_MASK 0x03FFU
+#define PALETTE_ADDR_MASK 0x001FU
+#define PALETTE_BG_ACCESS_MASK 0x0003U
+#define PALETTE_BG_MASK 0x000CU
+
+// PPU memory size values.
+#define NAMETABLE_SIZE 0x0400U
+
+// Used to interact with the optimized palette.
+#define PALETTE_NES_PIXEL_SHIFT 24U
+#define PALETTE_XRGB_MASK 0x00FFFFFFU
+
 /*
  * Abstract memory class. All memory mappers must implement these functions.
  *
@@ -31,19 +62,19 @@
 class Memory {
   protected:
     // Points the header structure asssociated with the loaded rom.
-    header_t *header;
+    RomHeader *header_;
 
     // Holds the current palette in memory, stored in an xRGB format with
     // the high byte set to the NES color byte. All implementations of memory
     // must fill this array with the current palette data using PaletteWrite.
-    uint32_t *palette_data;
+    uint32_t *palette_data_;
     void PaletteWrite(DoubleWord addr, DataWord val);
 
     // Points to the associated Ppp/Cpu/Apu classes for this memory class.
     // Necessary to perform most MMIO opperations.
-    Cpu *cpu;
-    Ppu *ppu;
-    Apu *apu;
+    Cpu *cpu_;
+    Ppu *ppu_;
+    Apu *apu_;
 
   public:
     // Provides access to CPU memory.
@@ -60,13 +91,10 @@ class Memory {
 
     // Gives the memory access to its associated Ppu/Cpu classes.
     // Must be called before any other function.
-    virtual void Connect(Cpu *conn_cpu, Ppu *conn_ppu, Apu *conn_apu) = 0;
+    virtual void Connect(Cpu *cpu, Ppu *ppu, Apu *apu) = 0;
 
-    // Decodes the header of the given rom and creates the palette data array.
-    virtual Memory();
-
-    // Frees the header and palette data array.
-    virtual ~Memory();
+    Memory(RomHeader *header);
+    ~Memory(void);
 };
 
 // Memory data structure initialization function. Handles memory maps.

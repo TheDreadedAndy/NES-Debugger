@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include "./data.h"
 
 // Avoid multiple definitions.
 #ifndef _NES_UTIL

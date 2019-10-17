@@ -20,34 +20,38 @@ class Uxrom : public Memory {
   private:
     // Used to emulate open bus behavior. Stores the last value read
     // from system memory.
-    DataWord bus;
+    DataWord bus_;
 
     // NES system ram.
-    DataWord *ram;
+    DataWord *ram_;
 
     // Cart memory.
-    DataWord *bat;
-    DataWord *cart[UXROM_MAX_BANKS];
-    DataWord current_bank;
+    DataWord *bat_;
+    DataWord *cart_[UXROM_MAX_BANKS];
+    DataWord current_bank_;
     // Should always be fixed to the final bank used.
-    DataWord fixed_bank;
-    DataWord bank_mask;
+    DataWord fixed_bank_;
+    DataWord bank_mask_;
 
     // PPU memory.
-    DataWord *pattern_table;
-    bool is_chr_ram;
-    DataWord *nametable[UXROM_MAX_SCREENS];
-
-    // Used to expose colors to the rendering system as an optimization.
-    uint32_t *palette_data;
+    DataWord *pattern_table_;
+    bool is_chr_ram_;
+    DataWord *nametable_[UXROM_MAX_SCREENS];
 
     // Helper functions for this class.
     void LoadPrg(FILE *rom_file);
     void LoadChr(FILE *rom_file);
 
   public:
-    Uxrom(FILE *rom_file, header_t *rom_header);
-    ~Uxrom();
+    // Functions implemented for the abstract class Memory.
+    DataWord Read(DoubleWord addr);
+    void Write(DoubleWord addr, DataWord val);
+    DataWord VramRead(DoubleWord addr);
+    void VramWrite(DoubleWord addr, DataWord val);
+    void Connect(Cpu *cpu, Ppu *ppu, Apu *apu);
+
+    Uxrom(FILE *rom_file, RomHeader *header);
+    ~Uxrom(void);
 };
 
 #endif

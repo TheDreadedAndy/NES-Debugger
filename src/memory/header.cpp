@@ -1,3 +1,14 @@
+/*
+ * All correctly formated NES roms are preceded by a 16-byte header,
+ * which encodes information about the chips contained on the board of the
+ * original rom.
+ *
+ * The purpose of this file is to decode that information
+ * into an easy to use structure, which can then be accessed by any
+ * mapper implementations. Doing this prevents every mapper implementation
+ * from having to include its own logic to decode the header.
+ */
+
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -45,23 +56,23 @@
 /* Global constants */
 
 // The first four bytes of all NES files should be this string.
-static const char *ines_preface = "NES\x1A";
+static const char *kInesPreface = "NES\x1A";
 
 /* Function definitions. */
-static nes_header_t get_header_type(char *file_header, size_t rom_size);
-static void decode_archaic_ines(header_t *header, char *file_header);
-static size_t get_ines_prg_rom_size(char *file_header);
-static size_t get_ines_chr_rom_size(char *file_header);
-static void decode_flag6(header_t *header, char *file_header);
-static void decode_ines(header_t *header, char *file_header);
-static size_t get_ines_mapper(char *file_header);
-static size_t get_ines_prg_ram_size(char *file_header);
-static void decode_ines_bools(header_t *header, char *file_header);
-static void decode_nes2(header_t *header, char *file_header);
-static size_t get_nes2_prg_rom_size(char *file_header);
-static size_t get_nes2_chr_rom_size(char *file_header);
-static size_t get_nes2_rom_section_size(word_t lsb, word_t msb,
-                                        size_t unit_size);
+static NesHeaderType GetHeaderType(char *file_header, size_t rom_size);
+static void DecodeArchaicInes(RomHeader *header, char *file_header);
+static size_t GetInesPrgRomSize(char *file_header);
+static size_t GetInesChrRomSize(char *file_header);
+static void DecodeFlag6(RomHeader *header, char *file_header);
+static void DecodeInes(RomHeader *header, char *file_header);
+static size_t GetInesMapper(char *file_header);
+static size_t GetInesPrgRamSize(char *file_header);
+static void DecodeInesBools(RomHeader *header, char *file_header);
+static void DecodeNes2(RomHeader *header, char *file_header);
+static size_t GetNes2PrgRomSize(char *file_header);
+static size_t GetNes2ChrRomSize(char *file_header);
+static size_t GetNes2RomSectionSize(DataWord lsb, DataWord msb,
+                                    size_t unit_size);
 
 /*
  * Takes in a rom file and returns the corresponding header structure.
@@ -71,41 +82,41 @@ static size_t get_nes2_rom_section_size(word_t lsb, word_t msb,
  * Returns a header structure on success and NULL otherwise.
  * Fails if the header is invalid.
  */
-header_t *decode_header(FILE *rom_file) {
+RomHeader *DecodeHeader(FILE *rom_file) {
   // Read the header in from the file.
   fseek(rom_file, 0, SEEK_SET);
-  char *file_header = xmalloc(sizeof(char) * HEADER_SIZE);
+  char *file_header = new char[HEADER_SIZE];
   for (size_t i = 0; i < HEADER_SIZE; i++) { file_header[i] = fgetc(rom_file); }
 
   // Calculate the size of the rom file.
-  size_t rom_size = get_file_size(rom_file);
+  size_t rom_size = GetFileSize(rom_file);
 
   // Verify that the header is correct.
-  if (strncmp(file_header, ines_preface, PREFACE_SIZE)) {
+  if (strncmp(file_header, kInesPreface, PREFACE_SIZE)) {
     fprintf(stderr, "Error: the provided file is not an NES file\n");
     return NULL;
   }
 
   // Allocate the header structure and determine the header type.
-  header_t *header = xcalloc(1, sizeof(header_t));
-  header->header_type = get_header_type(file_header, rom_size);
+  RomHeader *header = new RomHeader;
+  header->header_type = GetHeaderType(file_header, rom_size);
 
   // Decode the header according to its type.
   switch (header->header_type) {
     case ARCHAIC_INES:
       fprintf(stderr, "Warning: Provided rom has an Archaic INES header\n");
-      decode_archaic_ines(header, file_header);
+      DecodeArchaicInes(header, file_header);
       break;
     case INES:
-      decode_ines(header, file_header);
+      DecodeInes(header, file_header);
       break;
     case NES2:
-      decode_nes2(header, file_header);
+      DecodeNes2(header, file_header);
       break;
   }
 
   // Clean up and exit
-  free(file_header);
+  delete[] file_header;
   CONTRACT((header->prg_rom_size + header->chr_rom_size + 16) == rom_size);
   return header;
 }
@@ -116,7 +127,7 @@ header_t *decode_header(FILE *rom_file) {
  *
  * Assumes the header is non-null.
  */
-static nes_header_t get_header_type(char *file_header, size_t rom_size) {
+static NesHeaderType GetHeaderType(char *file_header, size_t rom_size) {
   /*
    * Byte 7, bits 2 and 3, of a nes file header contain an
    * indicator for whether or not the header is in the NES 2.0 format.
@@ -126,8 +137,8 @@ static nes_header_t get_header_type(char *file_header, size_t rom_size) {
    */
 
   // Get the size of the rom as if it was a nes2 header.
-  size_t size = get_nes2_prg_rom_size(file_header)
-              + get_nes2_chr_rom_size(file_header) + HEADER_SIZE;
+  size_t size = GetNes2PrgRomSize(file_header)
+              + GetNes2ChrRomSize(file_header) + HEADER_SIZE;
 
   // Determine if it's a nes2 header.
   if (((file_header[7] & 0x0C) == 0x08) && size <= rom_size) {
@@ -154,10 +165,10 @@ static nes_header_t get_header_type(char *file_header, size_t rom_size) {
  * the archaic INES format.
  * Assumes the header structure is non-null.
  */
-static void decode_archaic_ines(header_t *header, char *file_header) {
+static void DecodeArchaicInes(RomHeader *header, char *file_header) {
   // Gets the ram sizes using the INES standard.
-  header->prg_rom_size = get_ines_prg_rom_size(file_header);
-  header->chr_rom_size = get_ines_chr_rom_size(file_header);
+  header->prg_rom_size = GetInesPrgRomSize(file_header);
+  header->chr_rom_size = GetInesChrRomSize(file_header);
 
   // When an INES header does not specify a size for CHR-ROM, 8K of CHR-RAM
   // is assumed to be present.
@@ -167,10 +178,10 @@ static void decode_archaic_ines(header_t *header, char *file_header) {
 
   // The archaic ines format supported only 16 mappers, which were
   // determined by the upper four bits of flag 6.
-  header->mapper = (((word_t) file_header[FLAG_6]) >> 4);
+  header->mapper = ((static_cast<DataWord>(file_header[FLAG_6])) >> 4);
 
   // All three formats use the same flags in byte 6.
-  decode_flag6(header, file_header);
+  DecodeFlag6(header, file_header);
 
   return;
 }
@@ -180,8 +191,9 @@ static void decode_archaic_ines(header_t *header, char *file_header) {
  *
  * Assumes the header is non-null, 16 bytes long, and in an INES format.
  */
-static size_t get_ines_prg_rom_size(char *file_header) {
-  return ((size_t) file_header[PRG_ROM_SIZE_LSB]) * PRG_ROM_CHUNKSIZE;
+static size_t GetInesPrgRomSize(char *file_header) {
+  return (static_cast<size_t>(file_header[PRG_ROM_SIZE_LSB]))
+                            * PRG_ROM_CHUNKSIZE;
 }
 
 /*
@@ -189,8 +201,9 @@ static size_t get_ines_prg_rom_size(char *file_header) {
  *
  * Assumes the header is non-null, 16 bytes long, and in an INES format.
  */
-static size_t get_ines_chr_rom_size(char *file_header) {
-  return ((size_t) file_header[CHR_ROM_SIZE_LSB]) * CHR_ROM_CHUNKSIZE;
+static size_t GetInesChrRomSize(char *file_header) {
+  return (static_cast<size_t>(file_header[CHR_ROM_SIZE_LSB]))
+                            * CHR_ROM_CHUNKSIZE;
 }
 
 /*
@@ -199,11 +212,11 @@ static size_t get_ines_chr_rom_size(char *file_header) {
  *
  * Assumes the header is non-null and 16 bytes long.
  */
-static void decode_flag6(header_t *header, char *file_header) {
-  header->mirror = (bool) (file_header[FLAG_6] & 0x01);
-  header->battery = (bool) (file_header[FLAG_6] & 0x02);
-  header->trainer = (bool) (file_header[FLAG_6] & 0x04);
-  header->four_screen = (bool) (file_header[FLAG_6] & 0x08);
+static void DecodeFlag6(RomHeader *header, char *file_header) {
+  header->mirror = static_cast<bool>(file_header[FLAG_6] & 0x01);
+  header->battery = static_cast<bool>(file_header[FLAG_6] & 0x02);
+  header->trainer = static_cast<bool>(file_header[FLAG_6] & 0x04);
+  header->four_screen = static_cast<bool>(file_header[FLAG_6] & 0x08);
   return;
 }
 
@@ -213,10 +226,10 @@ static void decode_flag6(header_t *header, char *file_header) {
  * Assumes the file header is non-null, 16 bytes long, and in the INES format.
  * Assumes the header structure is non-null.
  */
-static void decode_ines(header_t *header, char *file_header) {
+static void DecodeInes(RomHeader *header, char *file_header) {
   // Get the ram sizes using the INES standard.
-  header->prg_rom_size = get_ines_prg_rom_size(file_header);
-  header->chr_rom_size = get_ines_chr_rom_size(file_header);
+  header->prg_rom_size = GetInesPrgRomSize(file_header);
+  header->chr_rom_size = GetInesChrRomSize(file_header);
 
   // When an INES header does not specify a size for CHR-ROM, CHR-RAM
   // is assumed to be present. This ram size is not specified, but here we
@@ -226,16 +239,16 @@ static void decode_ines(header_t *header, char *file_header) {
   }
 
   // Get the header using the INES standard.
-  header->mapper = get_ines_mapper(file_header);
+  header->mapper = GetInesMapper(file_header);
 
   // Decode the universal flag byte.
-  decode_flag6(header, file_header);
+  DecodeFlag6(header, file_header);
 
   // Get the ram size.
-  header->prg_ram_size = get_ines_prg_ram_size(file_header);
+  header->prg_ram_size = GetInesPrgRamSize(file_header);
 
   // Decode the remaining flags and exit.
-  decode_ines_bools(header, file_header);
+  DecodeInesBools(header, file_header);
   return;
 }
 
@@ -244,8 +257,9 @@ static void decode_ines(header_t *header, char *file_header) {
  *
  * Assumes the file header is non-null, 16 bytes long, and in the INES format.
  */
-static size_t get_ines_mapper(char *file_header) {
-  return (file_header[FLAG_7] & 0xf0U) | (((word_t) file_header[FLAG_6]) >> 4);
+static size_t GetInesMapper(char *file_header) {
+  return (file_header[FLAG_7] & 0xf0U)
+       | ((static_cast<DataWord>(file_header[FLAG_6])) >> 4);
 }
 
 /*
@@ -253,13 +267,14 @@ static size_t get_ines_mapper(char *file_header) {
  *
  * Assumes the file header is non-null, 16 bytes long, and in the INES format.
  */
-static size_t get_ines_prg_ram_size(char *file_header) {
-  if (((size_t) file_header[INES_PRG_RAM_SIZE]) == 0) {
+static size_t GetInesPrgRamSize(char *file_header) {
+  if ((static_cast<size_t>(file_header[INES_PRG_RAM_SIZE])) == 0) {
     // For compatibility reasons, 8KB of ram is always given to the rom, even
     // in mappers where it did not actually exist (like UxROM).
     return INES_PRG_RAM_CHUNKSIZE;
   } else {
-    return ((size_t) file_header[INES_PRG_RAM_SIZE]) * INES_PRG_RAM_CHUNKSIZE;
+    return (static_cast<size_t>(file_header[INES_PRG_RAM_SIZE]))
+                              * INES_PRG_RAM_CHUNKSIZE;
   }
 }
 
@@ -268,7 +283,7 @@ static size_t get_ines_prg_ram_size(char *file_header) {
  *
  * Assumes the file header is non-null, 16 bytes long, and in the INES format.
  */
-static void decode_ines_bools(header_t *header, char *file_header) {
+static void DecodeInesBools(RomHeader *header, char *file_header) {
   // Convert the VS bool to the header enum.
   if (file_header[FLAG_7] & 0x01) {
     header->console_type = VS;
@@ -293,12 +308,12 @@ static void decode_ines_bools(header_t *header, char *file_header) {
  * NES 2.0 format.
  * Assumes the structure is non-null.
  */
-static void decode_nes2(header_t *header, char *file_header) {
+static void DecodeNes2(RomHeader *header, char *file_header) {
   // TODO: Implement NES 2.0 header decoding.
   fprintf(stderr,
           "Warning: NES 2.0 headers are not implemented. Decoding as INES\n");
   header->header_type = INES;
-  decode_ines(header, file_header);
+  DecodeInes(header, file_header);
   return;
 }
 
@@ -307,10 +322,10 @@ static void decode_nes2(header_t *header, char *file_header) {
  *
  * Assumes the header is non-null, 16 bytes long, and in the NES 2.0 format.
  */
-static size_t get_nes2_prg_rom_size(char *file_header) {
-  word_t prg_lsb = (word_t) file_header[PRG_ROM_SIZE_LSB];
-  word_t prg_msb = (word_t) (file_header[9] & 0x0fU);
-  return get_nes2_rom_section_size(prg_lsb, prg_msb, PRG_ROM_CHUNKSIZE);
+static size_t GetNes2PrgRomSize(char *file_header) {
+  DataWord prg_lsb = static_cast<DataWord>(file_header[PRG_ROM_SIZE_LSB]);
+  DataWord prg_msb = static_cast<DataWord>(file_header[9] & 0x0fU);
+  return GetNes2RomSectionSize(prg_lsb, prg_msb, PRG_ROM_CHUNKSIZE);
 }
 
 /*
@@ -318,10 +333,10 @@ static size_t get_nes2_prg_rom_size(char *file_header) {
  *
  * Assumes the header is non-null, 16 bytes long, and in the NES 2.0 format.
  */
-static size_t get_nes2_chr_rom_size(char *file_header) {
-  word_t chr_lsb = (word_t) file_header[CHR_ROM_SIZE_LSB];
-  word_t chr_msb = ((word_t) file_header[9]) >> 4;
-  return get_nes2_rom_section_size(chr_lsb, chr_msb, CHR_ROM_CHUNKSIZE);
+static size_t GetNes2ChrRomSize(char *file_header) {
+  DataWord chr_lsb = static_cast<DataWord>(file_header[CHR_ROM_SIZE_LSB]);
+  DataWord chr_msb = (static_cast<DataWord>(file_header[9])) >> 4;
+  return GetNes2RomSectionSize(chr_lsb, chr_msb, CHR_ROM_CHUNKSIZE);
 }
 
 /*
@@ -330,15 +345,16 @@ static size_t get_nes2_chr_rom_size(char *file_header) {
  * Assumes the unit_size is correct for the section being calculated, and
  * that the high 4 bits of the msb are 0.
  */
-static size_t get_nes2_rom_section_size(word_t lsb, word_t msb,
-                                        size_t unit_size) {
+static size_t GetNes2RomSectionSize(DataWord lsb, DataWord msb,
+                                    size_t unit_size) {
   if (msb == 0xfU) {
-    // If the msb is 0xf, then the size follows the formulat 2^E * (MM * 2 + 1),
+    // If the msb is 0xf, then the size follows the formula 2^E * (MM * 2 + 1),
     // where E is the high 6 bits of the lsb and MM is the lower 2 bits.
     return (1 << (lsb & 0xFC)) * (((lsb & 0x03) << 1) + 1);
   } else {
     // Otherwise, the msb and lsb are considered as one number and multiplied
     // by the given unit size.
-    return ((((size_t) msb) << 8) | ((size_t) lsb)) * unit_size;
+    return (((static_cast<size_t>(msb)) << 8) | (static_cast<size_t>(lsb)))
+                                              * unit_size;
   }
 }

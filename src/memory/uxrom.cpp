@@ -16,6 +16,7 @@
 #include "./header.h"
 #include "./uxrom.h"
 #include "../util/data.h"
+#include "../io/controller.h"
 
 // Constants used to size and access memory.
 #define BANK_SIZE 0x4000U
@@ -29,6 +30,10 @@
 #define BAT_OFFSET 0x6000U
 #define BAT_MASK 0x1FFFU
 #define RAM_SIZE 0x800U
+#define RAM_MASK 0x7FFU
+#define PPU_OFFSET 0x2000U
+#define IO_OFFSET 0x4000U
+#define UXROM_OFFSET 0x4020U
 
 // Constants used to size and access VRAM.
 #define CHR_RAM_SIZE 0x2000U
@@ -124,40 +129,70 @@ void Uxrom::LoadChr(FILE *rom_file) {
 }
 
 /*
- * TODO
+ * Reads a value from the given address, accounting for MMIO and bank
+ * switching. If the address given leads to an open bus, the last value
+ * that was placed on the bus is returned instead.
  *
- * Takes in an address and a generic mapper pointer.
- * Uses these bytes to address the memory in the mapper.
- *
- * Assumes that the pointer is non-null and points to a valid
- * UxROM mapper.
+ * Assumes that Connect has been called on valid Cpu/Ppu/Apu classes for this
+ * memory class.
  */
 DataWord Uxrom::Read(DoubleWord addr) {
-  // Detect where in memory we need to access and do so.
-  if (addr < BAT_OFFSET) {
-    return memory_bus;
-  } else if (addr < BANK_OFFSET) {
+  // Detect where in memory we need to access and place the value on the bus.
+  if (addr < PPU_OFFSET) {
+    // Read from RAM.
+    bus = ram[addr & RAM_MASK];
+  } else if ((PPU_OFFSET <= addr) && (addr < IO_OFFSET)) {
+    // Access PPU MMIO.
+    bus = ppu->Read(addr);
+  } else if ((IO_OFFSET <= addr) && (addr < UXROM_OFFSET)) {
+    // Read from IO/APU MMIO.
+    if ((addr == IO_JOY1_ADDR) || (addr == IO_JOY2_ADDR)) {
+      bus = controller_read(addr);
+    } else {
+      bus = apu->Read(addr);
+    }
+  } else if ((BAT_OFFSET <= addr) && (addr < BANK_OFFSET)) {
+    // Read from the roms WRAM/Battery.
     return M->bat[addr & BAT_MASK];
-  } else if (addr < FIXED_BANK_OFFSET) {
+  } else if ((BANK_OFFSET <= addr) && (addr < FIXED_BANK_OFFSET)) {
+    // Read from the switchable bank.
     return M->cart[M->current_bank][addr & BANK_ADDR_MASK];
-  } else {
+  } else if (addr >= FIXED_BANK_OFFSET) {
+    // Read from the fixed bank.
     return M->cart[M->fixed_bank][addr & BANK_ADDR_MASK];
   }
+
+  return memory_bus;
 }
 
 /*
- * Takes in an address, a value, and a memory mapper.
- * Uses the address to write the value to the mapper.
+ * Writes a value to the given address, accounting for MMIO.
  *
- * Assumes that the mapper pointer is non-null and points
- * to a valid UxROM mapper.
+ * Assumes that Connect has been called on valid Cpu/Ppu/Apu classes for this
+ * memory class.
  */
-void uxrom_write(DataWord val, DoubleWord addr, void *map) {
-  // Cast back from generic pointer to the memory structure.
-  uxrom_t *M = (uxrom_t*) map;
+void Uxrom::Write(DoubleWord addr, DataWord val) {
+  // Put the value being written on the bus.
+  bus = val;
 
   // Detect where in memory we need to access and do so.
-  if ((BAT_OFFSET <= addr) && (addr < BANK_OFFSET)) {
+  if (addr < PPU_OFFSET) {
+    // Write to standard RAM.
+    ram[addr & RAM_MASK] = val;
+  } else if ((PPU_OFFSET <= addr) && (addr < IO_OFFSET)) {
+    // Write to the MMIO for the PPU.
+    ppu->Write(addr, val);
+  } else if ((IO_OFFSET <= addr) && (addr < MAPPER_OFFSET)) {
+    // Write to the general MMIO space.
+    if (addr == CPU_DMA_ADDR) {
+      cpu->StartDma(val);
+    } else if (addr == IO_JOY1_ADDR) {
+      ControllerWrite(addr, val);
+    } else {
+      apu->Write(addr, val);
+    }
+  } else if ((BAT_OFFSET <= addr) && (addr < BANK_OFFSET)) {
+    // Write to the WRAM/Battery of the cart.
     M->bat[addr & BAT_MASK] = val;
   } else if (addr >= BANK_OFFSET) {
     // Writing to the cart area uses the low bits to select a bank.

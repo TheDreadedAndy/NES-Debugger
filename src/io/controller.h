@@ -9,9 +9,9 @@
 #define IO_JOY2_ADDR 0x4017U
 
 // Reads from a controller mmio address.
-word_t controller_read(dword_t addr);
+DataWord ControllerRead(DoubleWord addr);
 
 // Writes to a controller mmio address.
-void controller_write(word_t val, dword_t addr);
+void ControllerWrite(DoubleWord addr, DataWord val);
 
 #endif

@@ -22,21 +22,8 @@
 #include "../io/controller.h"
 #include "../apu/apu.h"
 
-// RAM data constants.
-#define RAM_SIZE 0x800U
-#define RAM_MASK 0x7FFU
-
-// The address at which PPU registers are located.
-#define PPU_OFFSET 0x2000U
-
-// The address at which APU and IO registers are located.
-#define IO_OFFSET 0x4000U
-
-// The address at which memory begins  to depend on the mapper in use.
-#define MAPPER_OFFSET 0x4020U
-
 // Size of NES palette data.
-#define PALETTE_SIZE 0x20U
+#define PALETTE_DATA_SIZE 0x20U
 
 // Used to determine if (and where) the palette is being addressed.
 #define PALETTE_ACCESS_MASK 0x3F00U
@@ -62,10 +49,14 @@
  * Assumes the provided rom file is non-null and a valid NES rom.
  * Assumes that the provided header was generated using the given rom file.
  */
-Memory *MemoryCreate(FILE *rom_file, header_t *rom_header) {
+Memory *MemoryCreate(FILE *rom_file) {
+  // Use the provided rom file to create a decoded rom header.
+  RomHeader *rom_header = DecodeHeader(rom_file);
+  if (rom_header == NULL) { return NULL; }
+
   // Use the decoded header to decide which memory structure should be created.
   Memory *mem = NULL;
-  switch(header->mapper) {
+  switch(rom_header->mapper) {
     case NROM_MAPPER:
       mem = new Nrom(rom_file, rom_header);
       break;
@@ -77,7 +68,7 @@ Memory *MemoryCreate(FILE *rom_file, header_t *rom_header) {
       break;
     default:
       fprintf(stderr, "Error: Rom requires unimplemented mapper: %d\n",
-              static_cast<unsigned int>(header->mapper));
+              static_cast<unsigned int>(rom_header->mapper));
       break;
   }
 
@@ -85,79 +76,56 @@ Memory *MemoryCreate(FILE *rom_file, header_t *rom_header) {
 }
 
 /*
- * This must be here to prevent issues with declaring a pure
- * virtual constructor.
+ * Reads an xRGB color from the palette.
  */
-Memory::Memory(void) {
+uint32_t Memory::PaletteRead(DoubleWord addr) {
+  // Convert the address into an access to the palette data array.
+  addr = (addr & PALETTE_BG_ACCESS_MASK) ? (addr & PALETTE_ADDR_MASK)
+                                         : (addr & PALETTE_BG_MASK);
+  return palette_data[addr] & PALETTE_XRGB_MASK;
+}
+
+/*
+ * TODO
+ */
+void Memory::PaletteWrite(DoubleWord addr, DataWord val) {
+  return;
+}
+
+/*
+ * Refreshes the xRGB pixels that are stored in the palette.
+ */
+void Memory::PaletteUpdate(void) {
+  // Update each entry in the palette.
+  DataWord nes_pixel;
+  uint32_t pixel;
+  for (size_t i = 0; i < PALETTE_SIZE; i++) {
+    nes_pixel = palette_data[i] >> PALETTE_NES_PIXEL_SHIFT;
+    pixel = (nes_pixel << PALETTE_NES_PIXEL_SHIFT) | palette_decode(nes_pixel);
+    palette_data[i] = pixel;
+  }
+  return;
+}
+
+/*
+ * Stores the provided header and allocates the palette array.
+ */
+Memory::Memory(RomHeader *rom_header) {
+  header = rom_header;
+  palette_data = new uint32_t[PALETTE_DATA_SIZE];
+  return;
+}
+
+/*
+ * Frees the header and palatte data array associated with this memory class.
+ */
+Memory::~Memory() {
+  delete header;
+  delete[] palette_data;
   return;
 }
 
 //TODO: Remove all below this line.
-
-/*
- * Uses the generic memory structures read function to read a word
- * from memory.
- *
- * Assumes the memory structure is valid.
- */
-DataWord memory_read(DoubleWord addr) {
-  // Determine if the NES address space or the mapper should be accessed.
-  if (addr < PPU_OFFSET) {
-    // Access standard ram.
-    memory_bus = system_memory->ram[addr & RAM_MASK];
-  } else if (addr < IO_OFFSET) {
-    // Access PPU MMIO.
-    memory_bus = ppu_read(addr);
-  } else if (addr < MAPPER_OFFSET) {
-    // Access APU and IO registers.
-    if ((addr == IO_JOY1_ADDR) || (addr == IO_JOY2_ADDR)) {
-      // Read from controller register.
-      memory_bus = controller_read(addr);
-    } else {
-      // Read from APU register.
-      memory_bus = apu_read(addr);
-    }
-  } else {
-    // Access cartridge space using the mapper.
-    memory_bus = system_memory->read(addr, system_memory->map);
-  }
-
-  // Read the value from the bus.
-  return memory_bus;
-}
-
-/*
- * Uses the generic memory structures write function to write a word
- * to memory.
- *
- * Assumes the memory structure is valid.
- */
-void memory_write(DataWord val, DoubleWord addr) {
-  // Put the value being written on the bus.
-  memory_bus = val;
-
-  // Determine if the NES address space or the mapper should be accessed.
-  if (addr < PPU_OFFSET) {
-    // Access standard ram.
-    system_memory->ram[addr & RAM_MASK] = val;
-  } else if (addr < IO_OFFSET) {
-    // Access PPU MMIO.
-    ppu_write(addr, val);
-  } else if (addr < MAPPER_OFFSET) {
-    // Access APU and IO registers.
-    if (addr == CPU_DMA_ADDR) {
-      cpu_start_dma(val);
-    } else if (addr == IO_JOY1_ADDR) {
-      controller_write(val, addr);
-    } else {
-      apu_write(addr, val);
-    }
-  } else {
-    system_memory->write(val, addr, system_memory->map);
-  }
-
-  return;
-}
 
 /*
  * Uses the generic memory structures vram read function to read
@@ -207,49 +175,4 @@ void memory_vram_write(DataWord val, DoubleWord addr) {
   }
 
   return;
-}
-
-/*
- * Reads an xRGB color from the palette.
- *
- * Assumes memory has been initialized.
- */
-uint32_t memory_palette_read(DoubleWord addr) {
-  // Convert the address into an access to the palette data array.
-  addr = (addr & PALETTE_BG_ACCESS_MASK) ? (addr & PALETTE_ADDR_MASK)
-                                         : (addr & PALETTE_BG_MASK);
-  return system_memory->palette_data[addr] & PALETTE_XRGB_MASK;
-}
-
-/*
- * Refreshes the xRGB pixels that are stored in the palette.
- *
- * Assumes memory has been initialized.
- * Assumes the palette has been initialized.
- */
-void memory_palette_update(void) {
-  // Update each entry in the palette.
-  DataWord nes_pixel;
-  uint32_t pixel;
-  for (size_t i = 0; i < PALETTE_SIZE; i++) {
-    nes_pixel = system_memory->palette_data[i] >> PALETTE_NES_PIXEL_SHIFT;
-    pixel = (nes_pixel << PALETTE_NES_PIXEL_SHIFT) | palette_decode(nes_pixel);
-    system_memory->palette_data[i] = pixel;
-  }
-  return;
-}
-
-/*
- * Frees the generic memory structure.
- * Assumes that the structure is valid.
- */
-void memory_free(void) {
-  // Free the mapper structure using its specified function.
-  system_memory->free(system_memory->map);
-
-  // Free the generic structure.
-  free(system_memory->header);
-  free(system_memory->ram);
-  free(system_memory->palette_data);
-  free(system_memory);
 }

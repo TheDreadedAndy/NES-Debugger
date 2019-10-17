@@ -9,26 +9,26 @@
 #include "../util/data.h"
 
 // Each controller has a shift register for its inputs.
-word_t joy1_shift = 0xFF;
-word_t joy2_shift = 0xFF;
+DataWord joy1_shift = 0xFF;
+DataWord joy2_shift = 0xFF;
 
 // Additionally, standard controllers are polled for input
 // whenever the strobe bit is set.
-word_t joy_strobe = 0;
+DataWord joy_strobe = 0;
 
 /*
  * Reads from the specified controller port, shifting it.
  */
-word_t controller_read(dword_t addr) {
+DataWord ControllerRead(DoubleWord addr) {
   // Poll for SDL inputs, if strobe is active.
   if (joy_strobe) {
-    joy1_shift = input_poll();
+    joy1_shift = InputPoll();
     joy2_shift = 0x00U; // No P2 Emulation.
   }
 
   // Get the button being pressed for the requested controller and shift
   // its register to the next button.
-  word_t press = 0xFFU;
+  DataWord press = 0xFFU;
   if (addr == IO_JOY1_ADDR) {
     press = (joy1_shift & 1);
     joy1_shift = 0x80U | (joy1_shift >> 1);
@@ -45,13 +45,13 @@ word_t controller_read(dword_t addr) {
  * Writes to the controller registers, updating the strobe
  * and shift registers as needed.
  */
-void controller_write(word_t val, dword_t addr) {
+void ControllerWrite(DoubleWord addr, DataWord val) {
   // Update the strobe register if its address was written to.
   if (addr == IO_JOY1_ADDR) { joy_strobe = (val & 1); }
 
   // Poll for SDL inputs, if strobe is active.
   if (joy_strobe) {
-    joy1_shift = input_poll();
+    joy1_shift = InputPoll();
     joy2_shift = 0x00U; // No P2 Emulation.
   }
 

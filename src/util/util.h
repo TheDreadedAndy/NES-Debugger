@@ -7,7 +7,7 @@
 
 // Returns a randomized array of type word_t. The array is created with new,
 // and must be free'd with delete.
-word_t *RandNew(size_t size);
+DataWord *RandNew(size_t size);
 
 // Returns the size of the given file.
 size_t GetFileSize(FILE *file);

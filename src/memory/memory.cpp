@@ -77,7 +77,7 @@ Memory *MemoryCreate(FILE *rom_file, header_t *rom_header) {
       break;
     default:
       fprintf(stderr, "Error: Rom requires unimplemented mapper: %d\n",
-              (unsigned int) header->mapper);
+              static_cast<unsigned int>(header->mapper));
       break;
   }
 
@@ -100,7 +100,7 @@ Memory::Memory(void) {
  *
  * Assumes the memory structure is valid.
  */
-word_t memory_read(dword_t addr) {
+DataWord memory_read(DoubleWord addr) {
   // Determine if the NES address space or the mapper should be accessed.
   if (addr < PPU_OFFSET) {
     // Access standard ram.
@@ -132,7 +132,7 @@ word_t memory_read(dword_t addr) {
  *
  * Assumes the memory structure is valid.
  */
-void memory_write(word_t val, dword_t addr) {
+void memory_write(DataWord val, DoubleWord addr) {
   // Put the value being written on the bus.
   memory_bus = val;
 
@@ -165,7 +165,7 @@ void memory_write(word_t val, dword_t addr) {
  *
  * Assumes memory has been initialized.
  */
-word_t memory_vram_read(dword_t addr) {
+DataWord memory_vram_read(DoubleWord addr) {
   // Mask out any extra bits.
   addr &= VRAM_ADDR_MASK;
 
@@ -188,7 +188,7 @@ word_t memory_vram_read(dword_t addr) {
  * Assumes memory has been initialized.
  * Assumes the palette has been initialized.
  */
-void memory_vram_write(word_t val, dword_t addr) {
+void memory_vram_write(DataWord val, DoubleWord addr) {
   // Mask out any extra bits.
   addr &= VRAM_ADDR_MASK;
 
@@ -214,7 +214,7 @@ void memory_vram_write(word_t val, dword_t addr) {
  *
  * Assumes memory has been initialized.
  */
-uint32_t memory_palette_read(dword_t addr) {
+uint32_t memory_palette_read(DoubleWord addr) {
   // Convert the address into an access to the palette data array.
   addr = (addr & PALETTE_BG_ACCESS_MASK) ? (addr & PALETTE_ADDR_MASK)
                                          : (addr & PALETTE_BG_MASK);
@@ -229,7 +229,7 @@ uint32_t memory_palette_read(dword_t addr) {
  */
 void memory_palette_update(void) {
   // Update each entry in the palette.
-  word_t nes_pixel;
+  DataWord nes_pixel;
   uint32_t pixel;
   for (size_t i = 0; i < PALETTE_SIZE; i++) {
     nes_pixel = system_memory->palette_data[i] >> PALETTE_NES_PIXEL_SHIFT;

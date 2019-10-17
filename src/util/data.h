@@ -3,12 +3,12 @@
 #ifndef _NES_GLOBALS
 #define _NES_GLOBALS
 
-typedef uint8_t word_t;
-typedef uint16_t dword_t;
-typedef union multi_word {
-  dword_t dw;
-  word_t w[2];
-} mword_t;
+typedef uint8_t DataWord;
+typedef uint16_t DoubleWord;
+typedef union MultiWord {
+  DoubleWord dw;
+  DataWord w[2];
+} MultiWord;
 
 // Determine how the word union should be accessed, based on the byte order
 // of the target machine.
@@ -24,9 +24,9 @@ typedef union multi_word {
 #define WORD_MASK 0xFFU
 
 // Reverses a word.
-word_t ReverseWord(word_t word);
+DataWord ReverseWord(DataWord word);
 
 // Gets the MSB of a word.
-word_t MsbWord(word_t word);
+DataWord MsbWord(DataWord word);
 
 #endif

@@ -30,15 +30,15 @@ class Memory {
 
   public:
     // Provides access to CPU memory.
-    virtual word_t Read(dword_t addr) = 0;
-    virtual void Write(dword_t addr, word_t val) = 0;
+    virtual DataWord Read(DoubleWord addr) = 0;
+    virtual void Write(DoubleWord addr, DataWord val) = 0;
 
     // Provides access to PPU memory.
-    virtual word_t VramRead(dword_t addr) = 0;
-    virtual void VramWrite(dword_t addr, word_t val) = 0;
+    virtual DataWord VramRead(DoubleWord addr) = 0;
+    virtual void VramWrite(DoubleWord addr, DataWord val) = 0;
 
     // Provides quick access to the colors in the palette.
-    virtual uint32_t PaletteRead(dword_t addr) = 0;
+    virtual uint32_t PaletteRead(DoubleWord addr) = 0;
     virtual void PaletteUpdate() = 0;
 
     // Frees any structures used by the memory class.

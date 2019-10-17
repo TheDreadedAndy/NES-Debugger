@@ -71,7 +71,10 @@ Uxrom::Uxrom(FILE *rom_file, header_t *rom_header) {
 }
 
 /*
- * TODO
+ * Loads the program rom data into the calling Uxrom class during contruction.
+ *
+ * Assumes the provided rom file is non-null and points to a valid NES rom.
+ * Assumes the header field of the class is valid and matches the rom.
  */
 void Uxrom::LoadPrg(FILE *rom_file) {
   // Calculate the number of prg banks used by the rom, then load
@@ -79,7 +82,7 @@ void Uxrom::LoadPrg(FILE *rom_file) {
   size_t num_banks = (size_t) (header->prg_rom_size / BANK_SIZE);
   fseek(rom_file, HEADER_SIZE, SEEK_SET);
   for (size_t i = 0; i < num_banks; i++) {
-    cart[i] = new word_t[BANK_SIZE];
+    cart[i] = new DataWord[BANK_SIZE];
     for (size_t j = 0; j < BANK_SIZE; j++) {
       cart[i][j] = fgetc(rom_file);
     }
@@ -95,7 +98,10 @@ void Uxrom::LoadPrg(FILE *rom_file) {
 }
 
 /*
- * TODO
+ * Loads the CHR ROM data into the calling Uxrom class during construction.
+ *
+ * Assumes the provided rom file is non-null and points to a valid NES rom.
+ * Assumes the header field of the class is valid and matches the rom.
  */
 void Uxrom::LoadChr(FILE *rom_file) {
   // Check if the rom is using chr-ram, and allocate it if so.
@@ -108,7 +114,7 @@ void Uxrom::LoadChr(FILE *rom_file) {
   // Otherwise, the rom uses chr-rom and the data needs to be copied
   // from the rom file.
   is_chr_ram = false;
-  pattern_table = new word_t[header->chr_rom_size];
+  pattern_table = new DataWord[header->chr_rom_size];
   fseek(rom_file, HEADER_SIZE + header->prg_rom_size, SEEK_SET);
   for (size_t i = 0; i < PATTERN_TABLE_SIZE; i++) {
     pattern_table[i] = fgetc(rom_file);
@@ -118,16 +124,15 @@ void Uxrom::LoadChr(FILE *rom_file) {
 }
 
 /*
+ * TODO
+ *
  * Takes in an address and a generic mapper pointer.
  * Uses these bytes to address the memory in the mapper.
  *
  * Assumes that the pointer is non-null and points to a valid
  * UxROM mapper.
  */
-word_t uxrom_read(dword_t addr, void *map) {
-  // Cast back from generic pointer to the memory structure.
-  uxrom_t *M = (uxrom_t*) map;
-
+DataWord Uxrom::Read(DoubleWord addr) {
   // Detect where in memory we need to access and do so.
   if (addr < BAT_OFFSET) {
     return memory_bus;
@@ -147,7 +152,7 @@ word_t uxrom_read(dword_t addr, void *map) {
  * Assumes that the mapper pointer is non-null and points
  * to a valid UxROM mapper.
  */
-void uxrom_write(word_t val, dword_t addr, void *map) {
+void uxrom_write(DataWord val, DoubleWord addr, void *map) {
   // Cast back from generic pointer to the memory structure.
   uxrom_t *M = (uxrom_t*) map;
 
@@ -168,14 +173,14 @@ void uxrom_write(word_t val, dword_t addr, void *map) {
  * Assumes the mapper pointer is non-null and points
  * to a valid UxROM mapper.
  */
-word_t uxrom_vram_read(dword_t addr, void *map) {
+DataWord uxrom_vram_read(DoubleWord addr, void *map) {
   // Cast back from the generic structure.
   uxrom_t *M = (uxrom_t*) map;
 
   // Determine which part of VRAM is being accessed.
   if (addr & NAMETABLE_ACCESS_BIT) {
     // Name table is being accessed.
-    word_t table = (addr & NAMETABLE_SELECT_MASK) >> 10;
+    DataWord table = (addr & NAMETABLE_SELECT_MASK) >> 10;
     return M->nametable[table][addr & NAMETABLE_ADDR_MASK];
   } else {
     // Pattern table is being accessed.
@@ -190,14 +195,14 @@ word_t uxrom_vram_read(dword_t addr, void *map) {
  * Assumes the mapper pointer is non-null and points
  * to a valid UxROM mapper.
  */
-void uxrom_vram_write(word_t val, dword_t addr, void *map) {
+void uxrom_vram_write(DataWord val, DoubleWord addr, void *map) {
   // Cast back from the generic structure.
   uxrom_t *M = (uxrom_t*) map;
 
   // Determine which part of VRAM is being accessed.
   if (addr & NAMETABLE_ACCESS_BIT) {
     // Name table is being accessed.
-    word_t table = (addr & NAMETABLE_SELECT_MASK) >> 10;
+    DataWord table = (addr & NAMETABLE_SELECT_MASK) >> 10;
     M->nametable[table][addr & NAMETABLE_ADDR_MASK] = val;
   } else if (M->is_chr_ram) {
     // Pattern table is being accessed.

@@ -17,22 +17,22 @@
  * Allocates the requested number of words using new, then randomizes the
  * resulting array.
  */
-word_t *RandNew(size_t size) {
+DataWord *RandNew(size_t size) {
   // On the first call, rand is seeded with the current system time.
   static bool seeded = false;
   if (!seeded) {
-    srand((unsigned int) time(NULL));
+    srand(static_cast<unsigned int>(time(NULL)));
     seeded = true;
   }
 
   // Allocate the requested data.
-  word_t *res = new word_t[size];
+  DataWord *res = new DataWord[size];
 
   // Randomize the contents of the requested data.
   for (size_t i = 0; i < size; i++) {
     // On some platforms, the high bits of rand are more random than the low
     // bits. As such, the higher bits are shifted down to increase randomness.
-    res[i] = (word_t) (rand() >> 8);
+    res[i] = static_cast<DataWord>(rand() >> 8);
   }
 
   return res;

@@ -5,23 +5,47 @@
 #ifndef _NES_PALETTE
 #define _NES_PALETTE
 
-// Palette format constants. Colors are stored as ARGB 32-bit.
+// Palette format constants. Colors are stored as RGB 32-bit.
 #define PALETTE_DEPTH 32
 #define PALETTE_RMASK 0x00FF0000U
 #define PALETTE_GMASK 0x0000FF00U
 #define PALETTE_BMASK 0x000000FFU
 #define PIXEL_MASK 0x3FU
 
-// Loads in the palette file to be used for color decoding.
-void palette_init(char *file);
+/*
+ * Uses the provided file as an NES palette, allowing colors to be decoded
+ * into RGB colors.
+ *
+ * Color tints can be selected by providing a PPU mask value through the
+ * UpdateMask function.
+ */
+class NesPalette {
+  private:
+    // Checks if the loaded palette file was valid.
+    bool Invalid(FILE *pal_file);
 
-// Decodes an NES color into an ARGB color.
-uint32_t palette_decode(word_t color);
+    // Holds the color emphasis and grayscale value, which reflect
+    // the settings in PPUMASK.
+    DataWord color_tint_;
+    bool grayscale_colors_;
 
-// Updates the mask settings of the palette.
-void palette_update_mask(word_t mask);
+    // Stores the decoded paletter, where each index holds its
+    // corresponding color.
+    uint32_t *decoded_palette_;
 
-// Frees the palette file.
-void palette_free(void);
+  public:
+    // Loads in the given palette file for use in decoding colors.
+    // If the file is NULL or invalid, a default is used.
+    NesPalette(char *file);
+
+    // Decodes an NES color into an RGB color.
+    uint32_t Decode(DataWord color);
+
+    // Updates the mask settings of the palette.
+    void UpdateMask(DataWord mask);
+
+    // Frees the decoded palette.
+    ~NesPalette(void);
+};
 
 #endif

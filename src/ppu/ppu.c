@@ -1048,6 +1048,7 @@ void ppu_write(dword_t reg_addr, word_t val) {
     case PPU_MASK_ACCESS:
       ppu->mask = val;
       palette_update_mask(val);
+      memory_palette_update();
       break;
     case PPU_STATUS_ACCESS:
       // Read only.

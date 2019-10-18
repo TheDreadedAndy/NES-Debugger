@@ -18,11 +18,7 @@
 // Object Attribute Memory size.
 #define PRIMARY_OAM_SIZE 256U
 #define SOAM_BUFFER_SIZE 256U
-#define NUM_SOAM_BUFFERS 2U
 #define OAM_BUFFER_SIZE 96U
-
-// The number of planes in a sprite or tile.
-#define BIT_PLANES 2U
 
 // Mask for determining which register a mmio access is trying to use.
 #define PPU_MMIO_MASK 0x0007U
@@ -73,10 +69,8 @@
 #define X8_TILE_SHIFT 4
 #define X8_TABLE_SHIFT 9
 
-/*
- * Used, during rendering, to determine which piece of the tile should be
- * loaded on a given cycle.
- */
+// Used, during rendering, to determine which piece of the tile should be
+// loaded on a given cycle.
 #define REG_UPDATE_MASK 0x07U
 #define REG_FETCH_NT 1U
 #define REG_FETCH_AT 3U
@@ -91,10 +85,8 @@
 #define SPRITE_PALETTE_BASE 0x10U
 #define GREYSCALE_PIXEL_MASK 0x30U
 
-/*
- * The lower three bits of an mmio access to the ppu determine which register
- * is used.
- */
+// The lower three bits of an mmio access to the ppu determine which register
+// is used.
 #define PPU_CTRL_ACCESS 0U
 #define PPU_MASK_ACCESS 1U
 #define PPU_STATUS_ACCESS 2U
@@ -114,10 +106,8 @@
 #define PPU_NT_OFFSET 0x2000U
 #define VRAM_NT_ADDR_MASK 0x0FFFU
 
-/*
- * Accesses to PPU scroll adjust the PPU address in non-standard ways.
- * These constants determine how to update the scroll value.
- */
+// Accesses to PPU scroll adjust the PPU address in non-standard ways.
+// These constants determine how to update the scroll value.
 #define SCROLL_X_MASK 0x001FU
 #define SCROLL_Y_MASK 0x73E0U
 #define SCROLL_VNT_MASK 0x0800U
@@ -132,10 +122,8 @@
 #define COARSE_Y_MASK 0x03E0U
 #define COARSE_X_MASK 0x001FU
 
-/*
- * The vram address of the ppu can be incremented based on the X and Y
- * scroll values. These constants facilitate that.
- */
+// The vram address of the ppu can be incremented based on the X and Y
+// scroll values. These constants facilitate that.
 #define FINE_Y_INC 0x1000U
 #define FINE_Y_CARRY_MASK 0x8000U
 #define FINE_Y_CARRY_SHIFT 10
@@ -143,122 +131,30 @@
 #define Y_INC_OVERFLOW 0x03C0U
 #define TOGGLE_HNT_SHIFT 5
 
-/*
- * Flags used to access the SOAM buffer for sprites.
- */
+// Flags used to access the SOAM buffer for sprites.
 #define FLAG_SOAM_BUFFER_ZERO 0x80U
 #define FLAG_SOAM_BUFFER_PRIORITY 0x40U
 #define FLAG_SOAM_BUFFER_PALETTE 0x1FU
 #define FLAG_SOAM_BUFFER_PATTERN 0x03U
 
 /*
- * Contains the registers and memory internal to the PPU.
- *
- * TODO: Consider splitting into a register and OAM struct.
+ * Initializes the PPU and palette, using the given file if possible.
  */
-typedef struct ppu {
-  // Internal ppu registers.
-  dword_t vram_addr;
-  dword_t temp_vram_addr;
-  bool write_toggle;
-  word_t fine_x;
-
-  // Memory mapped ppu registers.
-  word_t bus;
-  word_t vram_buf;
-  word_t ctrl;
-  word_t mask;
-  word_t status;
-  word_t oam_addr;
-
-  // Working memory for the ppu.
-  // TODO: Consider using pointers instead.
-  word_t oam_mask;
-  word_t primary_oam[PRIMARY_OAM_SIZE];
-  word_t soam_eval_buf;
-  word_t soam_render_buf;
-  word_t soam_buffer[NUM_SOAM_BUFFERS][SOAM_BUFFER_SIZE];
-  word_t oam_buffer[OAM_BUFFER_SIZE];
-
-  // Temporary storage used in rendering.
-  // TODO: Remove these in favor of a system which displays tiles as soon
-  // as they are recieved.
-  mword_t tile_scroll[BIT_PLANES];
-  word_t next_tile[BIT_PLANES];
-  word_t palette_scroll[BIT_PLANES];
-  word_t palette_latch[BIT_PLANES];
-  word_t next_palette[BIT_PLANES];
-
-  // MDR and write toggle, used for 2-cycle r/w system.
-  word_t mdr;
-  bool mdr_write;
-} ppu_t;
-
-/*
- * The actions performed by the ppu each cycle depend entirely on which cycle
- * and scanline it is on. These variables track that information so that the
- * ppu emulation can adjust acordingly.
- */
-static size_t current_scanline = 261;
-static size_t current_cycle = 0;
-static bool frame_odd = false;
-
-/*
- * Global ppu structure. Cannot be accessed outside this file.
- * Initialized by ppu_init().
- */
-static ppu_t *ppu = NULL;
-
-/* Helper functions */
-static bool ppu_is_disabled(void);
-static void ppu_disabled(void);
-static void ppu_draw_background(void);
-static void ppu_render(void);
-static void ppu_render_visible(void);
-static void ppu_render_update_frame(bool output);
-static void ppu_render_draw_pixel(void);
-static word_t ppu_render_get_tile_pattern(void);
-static word_t ppu_render_get_tile_palette(void);
-static void ppu_render_update_registers(void);
-static void ppu_render_get_attribute(void);
-static word_t ppu_render_get_tile(word_t index, bool plane_high);
-static void ppu_render_update_hori(void);
-static void ppu_render_dummy_nametable_access(void);
-static void ppu_render_xinc(void);
-static void ppu_render_yinc(void);
-static void ppu_render_blank(void);
-static void ppu_render_pre(void);
-static void ppu_render_update_vert(void);
-static void ppu_eval_clear_soam(void);
-static void ppu_eval_sprites(void);
-static word_t ppu_oam_read(void);
-static bool ppu_eval_in_range(word_t sprite_y);
-static void ppu_eval_fill_soam_buffer(word_t *sprite_data, bool is_zero);
-static void ppu_eval_get_sprite(word_t *sprite_data, word_t *pat_lo,
-                                                     word_t *pat_hi);
-static void ppu_eval_fetch_sprites(void);
-static void ppu_signal(void);
-static void ppu_inc(void);
-static void ppu_mmio_scroll_write(word_t val);
-static void ppu_mmio_addr_write(word_t val);
-static void ppu_mmio_vram_addr_inc(void);
-
-/*
- * Initializes the PPU and palette, using the given file, then creates an
- * SDL window.
- *
- * Assumes the file is non-NULL.
- */
-bool ppu_init(char *file) {
+Ppu::Ppu(char *file, Memory *memory, Renderer *render) {
   // Prepare the ppu structure.
-  ppu = xcalloc(1, sizeof(ppu_t));
-  ppu->soam_eval_buf = 1;
+  soam_eval_buf_ = 1;
+  current_scanline_ = 261;
+  current_cycle_ = 0;
+  frame_odd_ = false;
 
-  // Load in the palette.
-  palette_init(file);
+  // Create the palette using the given file.
+  palette_ = new NesPalette(file);
 
-  // Return success.
-  return true;
+  // Stores the given Memory and Renderer class for use in the emulation.
+  memory_ = memory;
+  render_ = render;
+
+  return;
 }
 
 /*

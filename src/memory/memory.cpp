@@ -31,12 +31,12 @@
  * Decodes the header of the provided rom file, and creates the appropriate
  * memory class for it.
  *
- * On success, the returned value is the memory mapper class cast to Memory.
+ * On success, the returned value is a memory mapper object cast to Memory.
  * On failure, returns NULL.
  *
  * Assumes the provided rom file is non-null and a valid NES rom.
  */
-Memory *MemoryCreate(FILE *rom_file) {
+Memory *Memory::Create(FILE *rom_file) {
   // Use the provided rom file to create a decoded rom header.
   RomHeader *header = DecodeHeader(rom_file);
   if (header == NULL) { return NULL; }
@@ -56,6 +56,8 @@ Memory *MemoryCreate(FILE *rom_file) {
     default:
       fprintf(stderr, "Error: Rom requires unimplemented mapper: %d\n",
               static_cast<unsigned int>(header->mapper));
+      delete header;
+      return NULL;
       break;
   }
 

@@ -76,6 +76,9 @@ class Memory {
     Ppu *ppu_;
     Apu *apu_;
 
+    // Stores the rom header and allocates the palette data array.
+    Memory(RomHeader *header);
+
   public:
     // Provides access to CPU memory.
     virtual DataWord Read(DoubleWord addr) = 0;
@@ -93,11 +96,12 @@ class Memory {
     // Must be called before any other function.
     virtual void Connect(Cpu *cpu, Ppu *ppu, Apu *apu) = 0;
 
-    Memory(RomHeader *header);
-    ~Memory(void);
-};
+    // Creates a derived memory object for the mapper of the given
+    // rom file. Returns NULL on failure.
+    Memory *Create(FILE *rom_file);
 
-// Memory data structure initialization function. Handles memory maps.
-Memory *MemoryCreate(FILE *rom_file);
+    // Frees the rom header and palette data array.
+    virtual ~Memory(void);
+};
 
 #endif

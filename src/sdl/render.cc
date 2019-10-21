@@ -31,64 +31,125 @@
 #define NES_TRUE_H_TO_W (224.0 / 280.0)
 
 /*
- * Used to expose the functions necessary to access the active implementaion
- * of rendering to the caller.
+ * Hardware rendering implementation of a Render class.
  */
-render_t *render = NULL;
+class HardwareRenderer : public Render {
+  private:
+    // Holds the next frame of pixel data to be streamed to the texture.
+    uint32_t *pixel_buffer_;
+
+    // Used to stream pixel changes to the window renderer.
+    SDL_Texture *frame_texture_;
+
+    // The SDL hardware renderer tied to the window.
+    SDL_Renderer *renderer_;
+
+    // Uses the provided renderer to create a HardwareRenderer object.
+    HardwareRenderer(SDL_Renderer *renderer);
+
+  public:
+    // Functions implemented from the abstract class.
+    void Pixel(size_t row, size_t col, uint32_t pixel);
+    void Frame(void);
+
+    // Attempts to create a HardwareRenderer object. Returns NULL on failure.
+    HardwareRenderer *Create(SDL_Window *window);
+
+    // Frees the structures and buffers related to this class.
+    ~HardwareRenderer(void);
+};
 
 /*
- * Set whenever the ppu draws a frame (which happens at vblank).
- * Reset whenever render_has_drawn() is called.
- * Used to track the frame rate of the emulator and, thus, throttle it.
+ * Software rendering implementation of a Render class.
  */
-static bool frame_output = false;
+class SoftwareRenderer : public Render {
+  private:
+    // Holds the next frame to be drawn to the screen.
+    SDL_Surface *render_surface_;
+
+    // Uses the provided surface to create a SoftwareRenderer object.
+    SoftwareRenderer(SDL_Surface *surface);
+
+  public:
+    // Functions implemented from the abstract class.
+    void Pixel(size_t row, size_t col, uint32_t pixel);
+    void Frame(void);
+
+    // Attempts to create a SoftwareRenderer object. Returns NULL on failure.
+    SoftwareRenderer *Create(SDL_Window *window);
+
+    // Frees the surface used for software rendering.
+    ~SoftwareRenderer(void);
+};
 
 /*
- * Set by the event manager whenever the size of the window changes.
- */
-static bool window_size_valid = false;
-
-/* Hardware rendering globals */
-
-/*
- * Holds the next frame of pixels to be streamed to the texture and rendered
- * to the window.
- */
-static uint32_t *pixel_buffer = NULL;
-
-/*
- * Used to stream the pixel changes to the window renderer.
- */
-static SDL_Texture *frame_texture = NULL;
-
-/*
- * The SDL hardware renderer tied to the window.
- */
-static SDL_Renderer *hardware_renderer = NULL;
-
-/* Software rendering globals */
-
-/*
- * Used to hold the next frame to be drawn to the screen.
- */
-static SDL_Surface *render_surface = NULL;
-
-/* Helper functions */
-static void render_get_window_rect(SDL_Rect *window_rect);
-
-/*
- * Initializes the structures and buffers necessary to access the requested
- * rendering system. Returns true on successful initialization.
+ * Attempts to create the requested rendering system.
  *
- * This function must be called before using other rendering fuctions, and
- * the returned free function must be called before switching implemenations.
+ * Returns NULL on failure.
  */
-bool render_init(bool use_surface_rendering) {
-  // Allocate the structure which will hold the functions used to access
-  // the rendering implementation.
-  render = xcalloc(1, sizeof(render_t));
+Render *Render::Create(SDL_Window *window, RenderType type) {
+  // Calls the creation function for the appropriate derived class.
+  switch (type) {
+    case RENDER_SOFTWARE:
+      return SoftwareRenderer::Create(window);
+    case RENDER_HARDWARE:
+      return HardwareRenderer::Create(window);
+    default:
+      break;
+  }
 
-  // Initialize surface rendering.
+  return NULL;
+}
+
+/*
+ * Initializes the base rendering variables.
+ */
+Render::Render(SDL_Window *window) {
+  window_ = window;
+  frame_output_ = false;
+  window_size_valid_ = false;
+  return;
+}
+
+/*
+ * Attempts to create a hardware rendering object.
+ *
+ * Returns NULL on failure.
+ */
+HardwareRenderer *HardwareRenderer::Create(SDL_Window *window) {
+  // Attempt to create a hardware renderer.
+  SDL_Renderer *renderer = SDL_CreateRenderer(window, -1,
+                           SDL_RENDERER_ACCELERATED);
+
+  // Verify that the renderer was created successfully.
+  if (renderer == NULL) { return NULL; }
+
+  // Return the HardwareRenderer object.
+  return new HardwareRenderer(renderer);
+}
+
+/*
+ * Uses the provided SDL renderer to create a hardware rendering object.
+ */
+HardwareRenderer::HardwareRenderer(SDL_Renderer *renderer) {
+  // Store the provided renderer.
+  renderer_ = renderer;
+
+  // Allocate the rendering buffers.
+  pixel_buffer_ = new uint32_t[NES_WIDTH * NES_HEIGHT];
+  frame_texture_ = SDL_CreateTexture(renderer_, SDL_PIXELFORMAT_RGB888,
+                   SDL_TEXTUREACCESS_STREAMING, NES_WIDTH, NES_HEIGHT);
+
+  return;
+}
+
+/*
+ * Attempts to create a software rendering object.
+ *
+ * Returns NULL on failure.
+ */
+SoftwareRenderer *SoftwareRenderer::Create(SDL_Window *window) {
+  // FIXME: This is garbage code.
   if (use_surface_rendering) {
     // Create and verify the surface.
     render_surface = SDL_CreateRGBSurface(0, NES_WIDTH, NES_HEIGHT,
@@ -98,29 +159,8 @@ bool render_init(bool use_surface_rendering) {
 
     // Disable RLE acceleration on the render surface.
     SDL_SetSurfaceRLE(render_surface, 0);
-
-    // Assign the implementation functions to the structure.
-    render->free = &render_free_surface;
-    render->pixel = &render_pixel_surface;
-    render->frame = &render_frame_surface;
   } else {
-    // Otherwise, create the hardware renderer.
-    hardware_renderer = SDL_CreateRenderer(window, -1,
-                        SDL_RENDERER_ACCELERATED);
-
-    // Verify that the renderer was created successfully.
-    if (hardware_renderer == NULL) { return false; }
-
-    // Allocate the rendering buffers.
-    pixel_buffer = xcalloc(NES_WIDTH * NES_HEIGHT, sizeof(uint32_t));
-    frame_texture = SDL_CreateTexture(hardware_renderer, SDL_PIXELFORMAT_RGB888,
-                    SDL_TEXTUREACCESS_STREAMING, NES_WIDTH, NES_HEIGHT);
-
-    // Assign the implementation functions to the structure.
-    render->free = &render_free_hardware;
-    render->pixel = &render_pixel_hardware;
-    render->frame = &render_frame_hardware;
-  }
+      }
 
   // Rendering was successfully initalized.
   return true;

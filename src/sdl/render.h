@@ -5,41 +5,51 @@
 #ifndef _NES_VID
 #define _NES_VID
 
-// Function definition for rendering functions.
-typedef void render_free_t(void);
-typedef void render_pixel_t(size_t row, size_t col, uint32_t pixel);
-typedef void render_frame_t(void);
+// The types of rendering supported by the emulator.
+typedef enum { RENDER_SOFTWARE, RENDER_HARDWARE } RenderType;
 
-// Holds the functions to access the in-use implementation of rendering.
-typedef struct render {
-  render_free_t *free;
-  render_pixel_t *pixel;
-  render_frame_t *frame;
-} render_t;
+/*
+ * Abstract rendering class, used by the emulation to draw the game to
+ * the window.
+ */
+class Render {
+  private:
+    // Holds a pointer to the current SDL window.
+    SDL_Window *window_;
 
-// Exposes the in-use rendering implementation to the user.
-extern render_t *render;
+    // Set when a frame is drawn. Reset when HasDrawn() is called.
+    // Used to track the frame rate and time the emulator.
+    bool frame_output_;
 
-// Initializes rendering.
-bool render_init(bool use_surface_rendering);
+    // Set by the event manager when the size of the window changes.
+    bool window_size_valid_;
 
-// Draws a pixel to the window. The pixel will not be shown until
-// render_frame() is called.
-void render_pixel_surface(size_t row, size_t col, uint32_t pixel);
-void render_pixel_hardware(size_t row, size_t col, uint32_t pixel);
+    // Determines the dimensions of the window rect for correct scaling
+    // of the NES picture.
+    void GetWindowRect(SDL_Rect *window_rect);
 
-// Renders any pixel changes to the main window.
-void render_frame_surface(void);
-void render_frame_hardware(void);
+    Render(SDL_Window *window);
 
-// Returns if a frame has been drawn since the last call of this function.
-bool render_has_drawn(void);
+  public:
+    // Creates the specified renderer, and returns it cast to a Render class.
+    Render *Create(SDL_Window *window, RenderType type);
 
-// Signals that the window surface must be obtained again.
-void render_invalidate_window_surface(void);
+    // Draws a pixel to the window. The pixel will not be shown until Frame()
+    // is called.
+    virtual void Pixel(size_t row, size_t col, uint32_t pixel) = 0;
 
-// Closes rendering.
-void render_free_surface(void);
-void render_free_hardware(void);
+    // Renders any pixel changes to the main window.
+    virtual void Frame(void) = 0;
+
+    // Returns if the frame has been drawn since the last call to this function.
+    bool HasDrawn(void);
+
+    // Signals that the window surface must be obtained again.
+    void InvalidateWindowSurface(void);
+
+    // Declared as virtual to allows the derived renderers destructor to be
+    // called when this object is deleted.
+    virtual ~Render(void) = 0;
+};
 
 #endif

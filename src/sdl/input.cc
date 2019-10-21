@@ -47,65 +47,51 @@
  * These strings represent configuration options which can be used to change
  * the input map.
  */
-static const char *button_names[] = { "BUTTON_A", "BUTTON_B", "BUTTON_SELECT",
+static const char *kButtonNames[] = { "BUTTON_A", "BUTTON_B", "BUTTON_SELECT",
                                "BUTTON_START", "PAD_UP", "PAD_DOWN",
                                "PAD_LEFT", "PAD_RIGHT" };
 
 /*
- * These variables hold the current/default mapping for the NES controller.
+ * The default mapping for the NES controller.
  */
-static SDL_Keycode button_map[] = { SDLK_x, SDLK_z, SDLK_BACKSPACE, SDLK_RETURN,
-                            SDLK_UP, SDLK_DOWN, SDLK_LEFT, SDLK_RIGHT };
+static SDL_Keycode kDefaultButtonMap[] = { SDLK_x, SDLK_z, SDLK_BACKSPACE,
+                                           SDLK_RETURN, SDLK_UP, SDLK_DOWN,
+                                           SDLK_LEFT, SDLK_RIGHT };
 
 /*
  * The name of the default configuration file.
  */
-static const char *default_config = "ndb.cfg";
-
-/*
- * This word stores the current input status. Each bit represents a button
- * that is pressed. Starting from the lsb, the bits are A, B, Select, Start,
- * Up, Down, Left, and Right. This is the same order as the name and map arrays.
- *
- * This word is not directly given to the emulator, as some inputs will be
- * ignored in some circumstances.
- */
-static word_t input_status = 0;
-
-/*
- * With original NES controllers, it is not physically possible to press
- * both left/right or up/down at the same time. As such, the most recent
- * pressed of these buttons is tracked and the least recent is masked out
- * when the emulator requests the input status.
- */
-static bool dpad_priority_up = false;
-static bool dpad_priority_left = false;
-
-/* Helper functions */
-static void input_create_config(FILE *config);
-static void input_load_config(FILE *config);
-static bool input_file_read_chunk(char *buffer, FILE *file, int max_size, char term);
-static void input_set_map(char *cfg, char *key);
+static const char *kDefaultConfig = "ndb.cfg";
 
 /*
  * Loads the input mapping, allowing for key presses and releases to be used
  * for emulation.
  */
-void input_load(char *file) {
+Input::Input(char *file) {
+  // Load in the default button mapping.
+  for (int i = 0; i < NUM_BUTTONS; i++) {
+    button_map_[i] = kDefaultButtonMap[i];
+  }
+
+  // Setup the button press variables.
+  input_status_ = 0;
+  dpad_priority_up_ = false;
+  dpad_priority_left_ = false;
+
   // Load the default file if none was provided.
   FILE *config;
   if (file == NULL) {
-    config = fopen(default_config, "a+");
+    config = fopen(kDefaultConfig, "a+");
   } else {
     config = fopen(file, "a+");
   }
 
   // Check if the file is empty, and create the config if it is.
-  if (get_file_size(config) == 0) {
-    input_create_config(config);
+  if (GetFileSize(config) == 0) {
+    CreateConfig(config);
   } else {
     // Attempt to load the config file into the button mappings.
-    input_load_config(config);
+    LoadConfig(config);
   }
 
   // Close the file and exit.
@@ -118,15 +104,15 @@ void input_load(char *file) {
  *
  * Assumes the provided file is open, valid, and empty.
  */
-static void input_create_config(FILE *config) {
+void Input::CreateConfig(FILE *config) {
   CONTRACT(config != NULL);
 
   // Write the default mapping for each button.
   for (int i = 0; i < NUM_BUTTONS; i++) {
-    fwrite(button_names[i], 1, strlen(button_names[i]), config);
+    fwrite(kButtonNames[i], 1, strlen(kButtonNames[i]), config);
     fwrite("=", 1, 1, config);
-    fwrite(SDL_GetKeyName(button_map[i]), 1,
-           strlen(SDL_GetKeyName(button_map[i])), config);
+    fwrite(SDL_GetKeyName(button_map_[i]), 1,
+           strlen(SDL_GetKeyName(button_map_[i])), config);
     fwrite("\n", 1, 1, config);
   }
 
@@ -138,7 +124,7 @@ static void input_create_config(FILE *config) {
  *
  * Assumes the provided file is open and valid.
  */
-static void input_load_config(FILE *config) {
+void Input::LoadConfig(FILE *config) {
   CONTRACT(config != NULL);
 
   // Reset the file to the begining.
@@ -152,17 +138,17 @@ static void input_load_config(FILE *config) {
     fseek(config, -1, SEEK_CUR);
 
     // Read in the configuration name string and verify it was successful.
-    if (!input_file_read_chunk(cfg_buf, config, BUFFER_MAX, '=')) {
+    if (!FileReadChunk(cfg_buf, config, BUFFER_MAX, '=')) {
       continue;
     }
 
     // Read in the key name string and verify it was successful.
-    if (!input_file_read_chunk(key_buf, config, BUFFER_MAX, '\n')) {
+    if (!FileReadChunk(key_buf, config, BUFFER_MAX, '\n')) {
       continue;
     }
 
     // Update the mapping using the read in strings.
-    input_set_map(cfg_buf, key_buf);
+    SetMap(cfg_buf, key_buf);
   }
 
   return;
@@ -174,7 +160,7 @@ static void input_load_config(FILE *config) {
  *
  * Assumes the array and file are non-null.
  */
-static bool input_file_read_chunk(char *buffer, FILE *file, int max_size, char term) {
+bool Input::FileReadChunk(char *buffer, FILE *file, int max_size, char term) {
   CONTRACT(buffer != NULL && file != NULL);
 
   // Read from the file into the buffer until a termination byte is reached
@@ -182,7 +168,7 @@ static bool input_file_read_chunk(char *buffer, FILE *file, int max_size, char t
   int size = 0;
   int next_byte = fgetc(file);
   while ((size < (max_size - 1)) && (next_byte != term) && (next_byte != EOF)) {
-    buffer[size] = (char) next_byte;
+    buffer[size] = static_cast<char>(next_byte);
     size++;
     next_byte = fgetc(file);
   }
@@ -208,12 +194,12 @@ static bool input_file_read_chunk(char *buffer, FILE *file, int max_size, char t
  * Assumes the strings are non-null.
  * Assumes SDL has been initialized.
  */
-static void input_set_map(char *cfg_name, char *key_name) {
+void Input::SetMap(char *cfg_name, char *key_name) {
   CONTRACT(cfg_name != NULL && key_name != NULL);
 
   // Get the map index of the specified config string, if it exists.
   size_t button = 0;
-  while (strcmp(cfg_name, button_names[button])) {
+  while (strcmp(cfg_name, kButtonNames[button])) {
     button++;
     // If the config string is invalid, so we return.
     if (button >= NUM_BUTTONS) { return; }
@@ -221,7 +207,7 @@ static void input_set_map(char *cfg_name, char *key_name) {
 
   // Get the SDL key and write it to the mapping if it is valid.
   SDL_Keycode key = SDL_GetKeyFromName(key_name);
-  if (key != SDLK_UNKNOWN) { button_map[button] = key; }
+  if (key != SDLK_UNKNOWN) { button_map_[button] = key; }
 
   return;
 }
@@ -233,10 +219,10 @@ static void input_set_map(char *cfg_name, char *key_name) {
  * Assumes the mapping has been initialized.
  * Assumes SDL has been initialized.
  */
-void input_press(SDL_Keycode key) {
+void Input::Press(SDL_Keycode key) {
   // Determine which button was pressed, if any.
   size_t button = 0;
-  while ((button < NUM_BUTTONS) && (button_map[button] != key)) { button++; }
+  while ((button < NUM_BUTTONS) && (button_map_[button] != key)) { button++; }
 
   // If the button is not in the map, we do nothing.
   if (button >= NUM_BUTTONS) { return; }
@@ -244,32 +230,32 @@ void input_press(SDL_Keycode key) {
   // Otherwise, we update the pressed button in the input status.
   switch(button) {
     case MAP_A:
-      input_status |= FLAG_A;
+      input_status_ |= FLAG_A;
       break;
     case MAP_B:
-      input_status |= FLAG_B;
+      input_status_ |= FLAG_B;
       break;
     case MAP_SELECT:
-      input_status |= FLAG_SELECT;
+      input_status_ |= FLAG_SELECT;
       break;
     case MAP_START:
-      input_status |= FLAG_START;
+      input_status_ |= FLAG_START;
       break;
     case MAP_UP:
-      dpad_priority_up = true;
-      input_status |= FLAG_UP;
+      dpad_priority_up_ = true;
+      input_status_ |= FLAG_UP;
       break;
     case MAP_DOWN:
-      dpad_priority_up = false;
-      input_status |= FLAG_DOWN;
+      dpad_priority_up_ = false;
+      input_status_ |= FLAG_DOWN;
       break;
     case MAP_LEFT:
-      dpad_priority_left = true;
-      input_status |= FLAG_LEFT;
+      dpad_priority_left_ = true;
+      input_status_ |= FLAG_LEFT;
       break;
     case MAP_RIGHT:
-      dpad_priority_left = false;
-      input_status |= FLAG_RIGHT;
+      dpad_priority_left_ = false;
+      input_status_ |= FLAG_RIGHT;
       break;
     default:
       break;
@@ -285,10 +271,10 @@ void input_press(SDL_Keycode key) {
  * Assumes the mapping has been initialized.
  * Assumes SDL has been initialized.
  */
-void input_release(SDL_Keycode key) {
+void Input::Release(SDL_Keycode key) {
   // Determine which button was released, if any.
   size_t button = 0;
-  while ((button < NUM_BUTTONS) && (button_map[button] != key)) { button++; }
+  while ((button < NUM_BUTTONS) && (button_map_[button] != key)) { button++; }
 
   // If the button is not in the map, we do nothing.
   if (button >= NUM_BUTTONS) { return; }
@@ -296,32 +282,32 @@ void input_release(SDL_Keycode key) {
   // Otherwise, we update the released button in the input status.
   switch(button) {
     case MAP_A:
-      input_status &= ~FLAG_A;
+      input_status_ &= ~FLAG_A;
       break;
     case MAP_B:
-      input_status &= ~FLAG_B;
+      input_status_ &= ~FLAG_B;
       break;
     case MAP_SELECT:
-      input_status &= ~FLAG_SELECT;
+      input_status_ &= ~FLAG_SELECT;
       break;
     case MAP_START:
-      input_status &= ~FLAG_START;
+      input_status_ &= ~FLAG_START;
       break;
     case MAP_UP:
-      dpad_priority_up = false;
-      input_status &= ~FLAG_UP;
+      dpad_priority_up_ = false;
+      input_status_ &= ~FLAG_UP;
       break;
     case MAP_DOWN:
-      dpad_priority_up = true;
-      input_status &= ~FLAG_DOWN;
+      dpad_priority_up_ = true;
+      input_status_ &= ~FLAG_DOWN;
       break;
     case MAP_LEFT:
-      dpad_priority_left = false;
-      input_status &= ~FLAG_LEFT;
+      dpad_priority_left_ = false;
+      input_status_ &= ~FLAG_LEFT;
       break;
     case MAP_RIGHT:
-      dpad_priority_left = true;
-      input_status &= ~FLAG_RIGHT;
+      dpad_priority_left_ = true;
+      input_status_ &= ~FLAG_RIGHT;
       break;
     default:
       break;
@@ -335,8 +321,8 @@ void input_release(SDL_Keycode key) {
  * Conflicting directions in the input status are masked out based on which
  * was pressed more recently.
  */
-word_t input_poll(void) {
-  word_t vmask = (dpad_priority_up) ? (~FLAG_DOWN) : (~FLAG_UP);
-  word_t hmask = (dpad_priority_left) ? (~FLAG_RIGHT) : (~FLAG_LEFT);
-  return input_status & vmask & hmask;
+DataWord Input::Poll(void) {
+  DataWord vmask = (dpad_priority_up_) ? (~FLAG_DOWN) : (~FLAG_UP);
+  DataWord hmask = (dpad_priority_left_) ? (~FLAG_RIGHT) : (~FLAG_LEFT);
+  return input_status_ & vmask & hmask;
 }

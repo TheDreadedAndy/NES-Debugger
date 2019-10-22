@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <SDL2/SDL.h>
-#include "./render.h"
+#include "./renderer.h"
 
 #ifndef _NES_SWRENDER
 #define _NES_SWRENDER
@@ -9,10 +9,13 @@
 /*
  * Software rendering implementation of a Render class.
  */
-class SoftwareRenderer : public Render {
+class SoftwareRenderer : public Renderer {
   private:
     // Holds the next frame to be drawn to the screen.
     SDL_Surface *render_surface_;
+
+    // Used to draw the next frame to the screen.
+    SDL_Surface *window_surface_;
 
     // Uses the provided surface to create a SoftwareRenderer object.
     SoftwareRenderer(SDL_Surface *surface);

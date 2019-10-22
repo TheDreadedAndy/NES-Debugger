@@ -27,7 +27,7 @@ typedef enum { RENDER_SOFTWARE, RENDER_HARDWARE } RenderType;
  * Abstract rendering class, used by the emulation to draw the game to
  * the window.
  */
-class Render {
+class Renderer {
   protected:
     // Used to scale the output to the window.
     SDL_Rect frame_rect_;
@@ -47,11 +47,11 @@ class Render {
     // of the NES picture.
     void GetWindowRect(void);
 
-    Render(SDL_Window *window);
+    Renderer(SDL_Window *window);
 
   public:
     // Creates the specified renderer, and returns it cast to a Render class.
-    Render *Create(SDL_Window *window, RenderType type);
+    Renderer *Create(SDL_Window *window, RenderType type);
 
     // Draws a pixel to the window. The pixel will not be shown until Frame()
     // is called.
@@ -68,7 +68,7 @@ class Render {
 
     // Declared as virtual to allows the derived renderers destructor to be
     // called when this object is deleted.
-    virtual ~Render(void) = 0;
+    virtual ~Renderer(void) = 0;
 };
 
 #endif

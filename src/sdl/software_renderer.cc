@@ -8,7 +8,7 @@
 #include <SDL2/SDL.h>
 #include "../util/contracts.h"
 #include "./window.h"
-#include "./render.h"
+#include "./renderer.h"
 
 /*
  * Attempts to create a software rendering object.
@@ -30,18 +30,29 @@ SoftwareRenderer *SoftwareRenderer::Create(SDL_Window *window) {
 }
 
 /*
+ * Creates a SoftwareRenderer object using the given window and rendering
+ * surface.
+ *
+ * Assumes the window and rendering surface are valid.
+ */
+SoftwareRenderer::SoftwareRenderer(SDL_Window *window, SDL_Surface *render)
+                                                         : Renderer(window) {
+  render_surface_ = render;
+  return;
+}
+
+/*
  * Draws the given pixel to the rendering surface.
  *
- * Assumes that surface rendering has been initialized.
+ * Assumes the SDL window and rendering surface are valid.
  * Assumes that the row and column are in range of the surface size.
  */
-void render_pixel_surface(size_t row, size_t col, uint32_t pixel) {
-  CONTRACT(row < (size_t) NES_HEIGHT);
-  CONTRACT(col < (size_t) NES_WIDTH);
-  CONTRACT(render_surface != NULL);
+void SoftwareRenderer::Pixel(size_t row, size_t col, uint32_t pixel) {
+  CONTRACT(row < static_cast<size_t>(NES_HEIGHT));
+  CONTRACT(col < static_cast<size_t>(NES_WIDTH));
 
   // Write the given pixel to the given location in the rendering surface.
-  uint32_t *pixels = (uint32_t*) render_surface->pixels;
+  uint32_t *pixels = static_cast<uint32_t*>(render_surface_->pixels);
   pixels[row * NES_WIDTH + col] = pixel;
 
   return;
@@ -50,49 +61,33 @@ void render_pixel_surface(size_t row, size_t col, uint32_t pixel) {
 /*
  * Copies the rendering surface to the window.
  *
- * Assumes the window has been initialized.
- * Assumes that software rendering has been initialized.
+ * Assumes that the SDL window is valid.
  */
-void render_frame_surface(void) {
-  CONTRACT(window != NULL);
-  CONTRACT(render_surface != NULL);
-
-  // Setup the window surface.
-  static SDL_Surface *window_surface = NULL;
-  static SDL_Rect render_rect = { .x = NES_WIDTH_OFFSET, .y = NES_HEIGHT_OFFSET,
-                                  .w = NES_WIDTH, .h = NES_TRUE_HEIGHT };
-  static SDL_Rect window_rect;
-
+void SoftwareRenderer::Frame(void) {
   // Get the window surface, and recalculate the rect, if the surface is invalid.
   if (!window_size_valid) {
-    window_surface = SDL_GetWindowSurface(window);
-    render_get_window_rect(&window_rect);
-    SDL_FillRect(window_surface, NULL, 0);
-    window_size_valid = true;
+    window_surface_ = SDL_GetWindowSurface(window_);
+    GetWindowRect();
+    SDL_FillRect(window_surface_, NULL, 0);
+    window_size_valid_ = true;
   }
 
   // Copy the render surface to the window surface.
-  SDL_BlitScaled(render_surface, &render_rect, window_surface, &window_rect);
+  SDL_BlitScaled(render_surface_, &frame_rect_, window_surface_, &window_rect_);
 
-  // Update the window.
-  SDL_UpdateWindowSurface(window);
+  // Draw the frame to the window.
+  SDL_UpdateWindowSurface(window_);
 
   // Signal that a frame was drawn.
-  frame_output = true;
+  frame_output_ = true;
 
   return;
 }
 
 /*
- * Frees the rendering surface and render structure.
- *
- * Assumes software rendering has been initialized.
+ * Frees the rendering surface.
  */
-void render_free_surface(void) {
-  CONTRACT(render_surface != NULL);
-  CONTRACT(render != NULL);
-
-  SDL_FreeSurface(render_surface);
-  free(render);
+SoftwareRenderer::~SoftwareRenderer(void) {
+  SDL_FreeSurface(render_surface_);
   return;
 }

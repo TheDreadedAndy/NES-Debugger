@@ -7,7 +7,7 @@
 #include <stdint.h>
 #include <SDL2/SDL.h>
 #include "./window.h"
-#include "./render.h"
+#include "./renderer.h"
 #include "./hardware_renderer.h"
 #include "./software_renderer.h"
 
@@ -16,7 +16,7 @@
  *
  * Returns NULL on failure.
  */
-Render *Render::Create(SDL_Window *window, RenderType type) {
+Renderer *Renderer::Create(SDL_Window *window, RenderType type) {
   // Calls the creation function for the appropriate derived class.
   switch (type) {
     case RENDER_SOFTWARE:
@@ -33,7 +33,7 @@ Render *Render::Create(SDL_Window *window, RenderType type) {
 /*
  * Initializes the base rendering variables.
  */
-Render::Render(SDL_Window *window) {
+Renderer::Renderer(SDL_Window *window) {
   window_ = window;
   frame_output_ = false;
   window_size_valid_ = false;
@@ -50,7 +50,7 @@ Render::Render(SDL_Window *window) {
  *
  * Assumes the given surface and rect are non-null.
  */
-void Render::GetWindowRect(void) {
+void Renderer::GetWindowRect(void) {
   // Get the size of the window, to be used in the following calculation.
   int w, h;
   SDL_GetWindowSize(window_, &w, &h);
@@ -77,7 +77,7 @@ void Render::GetWindowRect(void) {
  * Returns the current value of frame_output_, sets frame_output to false.
  * Used to track frame timing in the emulation.
  */
-bool Render::HasDrawn(void) {
+bool Renderer::HasDrawn(void) {
   bool frame = frame_output_;
   frame_output_ = false;
   return frame;
@@ -87,7 +87,7 @@ bool Render::HasDrawn(void) {
  * Sets the value of window_size_valid_ to false.
  * Called from the SDL event manager to invalidate the window.
  */
-void RenderInvalidateWindowSurface(void) {
+void Renderer::InvalidateWindowSurface(void) {
   window_size_valid_ = false;
   return;
 }
@@ -95,6 +95,6 @@ void RenderInvalidateWindowSurface(void) {
 /*
  * Prevents issues with freeing an object of type Render.
  */
-Render::~Render(void) {
+Renderer::~Renderer(void) {
   return;
 }

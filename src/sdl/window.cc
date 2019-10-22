@@ -1,4 +1,6 @@
 /*
+ * TODO: Update this.
+ *
  * This file is used to initialize all SDL systems used by the emulator.
  * It is required that window_init be called before using any functions
  * in render.c, audio.c, and input.c. As such, the window should
@@ -18,7 +20,8 @@
 #include <SDL2/SDL.h>
 #include "./window.h"
 #include "./input.h"
-#include "./render.h"
+#include "./renderer.h"
+#include "./audio_player.h"
 #include "../util/contracts.h"
 #include "../util/util.h"
 #include "../ppu/palette.h"
@@ -32,34 +35,29 @@
 #define MAX_TITLE_SIZE 256
 
 // The name displayed in the SDL window.
-const char *window_name = "NES, I guess?";
-
-// Global sdl window variable, used to render to the game window, play sounds,
-// and collect input. Cannot be directly accessed outside this file.
-SDL_Window *window = NULL;
-
-/* Helper functions */
-void window_process_window_event(SDL_Event *event);
+const char *kWindowName = "NES, I guess?";
 
 /*
- * Sets up the SDL window for rendering and gathering input.
+ * Attempts to create a Window object. Returns NULL and cleans any data already
+ * created on failure.
  */
-bool window_init(bool use_surface_rendering) {
+Window *Window::Create(RenderType rendering_type) {
   // Init SDL's video system.
   if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_EVENTS) != 0) {
     fprintf(stderr, "Failed to initialize SDL.\n");
-    return false;
+    return NULL;
   }
 
   // Create window.
-  window = SDL_CreateWindow(window_name, SDL_WINDOWPOS_CENTERED,
-                            SDL_WINDOWPOS_CENTERED, WINDOW_WIDTH, WINDOW_HEIGHT,
-                            SDL_WINDOW_RESIZABLE);
+  window_ = SDL_CreateWindow(window_name, SDL_WINDOWPOS_CENTERED,
+                             SDL_WINDOWPOS_CENTERED, WINDOW_WIDTH,
+                             WINDOW_HEIGHT, SDL_WINDOW_RESIZABLE);
 
   // Check if the window was created successfully.
   if (window == NULL) {
     fprintf(stderr, "Failed to create SDL window.\n");
-    return false;
+    SDL_Quit();
+    return NULL;
   }
 
 #ifdef _NES_OSLIN
@@ -67,6 +65,8 @@ bool window_init(bool use_surface_rendering) {
   // Work around for a known SDL2 crash.
   SDL_SetHint(SDL_HINT_IME_INTERNAL_EDITING, "1");
 #endif
+
+  // TODO: Finish below.
 
   // Initialize the requested rendering system.
   if (!render_init(use_surface_rendering)) {

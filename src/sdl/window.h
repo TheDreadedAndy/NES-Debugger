@@ -1,23 +1,51 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <SDL2/SDL.h>
+#include "./renderer.h"
+#include "./audio_player.h"
+#include "./input.h"
 
 #ifndef _NES_SDL
 #define _NES_SDL
 
-// Main window, used by render.c.
-extern SDL_Window *window;
+/*
+ * Maintains all of the data necessary to interact with SDL.
+ *
+ * Only one Window object should exist at any given time.
+ */
+class Window {
+  private:
+    // The main sdl window for rendering.
+    SDL_Window *window_;
 
-// Creates the SDL window.
-bool window_init(bool use_surface_rendering);
+    // SDL sub-interfaces, which are created from this window.
+    Renderer *renderer_;
+    AudioPlayer *audio_;
+    Input *input_;
 
-// Processes all relevent events on the SDL event queue.
-void window_process_events(void);
+    // Processes the window events stored in a given SDL event.
+    void ProcessWindowEvent(SDL_Event *event);
 
-// Displays the given FPS in the main window title.
-void window_display_fps(double fps);
+    Window(SDL_Window *window, Renderer *renderer,
+           AudioPlayer *audio, Input *input);
 
-// Closes the SDL window.
-void window_close(void);
+  public:
+    // Attempts to create a Window object. Returns NULL on failure.
+    Window *Create(RenderType rendering_type);
+
+    // Processes all relevent events on the SDL event queue.
+    void ProcessEvents(void);
+
+    // Displays the given FPS in the main window title.
+    void DisplayFps(double fps);
+
+    // Provides the caller with a copy of the respective sub-interface.
+    Renderer *GetRenderer(void);
+    AudioPlayer *GetAudioPlayer(void);
+    Input *GetInput(void);
+
+    // Closes the SDL window.
+    ~Window(void);
+}
 
 #endif

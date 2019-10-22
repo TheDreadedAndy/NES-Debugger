@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <SDL2/SDL.h>
-#include "./render.h"
+#include "./renderer.h"
 
 #ifndef _NES_HWRENDER
 #define _NES_HWRENDER
@@ -9,7 +9,7 @@
 /*
  * Hardware rendering implementation of a Render class.
  */
-class HardwareRenderer : public Render {
+class HardwareRenderer : public Renderer {
   private:
     // Used to scale the output to the window.
     SDL_Rect frame_rect_;

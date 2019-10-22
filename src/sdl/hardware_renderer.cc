@@ -7,7 +7,7 @@
 #include <stdint.h>
 #include <SDL2/SDL.h>
 #include "./window.h"
-#include "./render.h"
+#include "./renderer.h"
 #include "./hardware_renderer.h"
 #include "../util/contracts.h"
 
@@ -33,7 +33,7 @@ HardwareRenderer *HardwareRenderer::Create(SDL_Window *window) {
  * Uses the provided SDL renderer to create a hardware rendering object.
  */
 HardwareRenderer::HardwareRenderer(SDL_Window *window, SDL_Renderer *renderer)
-                : Render(window) {
+                : Renderer(window) {
   // Store the provided renderer.
   renderer_ = renderer;
 

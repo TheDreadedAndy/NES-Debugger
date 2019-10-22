@@ -1,9 +1,24 @@
 #include <stdlib.h>
 #include <stdbool.h>
-#include "../util/data.h"
 
 #ifndef _NES_VID
 #define _NES_VID
+
+/*
+ * The NES draws a 256x240 pictures, which is padded to 280x240. Most tvs
+ * display this picture as 280x224. These constants are used to scale the
+ * SDL rendering surface to the appropriate size on the SDL window, given
+ * this information about the NES.
+ */
+#define NES_WIDTH_OFFSET 0
+#define NES_WIDTH 256
+#define NES_HEIGHT 240
+#define NES_HEIGHT_OFFSET 8
+#define NES_TRUE_HEIGHT 224
+#define NES_TRUE_WIDTH_RATIO (256.0 / 280.0)
+#define NES_WIDTH_PAD_OFFSET_RATIO (12.0 / 280.0)
+#define NES_W_TO_H (256.0 / 224.0)
+#define NES_TRUE_H_TO_W (224.0 / 280.0)
 
 // The types of rendering supported by the emulator.
 typedef enum { RENDER_SOFTWARE, RENDER_HARDWARE } RenderType;
@@ -13,7 +28,11 @@ typedef enum { RENDER_SOFTWARE, RENDER_HARDWARE } RenderType;
  * the window.
  */
 class Render {
-  private:
+  protected:
+    // Used to scale the output to the window.
+    SDL_Rect frame_rect_;
+    SDL_Rect window_rect_;
+
     // Holds a pointer to the current SDL window.
     SDL_Window *window_;
 
@@ -26,7 +45,7 @@ class Render {
 
     // Determines the dimensions of the window rect for correct scaling
     // of the NES picture.
-    void GetWindowRect(SDL_Rect *window_rect);
+    void GetWindowRect(void);
 
     Render(SDL_Window *window);
 

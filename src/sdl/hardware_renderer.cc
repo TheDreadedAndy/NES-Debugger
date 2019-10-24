@@ -26,7 +26,7 @@ HardwareRenderer *HardwareRenderer::Create(SDL_Window *window) {
   if (renderer == NULL) { return NULL; }
 
   // Return the HardwareRenderer object.
-  return new HardwareRenderer(renderer);
+  return new HardwareRenderer(window, renderer);
 }
 
 /*
@@ -85,7 +85,7 @@ void HardwareRenderer::Frame(void) {
   SDL_UnlockTexture(frame_texture_);
 
   // Copy the render surface to the window surface.
-  SDL_RenderCopy(renderer_, frame_texture_, &frame_rect, &window_rect);
+  SDL_RenderCopy(renderer_, frame_texture_, &frame_rect_, &window_rect_);
 
   // Update the window.
   SDL_RenderPresent(renderer_);

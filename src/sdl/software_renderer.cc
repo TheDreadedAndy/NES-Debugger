@@ -9,6 +9,8 @@
 #include "../util/contracts.h"
 #include "./window.h"
 #include "./renderer.h"
+#include "./software_renderer.h"
+#include "../ppu/palette.h"
 
 /*
  * Attempts to create a software rendering object.
@@ -17,16 +19,16 @@
  */
 SoftwareRenderer *SoftwareRenderer::Create(SDL_Window *window) {
   // Create and verify the surface.
-  render_surface = SDL_CreateRGBSurface(0, NES_WIDTH, NES_HEIGHT,
-                   PALETTE_DEPTH, PALETTE_RMASK, PALETTE_GMASK,
-                   PALETTE_BMASK, 0);
+  SDL_Surface *render_surface = SDL_CreateRGBSurface(0, NES_WIDTH, NES_HEIGHT,
+                                PALETTE_DEPTH, PALETTE_RMASK, PALETTE_GMASK,
+                                PALETTE_BMASK, 0);
   if (render_surface == NULL) { return NULL; }
 
   // Disable RLE acceleration on the render surface.
   SDL_SetSurfaceRLE(render_surface, 0);
 
   // Use the rendering surface to create a SoftwareRenderer object.
-  return new SoftwareRenderer(render_surface);
+  return new SoftwareRenderer(window, render_surface);
 }
 
 /*
@@ -35,9 +37,9 @@ SoftwareRenderer *SoftwareRenderer::Create(SDL_Window *window) {
  *
  * Assumes the window and rendering surface are valid.
  */
-SoftwareRenderer::SoftwareRenderer(SDL_Window *window, SDL_Surface *render)
+SoftwareRenderer::SoftwareRenderer(SDL_Window *window, SDL_Surface *surface)
                                                          : Renderer(window) {
-  render_surface_ = render;
+  render_surface_ = surface;
   return;
 }
 
@@ -65,7 +67,7 @@ void SoftwareRenderer::Pixel(size_t row, size_t col, uint32_t pixel) {
  */
 void SoftwareRenderer::Frame(void) {
   // Get the window surface, and recalculate the rect, if the surface is invalid.
-  if (!window_size_valid) {
+  if (!window_size_valid_) {
     window_surface_ = SDL_GetWindowSurface(window_);
     GetWindowRect();
     SDL_FillRect(window_surface_, NULL, 0);

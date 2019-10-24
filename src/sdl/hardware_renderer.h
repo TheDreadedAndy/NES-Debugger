@@ -33,7 +33,7 @@ class HardwareRenderer : public Renderer {
     void Frame(void);
 
     // Attempts to create a HardwareRenderer object. Returns NULL on failure.
-    HardwareRenderer *Create(SDL_Window *window);
+    static HardwareRenderer *Create(SDL_Window *window);
 
     // Frees the structures and buffers related to this class.
     ~HardwareRenderer(void);

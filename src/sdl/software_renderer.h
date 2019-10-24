@@ -18,7 +18,7 @@ class SoftwareRenderer : public Renderer {
     SDL_Surface *window_surface_;
 
     // Uses the provided surface to create a SoftwareRenderer object.
-    SoftwareRenderer(SDL_Surface *surface);
+    SoftwareRenderer(SDL_Window *window, SDL_Surface *surface);
 
   public:
     // Functions implemented from the abstract class.
@@ -26,7 +26,7 @@ class SoftwareRenderer : public Renderer {
     void Frame(void);
 
     // Attempts to create a SoftwareRenderer object. Returns NULL on failure.
-    SoftwareRenderer *Create(SDL_Window *window);
+    static SoftwareRenderer *Create(SDL_Window *window);
 
     // Frees the surface used for software rendering.
     ~SoftwareRenderer(void);

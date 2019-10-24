@@ -67,7 +67,7 @@ class Ppu {
     Memory *memory_;
 
     // Holds the Renderer class to be used to draw pixels to the screen.
-    Renderer *render_;
+    Renderer *renderer_;
 
     // Helper functions for the PPU emulation.
     bool IsDisabled(void);

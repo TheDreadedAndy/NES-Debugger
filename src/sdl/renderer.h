@@ -51,7 +51,7 @@ class Renderer {
 
   public:
     // Creates the specified renderer, and returns it cast to a Render class.
-    Renderer *Create(SDL_Window *window, RenderType type);
+    static Renderer *Create(SDL_Window *window, RenderType type);
 
     // Draws a pixel to the window. The pixel will not be shown until Frame()
     // is called.

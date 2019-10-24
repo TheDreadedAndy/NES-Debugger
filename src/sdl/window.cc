@@ -22,9 +22,7 @@
 #include "./input.h"
 #include "./renderer.h"
 #include "./audio_player.h"
-#include "../util/contracts.h"
 #include "../util/util.h"
-#include "../ppu/palette.h"
 #include "../ndb.h"
 
 // Window size constants
@@ -41,7 +39,7 @@ const char *kWindowName = "NES, I guess?";
  * Attempts to create a Window object. Returns NULL and cleans any data already
  * created on failure.
  */
-Window *Window::Create(RenderType rendering_type) {
+Window *Window::Create(char *input_cfg, RenderType rendering_type) {
   // Init SDL's video system.
   if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_EVENTS) != 0) {
     fprintf(stderr, "Failed to initialize SDL.\n");
@@ -49,9 +47,9 @@ Window *Window::Create(RenderType rendering_type) {
   }
 
   // Create window.
-  window_ = SDL_CreateWindow(window_name, SDL_WINDOWPOS_CENTERED,
-                             SDL_WINDOWPOS_CENTERED, WINDOW_WIDTH,
-                             WINDOW_HEIGHT, SDL_WINDOW_RESIZABLE);
+  SDL_Window *window = SDL_CreateWindow(kWindowName, SDL_WINDOWPOS_CENTERED,
+                                        SDL_WINDOWPOS_CENTERED, WINDOW_WIDTH,
+                                        WINDOW_HEIGHT, SDL_WINDOW_RESIZABLE);
 
   // Check if the window was created successfully.
   if (window == NULL) {
@@ -66,16 +64,44 @@ Window *Window::Create(RenderType rendering_type) {
   SDL_SetHint(SDL_HINT_IME_INTERNAL_EDITING, "1");
 #endif
 
-  // TODO: Finish below.
-
-  // Initialize the requested rendering system.
-  if (!render_init(use_surface_rendering)) {
-    fprintf(stderr, "Failed to initialize rendering.\n");
-    return false;
+  // Attempt to create a renderer; error on failure.
+  Renderer *renderer = Renderer::Create(window, rendering_type);
+  if (renderer == NULL) {
+    fprintf(stderr, "Failed to create a renderer for the SDL window.\n");
+    SDL_DestroyWindow(window);
+    SDL_Quit();
+    return NULL;
   }
 
-  // Return success.
-  return true;
+  // Attempt to create an Audio Player; error on failure.
+  AudioPlayer *audio = AudioPlayer::Create();
+  if (audio == NULL) {
+    fprintf(stderr, "Failed to create an audio player.\n");
+    delete renderer;
+    SDL_DestroyWindow(window);
+    SDL_Quit();
+    return NULL;
+  }
+
+  // Open the input config file and setup input.
+  Input *input = new Input(input_cfg);
+
+  // Create a Window object and return it to the caller.
+  return new Window(window, renderer, audio, input);
+}
+
+/*
+ * Assigns the provided objects to the private variables of the object.
+ *
+ * Assumes all of the given objects are non-null and valid.
+ */
+Window::Window(SDL_Window *window, Renderer *renderer,
+               AudioPlayer *audio, Input *input) {
+  window_ = window;
+  renderer_ = renderer;
+  audio_ = audio;
+  input_ = input;
+  return;
 }
 
 /*
@@ -83,20 +109,20 @@ Window *Window::Create(RenderType rendering_type) {
  *
  * Assumes that SDL has been initialized.
  */
-void window_process_events(void) {
+void Window::ProcessEvents(void) {
   // Loop over all events on the SDL event queue.
   SDL_Event event;
   while (SDL_PollEvent(&event)) {
     // Determine the event type and call its handling function.
     switch (event.type) {
       case SDL_WINDOWEVENT:
-        window_process_window_event(&event);
+        ProcessWindowEvent(&event);
         break;
       case SDL_KEYDOWN:
-        input_press(event.key.keysym.sym);
+        input_->Press(event.key.keysym.sym);
         break;
       case SDL_KEYUP:
-        input_release(event.key.keysym.sym);
+        input_->Release(event.key.keysym.sym);
         break;
       default:
         break;
@@ -112,7 +138,7 @@ void window_process_events(void) {
  * Assumes that the event holds a window event.
  * Assumes that SDL has been initialized.
  */
-void window_process_window_event(SDL_Event *event) {
+void Window::ProcessWindowEvent(SDL_Event *event) {
   // Determine which window event is being thrown.
   switch (event->window.event) {
     case SDL_WINDOWEVENT_CLOSE:
@@ -121,7 +147,7 @@ void window_process_window_event(SDL_Event *event) {
       break;
     case SDL_WINDOWEVENT_SIZE_CHANGED:
       // The window has been resized, so the surface must be marked as invalid.
-      render_invalidate_window_surface();
+      renderer_->InvalidateWindowSurface();
       break;
     default:
       break;
@@ -135,11 +161,32 @@ void window_process_window_event(SDL_Event *event) {
  *
  * Assumes that SDL has been initialized.
  */
-void window_display_fps(double fps) {
+void Window::DisplayFps(double fps) {
   char buf[MAX_TITLE_SIZE];
-  sprintf(buf, "%s | FPS: %.1f", window_name, fps);
-  SDL_SetWindowTitle(window, buf);
+  sprintf(buf, "%s | FPS: %.1f", kWindowName, fps);
+  SDL_SetWindowTitle(window_, buf);
   return;
+}
+
+/*
+ * Exposes the created renderer object to the caller.
+ */
+Renderer *Window::GetRenderer(void) {
+  return renderer_;
+}
+
+/*
+ * Exposes the created audio player object to the caller.
+ */
+AudioPlayer *Window::GetAudioPlayer(void) {
+  return audio_;
+}
+
+/*
+ * Exposes the created input object to the caller.
+ */
+Input *Window::GetInput(void) {
+  return input_;
 }
 
 /*
@@ -147,12 +194,14 @@ void window_display_fps(double fps) {
  *
  * Assumes the window and render surface have been initialized.
  */
-void window_close(void) {
-  CONTRACT(window != NULL);
-  CONTRACT(render != NULL);
+Window::~Window(void) {
+  // Free all the interface objects.
+  delete renderer_;
+  delete audio_;
+  delete input_;
 
-  render->free();
-  SDL_DestroyWindow(window);
+  // Close SDL.
+  SDL_DestroyWindow(window_);
   SDL_Quit();
 
   return;

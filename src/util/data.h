@@ -5,7 +5,7 @@
 
 typedef uint8_t DataWord;
 typedef uint16_t DoubleWord;
-typedef union MultiWord {
+typedef union {
   DoubleWord dw;
   DataWord w[2];
 } MultiWord;

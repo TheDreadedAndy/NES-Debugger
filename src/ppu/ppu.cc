@@ -139,6 +139,8 @@
 
 /*
  * Initializes the PPU and palette, using the given file if possible.
+ *
+ * Assumes the provided renderer and memory object are valid.
  */
 Ppu::Ppu(char *file, Memory *memory, Renderer *render) {
   // Prepare the ppu structure.
@@ -150,6 +152,9 @@ Ppu::Ppu(char *file, Memory *memory, Renderer *render) {
   // Create the palette using the given file.
   palette_ = new NesPalette(file);
 
+  // Allocate the sprite renderering buffers.
+  // TODO
+
   // Stores the given Memory and Renderer class for use in the emulation.
   memory_ = memory;
   render_ = render;
@@ -160,55 +165,49 @@ Ppu::Ppu(char *file, Memory *memory, Renderer *render) {
 /*
  * Runs the next cycle in the ppu emulation, then increments the cycle/scanline
  * counters.
- *
- * Assumes the ppu and memory have been initialized.
  */
-void ppu_run_cycle(void) {
+void Ppu::RunCycle(void) {
   // Check if rendering has been disabled by the software.
-  if (ppu_is_disabled()) {
-    ppu_disabled();
+  if (IsDisabled()) {
+    Disabled();
   } else {
     // Render video using the current scanline/cycle.
-    ppu_render();
+    Render();
   }
 
   // Pull the NMI line high if one should be generated.
-  ppu_signal();
+  Signal();
 
   // Increment the cycle/scanline counters.
-  ppu_inc();
+  Inc();
 
   return;
 }
 
 /*
  * Returns true when rendering is disabled.
- *
- * Assumes the ppu has been initialized.
  */
-static bool ppu_is_disabled(void) {
-  return !(ppu->mask & FLAG_RENDER_BG) && !(ppu->mask & FLAG_RENDER_SPRITES);
+bool Ppu::IsDisabled(void) {
+  return !(mask_ & FLAG_RENDER_BG) && !(mask_ & FLAG_RENDER_SPRITES);
 }
 
 /*
  * Performs any PPU actions which cannot be disabled.
- *
- * Assumes the PPU has been initialized.
  */
-static void ppu_disabled(void) {
+void Ppu::Disabled(void) {
   // The OAM mask should not be active when rendering is disabled.
-  ppu->oam_mask = 0;
+  oam_mask_ = 0;
 
   // Determine which action should be performed.
-  if ((current_scanline >= 8) && (current_scanline < 232)) {
+  if ((current_scanline_ >= 8) && (current_scanline_ < 232)) {
     // Draws the background color to the screen when rendering is disabled.
-    if ((current_cycle > 0) && (current_cycle < 257)) { ppu_draw_background(); }
-  } else if ((current_scanline >= 240) && (current_scanline < 261)) {
+    if ((current_cycle_ > 0) && (current_cycle_ < 257)) { DrawBackground(); }
+  } else if ((current_scanline_ >= 240) && (current_scanline_ < 261)) {
     // Signals the start of vblanks.
-    ppu_render_blank();
-  } else if ((current_scanline >= 261) && (current_cycle == 1)) {
+    RenderBlank();
+  } else if ((current_scanline_ >= 261) && (current_cycle_ == 1)) {
     // Resets the status register during the pre-render scanline.
-    ppu->status = 0;
+    status_ = 0;
   }
 
   return;
@@ -217,25 +216,25 @@ static void ppu_disabled(void) {
 /*
  * Draws the background color to the screen when rendering is disabled.
  *
- * Assumes the PPU has been initialized and rendering is disabled.
+ * Assumes PPU rendering is disabled.
  */
-static void ppu_draw_background(void) {
+void Ppu::DrawBackground(void) {
   // Get the universal background color address and the screen position.
-  size_t screen_x = current_cycle - 1;
-  size_t screen_y = current_scanline;
-  dword_t color_addr = PALETTE_BASE_ADDR;
+  size_t screen_x = current_cycle_ - 1;
+  size_t screen_y = current_scanline_;
+  DoubleWord color_addr = PALETTE_BASE_ADDR;
 
   // The universal background color can be changed using the current vram
   // address.
-  if ((ppu->vram_addr & VRAM_BUS_MASK) > PALETTE_BASE_ADDR) {
-    color_addr = ppu->vram_addr & VRAM_BUS_MASK;
+  if ((vram_addr_ & VRAM_BUS_MASK) > PALETTE_BASE_ADDR) {
+    color_addr = vram_addr_ & VRAM_BUS_MASK;
   }
 
   // Get the background color pixel.
-  uint32_t pixel = memory_palette_read(color_addr);
+  uint32_t pixel = memory_->PaletteRead(color_addr);
 
   // Render the pixel.
-  render->pixel(screen_y, screen_x, pixel);
+  renderer_->Pixel(screen_y, screen_x, pixel);
 
   return;
 }
@@ -243,17 +242,15 @@ static void ppu_draw_background(void) {
 
 /*
  * Runs the rendering action for the given cycle/scanline.
- *
- * Assumes the ppu has been initialized.
  */
-static void ppu_render(void) {
+void Ppu::Render(void) {
   // Determine which scanline we're on and render accordingly.
-  if (current_scanline < 240) {
-    ppu_render_visible();
-  } else if (current_scanline < 261) {
-    ppu_render_blank();
+  if (current_scanline_ < 240) {
+    RenderVisible();
+  } else if (current_scanline_ < 261) {
+    RenderBlank();
   } else {
-    ppu_render_pre();
+    RenderPre();
   }
 
   return;
@@ -261,77 +258,75 @@ static void ppu_render(void) {
 
 /*
  * Performs the current cycles action for a rendering scanline.
- *
- * Assumes the PPU has been initialized.
  */
-static void ppu_render_visible(void) {
+void Ppu::RenderVisible(void) {
   // Sprite evaluation can raise an internal signal that forces OAM reads
   // to return 0xFF. In the emulation, this signal is reset each cycle and
   // set by ppu_eval_clear_soam() when it needs to be raised.
-  ppu->oam_mask = 0x00;
+  oam_mask_ = 0x00;
 
   /*
    * Determine which phase of rendering the scanline is in.
    * The first cycle may finish a read, when coming from a pre-render scanline
    * on an odd frame.
    */
-  if (current_cycle == 0) {
+  if (current_cycle_ == 0) {
     // Finish the garbage nametable write that got skipped.
-    if (ppu->mdr_write) { ppu_render_dummy_nametable_access(); }
-  } else if (current_cycle <= 64) {
+    if (mdr_write_) { RenderDummyNametableAccess(); }
+  } else if (current_cycle_ <= 64) {
     // Draw a pixel in the frame.
-    ppu_render_update_frame(true);
+    RenderUpdateFrame(true);
     // Clear SOAM for sprite evaluation.
-    ppu_eval_clear_soam();
-  } else if (current_cycle <= 256) {
+    EvalClearSoam();
+  } else if (current_cycle_ <= 256) {
     // Draw a pixel in the frame.
-    ppu_render_update_frame(true);
+    RenderUpdateFrame(true);
     // Evaluate the sprites on the next scanline.
-    ppu_eval_sprites();
-  } else if (current_cycle <= 320) {
+    EvalSprites();
+  } else if (current_cycle_ <= 320) {
     // On cycle 257, the horizontal vram position is loaded from the temp vram
     // address register. As an optmization, sprite fetching is run only on this
     // cycle.
-    if (current_cycle == 257) {
-      ppu_render_update_hori();
-      ppu_eval_fetch_sprites();
+    if (current_cycle_ == 257) {
+      RenderUpdateHori();
+      EvalFetchSprites();
     }
     // The OAM addr is reset to zero during sprite prep, which has been
     // optimized out.
-    ppu->oam_addr = 0;
-  } else if (current_cycle <= 336) {
+    oam_addr_ = 0;
+  } else if (current_cycle_ <= 336) {
     // Fetch the background tile data for the next cycle.
-    ppu_render_update_registers();
-    if ((current_cycle % 8) == 0) { ppu_render_xinc(); }
-  } else if (current_cycle > 336 && current_cycle <= 340) {
+    RenderUpdateRegisters();
+    if ((current_cycle_ % 8) == 0) { RenderXinc(); }
+  } else if (current_cycle_ > 336 && current_cycle_ <= 340) {
     // Unused NT byte fetches, mappers may clock this.
-    ppu_render_dummy_nametable_access();
+    RenderDummyNametableAccess();
   }
 
   return;
 }
 
 /*
- * Runs a ppu cycle during the drawing phase of a visible scanline.
+ * Runs a PPU cycle during the drawing phase of a visible scanline.
  * This includes drawing a pixel to the screen, updating the shift registers,
  * and possibly incrementing the vram address.
  *
- * Assumes the ppu has been initialized and is currently between cycles
- * 1 and 256 (inclusive) of a visible scanline.
+ * Assumes the PPU is currently between cycles 1 and 256 (inclusive) of a
+ * visible scanline.
  */
-static void ppu_render_update_frame(bool output) {
+void Ppu::RenderUpdateFrame(bool output) {
   // Render the pixel.
-  if (output) { ppu_render_draw_pixel(); }
+  if (output) { RenderDrawPixel(); }
 
   // Update the background registers.
-  ppu_render_update_registers();
+  RenderUpdateRegisters();
 
   // Update the vram address.
-  if ((current_cycle % 8) == 0) {
+  if ((current_cycle_ % 8) == 0) {
     // Every 8 cycles, the horizontal vram position is incremented.
-    ppu_render_xinc();
+    RenderXinc();
     // On cycle 256, the vertical vram position is incremented.
-    if (current_cycle == 256) { ppu_render_yinc(); }
+    if (current_cycle_ == 256) { RenderYinc(); }
   }
 
   return;
@@ -341,32 +336,31 @@ static void ppu_render_update_frame(bool output) {
  * Uses the shift registers and sprite memory to draw the current cycles
  * pixel to the screen
  *
- * Assumes the PPU has been initialized and is currently running a cycle
- * between 1 and 256 (inclusive) of a visible scanline.
+ * Assumes the PPU is currently running a cycle between 1 and 256 (inclusive)
+ * of a visible scanline.
  */
-static void ppu_render_draw_pixel(void) {
+void Ppu::RenderDrawPixel(void) {
   // Get the screen position.
-  size_t screen_x = current_cycle - 1;
-  size_t screen_y = current_scanline;
+  size_t screen_x = current_cycle_ - 1;
+  size_t screen_y = current_scanline_;
 
   // Holds the background and sprite palette color index.
-  word_t bg_pattern = 0;
+  DataWord bg_pattern = 0;
 
   // Flags whether the background or sprite pixel should be rendered.
   bool sprite_on_top = false;
 
   // Get the background tile pattern.
-  if ((ppu->mask & FLAG_RENDER_BG) && ((screen_x >= 8)
-                                   || (ppu->mask & FLAG_LEFT_BG))) {
-    bg_pattern = ppu_render_get_tile_pattern();
+  if ((mask_ & FLAG_RENDER_BG) && ((screen_x >= 8)
+                               || (mask_ & FLAG_LEFT_BG))) {
+    bg_pattern = RenderGetTilePattern();
   }
 
   // Get the sprite pattern.
-  word_t sprite_buf = 0xFF;
-  if ((ppu->mask & FLAG_RENDER_SPRITES)
-     && ((screen_x >= 8) || (ppu->mask & FLAG_LEFT_SPRITES))
-     && ((sprite_buf = ppu->soam_buffer[ppu->soam_render_buf][screen_x])
-     != 0xFF)) {
+  DataWord sprite_buf = 0xFF;
+  if ((mask_ & FLAG_RENDER_SPRITES)
+     && ((screen_x >= 8) || (mask_ & FLAG_LEFT_SPRITES))
+     && ((sprite_buf = soam_buffer_[soam_render_buf_][screen_x]) != 0xFF)) {
 
     // Check if the pixel should be rendered on top of the background.
     if (((bg_pattern == 0) || !(sprite_buf & FLAG_SOAM_BUFFER_PRIORITY))
@@ -377,28 +371,28 @@ static void ppu_render_draw_pixel(void) {
     // Check if this counts as a sprite 0 hit.
     if ((sprite_buf & FLAG_SOAM_BUFFER_ZERO) && (bg_pattern != 0)
          && (screen_x != 255) && (sprite_buf & FLAG_SOAM_BUFFER_PATTERN)) {
-      ppu->status |= FLAG_HIT;
+      status_ |= FLAG_HIT;
     }
   }
 
   // Calculate the address of the pixel to be drawn.
-  dword_t pixel_addr;
+  DoubleWord pixel_addr;
   if (sprite_on_top) {
     pixel_addr = PALETTE_BASE_ADDR | (sprite_buf & FLAG_SOAM_BUFFER_PALETTE);
   } else if (bg_pattern != 0) {
     pixel_addr = PALETTE_BASE_ADDR | bg_pattern
-               | ppu_render_get_tile_palette();
+               | RenderGetTilePalette();
   } else {
     pixel_addr = PALETTE_BASE_ADDR;
   }
 
   // Check if the pixel is on a scanline that is displayed.
-  if ((current_scanline >= 8) && (current_scanline < 232)) {
+  if ((current_scanline_ >= 8) && (current_scanline_ < 232)) {
     // Get the pixel.
-    uint32_t pixel = memory_palette_read(pixel_addr);
+    uint32_t pixel = memory_->PaletteRead(pixel_addr);
 
     // Render the pixel.
-    render->pixel(screen_y, screen_x, pixel);
+    renderer_->Pixel(screen_y, screen_x, pixel);
   }
 
   return;
@@ -406,37 +400,30 @@ static void ppu_render_draw_pixel(void) {
 
 /*
  * Pulls the next background tile pattern from the shift registers.
- *
- * Assumes the PPU has been initialized.
  */
-static word_t ppu_render_get_tile_pattern(void) {
+DataWord Ppu::RenderGetTilePattern(void) {
   // Get the pattern of the background tile.
-  word_t tile_pattern = (((ppu->tile_scroll[0].w[WORD_HI] << ppu->fine_x)
-                      >> 7U) & 1U)
-                      | (((ppu->tile_scroll[1].w[WORD_HI] << ppu->fine_x)
-                      >> 6U) & 2U);
-  return tile_pattern;
+  DataWord pattern = (((tile_scroll_[0].w[WORD_HI] << fine_x_) >> 7U) & 1U)
+                   | (((tile_scroll_[1].w[WORD_HI] << fine_x_) >> 6U) & 2U);
+  return pattern;
 }
 
 /*
  * Gets the palette index of the current background tile from the shift
  * registers.
  *
- * Assumes the PPU has been initialized.
  * Assumes the current tile pattern is non-zero.
  */
-static word_t ppu_render_get_tile_palette(void) {
+DataWord Ppu::RenderGetTilePalette(void) {
   // Get the palette of the background tile.
-  word_t tile_palette = (((ppu->palette_scroll[0] << ppu->fine_x) >> 7U) & 1U)
-                      | (((ppu->palette_scroll[1] << ppu->fine_x) >> 6U) & 2U);
-  return tile_palette << 2U;
+  DataWord palette = (((palette_scroll_[0] << fine_x_) >> 7U) & 1U)
+                   | (((palette_scroll_[1] << fine_x_) >> 6U) & 2U);
+  return palette << 2U;
 }
 
 /*
  * Updates the background tile data shift registers based on the current cycle.
  * It takes 8 cycles to fully load in an 8x1 region for 1 tile.
- *
- * Assumes the PPU has been initialized.
  */
 static void ppu_render_update_registers(void) {
   // Shift the tile registers.

@@ -31,7 +31,7 @@ class Window {
 
   public:
     // Attempts to create a Window object. Returns NULL on failure.
-    Window *Create(RenderType rendering_type);
+    Window *Create(char *input_cfg, RenderType rendering_type);
 
     // Processes all relevent events on the SDL event queue.
     void ProcessEvents(void);
@@ -46,6 +46,6 @@ class Window {
 
     // Closes the SDL window.
     ~Window(void);
-}
+};
 
 #endif

@@ -1,12 +1,10 @@
+#ifndef _NES_MEM
+#define _NES_MEM
+
 #include <stdlib.h>
 #include <stdint.h>
 #include "../util/data.h"
 #include "./header.h"
-#include "../ppu/ppu.h"
-#include "../cpu/2A03.h"
-
-#ifndef _NES_MEM
-#define _NES_MEM
 
 // Memory addressing constants.
 #define MEMORY_STACK_HIGH 0x01U
@@ -31,7 +29,7 @@
 #define PALETTE_OFFSET 0x3F00U
 
 // PPU memory accessing masks.
-#define VRAM_ADDR_MASK 0x3FFFU
+#define VRAM_BUS_MASK 0x3FFFU
 #define NAMETABLE_SELECT_MASK 0x0C00U
 #define NAMETABLE_ADDR_MASK 0x03FFU
 #define PALETTE_ADDR_MASK 0x001FU
@@ -44,6 +42,18 @@
 // Used to interact with the optimized palette.
 #define PALETTE_NES_PIXEL_SHIFT 24U
 #define PALETTE_XRGB_MASK 0x00FFFFFFU
+
+/*
+ * Forward declarations for the other chip emulations.
+ *
+ * This must be done here because the Memory class does not require these
+ * classes on creation. These classes are dependent on each other, with
+ * Memory being provided pointers to its associated objects after they have
+ * been created (using the Connect() method).
+ */
+class Cpu;
+class Ppu;
+class Apu;
 
 /*
  * Abstract memory class. All memory mappers must implement these functions.

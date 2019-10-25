@@ -199,7 +199,7 @@ void Uxrom::Write(DoubleWord addr, DataWord val) {
  */
 DataWord Uxrom::VramRead(DoubleWord addr) {
   // Mask out any extra bits.
-  addr &= VRAM_ADDR_MASK;
+  addr &= VRAM_BUS_MASK;
 
   // Determine which part of VRAM is being accessed.
   if (addr < NAMETABLE_OFFSET) {
@@ -224,7 +224,7 @@ DataWord Uxrom::VramRead(DoubleWord addr) {
  */
 void Uxrom::VramWrite(DoubleWord addr, DataWord val) {
   // Masks out any extra bits.
-  addr &= VRAM_ADDR_MASK;
+  addr &= VRAM_BUS_MASK;
 
   // Determine which part of VRAM is being accessed.
   if ((addr < NAMETABLE_OFFSET) && is_chr_ram_) {

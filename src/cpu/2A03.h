@@ -13,20 +13,20 @@
 #define CPU_DMA_ADDR 0x4014U
 
 // Interrupt lines, which can be set by the PPU/APU
-extern word_t irq_line;
+extern DataWord irq_line;
 extern bool nmi_line;
 
 // Interrupt bools, which can be used by the micro ops.
 extern bool nmi_edge, irq_ready;
 
 // Initializes the cpu, so that cycles may be executed.
-void cpu_init(FILE *rom_file, header_t *header);
+void cpu_init(FILE *rom_file, RomHeader *header);
 
 // Executes the next cycle of the 2A03.
 void cpu_run_cycle(void);
 
 // Starts a DMA transfer from CPU memory to OAM.
-void cpu_start_dma(word_t addr);
+void cpu_start_dma(DataWord addr);
 
 // Fetches the next instruction in the emulation. Should only be called from
 // micro ops.

@@ -1,8 +1,9 @@
-#include <stdlib.h>
-#include <stdbool.h>
-
 #ifndef _NES_VID
 #define _NES_VID
+
+#include <stdlib.h>
+#include <stdbool.h>
+#include <SDL2/SDL.h>
 
 /*
  * The NES draws a 256x240 pictures, which is padded to 280x240. Most tvs

@@ -1,12 +1,12 @@
+#ifndef _NES_PPU
+#define _NES_PPU
+
 #include <stdlib.h>
 #include <stdbool.h>
 #include "../util/data.h"
 #include "../ppu/palette.h"
 #include "../memory/memory.h"
-#include "../sdl/render.h"
-
-#ifndef _NES_PPU
-#define _NES_PPU
+#include "../sdl/renderer.h"
 
 // The number of secondary sprite buffers used during rendering.
 #define NUM_SOAM_BUFFERS 2U
@@ -53,7 +53,7 @@ class Ppu {
 
     // MDR and write toggle, used for 2-cycle r/w system.
     DataWord mdr_;
-    bool mdr_write;
+    bool mdr_write_;
 
     // Tracks the current scanline/cycle the PPU emulation is on.
     size_t current_scanline_;
@@ -117,8 +117,8 @@ class Ppu {
     // The current OAM address is incremented by this operation.
     void OamDma(DataWord val);
 
-    Ppu(char *file);
+    Ppu(char *file, Memory *memory, Renderer *renderer);
     ~Ppu(void);
-}
+};
 
 #endif

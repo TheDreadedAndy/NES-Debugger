@@ -1,9 +1,9 @@
+#ifndef _NES_PALETTE
+#define _NES_PALETTE
+
 #include "../util/data.h"
 #include <stdint.h>
 #include <stdbool.h>
-
-#ifndef _NES_PALETTE
-#define _NES_PALETTE
 
 // Palette format constants. Colors are stored as RGB 32-bit.
 #define PALETTE_DEPTH 32

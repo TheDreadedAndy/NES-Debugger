@@ -1,7 +1,7 @@
-#include <stdint.h>
-
 #ifndef _NES_GLOBALS
 #define _NES_GLOBALS
+
+#include <stdint.h>
 
 typedef uint8_t DataWord;
 typedef uint16_t DoubleWord;

@@ -10,7 +10,7 @@
 #include "./ppu.h"
 #include "./palette.h"
 #include "../cpu/2A03.h"
-#include "../sdl/render.h"
+#include "../sdl/renderer.h"
 #include "../memory/memory.h"
 
 /* Emulation constants */
@@ -160,7 +160,7 @@ Ppu::Ppu(char *file, Memory *memory, Renderer *render) {
 
   // Stores the given Memory and Renderer class for use in the emulation.
   memory_ = memory;
-  render_ = render;
+  renderer_ = render;
 
   return;
 }
@@ -446,7 +446,7 @@ void Ppu::RenderUpdateRegisters(void) {
   }
 
   // Determine which of the 8 cycles is being executed.
-  switch (current_cycle & REG_UPDATE_MASK) {
+  switch (current_cycle_ & REG_UPDATE_MASK) {
     case REG_FETCH_NT:
       mdr_ = memory_->VramRead((vram_addr_ & VRAM_NT_ADDR_MASK)
                                            | PPU_NT_OFFSET);
@@ -668,9 +668,9 @@ void Ppu::EvalClearSoam(void) {
  *
  * Assumes the first call on a scanline will happen on cycle 65.
  */
-static void ppu_eval_sprites(void) {
+void Ppu::EvalSprites(void) {
   // As an optimization, sprite evaluation is run only once per scanline.
-  if (current_cycle != 65) { return; }
+  if (current_cycle_ != 65) { return; }
 
   // Run sprite evaluation. This loop fills both the OAM read buffer,
   // which returns the correct values read from OAM each cycle on request
@@ -681,15 +681,15 @@ static void ppu_eval_sprites(void) {
   size_t sprites_found = 0;
   while (i < PRIMARY_OAM_SIZE) {
     // Read in the sprite and check if it was in range.
-    ppu->oam_buffer[sim_cycle] = ppu->primary_oam[i];
+    oam_buffer_[sim_cycle] = primary_oam_[i];
     if (sprites_found >= 8) {
       // More than 8 sprites have been found, so spirte overflow begins.
-      if (ppu_eval_in_range(ppu->oam_buffer[sim_cycle])) {
+      if (EvalInRange(oam_buffer_[sim_cycle])) {
         // Flag that overflow occured, and fill the rest of the OAM buffer.
         // FIXME: Should not be set immediately.
         status_ |= FLAG_OVERFLOW;
         for (; sim_cycle < OAM_BUFFER_SIZE; sim_cycle++) {
-          ppu->oam_buffer[sim_cycle] = ppu->primary_oam[i];
+          oam_buffer_[sim_cycle] = primary_oam_[i];
         }
         break;
       } else {
@@ -697,16 +697,16 @@ static void ppu_eval_sprites(void) {
         sim_cycle++;
         i += 5;
       }
-    } else if (ppu_eval_in_range(ppu->oam_buffer[sim_cycle])) {
+    } else if (EvalInRange(oam_buffer_[sim_cycle])) {
       // If it was, read it into the OAM buffer and add it to the scanline
       // buffer.
       sprites_found++;
       for (int j = 0; j < 4; j++) {
-        ppu->oam_buffer[sim_cycle] = ppu->primary_oam[i];
+        oam_buffer_[sim_cycle] = primary_oam_[i];
         i++;
       }
-      ppu_eval_fill_soam_buffer(&(ppu->primary_oam[i - 4]),
-                                 (i - 4) == oam_addr_);
+      EvalFillSoamBuffer(&(primary_oam_[i - 4]),
+                        (i - 4) == oam_addr_);
     } else {
       // Otherwise, the sprite was out of range, so we move on.
       i += 4;
@@ -721,14 +721,12 @@ static void ppu_eval_sprites(void) {
 /*
  * Checks if a sprite is visible on the current scanline using the value
  * stored in the eval buffer as a Y cordinate.
- *
- * Assumes the PPU has been initialized.
  */
-static bool ppu_eval_in_range(DataWord sprite_y) {
+bool Ppu::EvalInRange(DataWord sprite_y) {
   // Get the current size of sprites (8x8 or 8x16) from the control register
   // and the screen y coordinate from the current scanline.
   DataWord sprite_size = (ctrl_ & FLAG_SPRITE_SIZE) ? 16 : 8;
-  DataWord screen_y = current_scanline;
+  DataWord screen_y = current_scanline_;
 
   // Check if the sprite is visible on this scanline.
   bool in_range = (sprite_y <= screen_y) && (sprite_y < 240)
@@ -739,10 +737,8 @@ static bool ppu_eval_in_range(DataWord sprite_y) {
 /*
  * Adds the given sprite to the soam sprite buffer, setting its sprite zero
  * bit if is_zero is set.
- *
- * Assumes the PPU has been initialized.
  */
-static void ppu_eval_fill_soam_buffer(DataWord *sprite_data, bool is_zero) {
+void Ppu::EvalFillSoamBuffer(DataWord *sprite_data, bool is_zero) {
   // Setup the information that will be contained in each scanline buffer byte
   // for this sprite. This byte contains whether or not the pixel belongs to
   // sprite zero, the sprites priority, and its palette index.
@@ -755,7 +751,7 @@ static void ppu_eval_fill_soam_buffer(DataWord *sprite_data, bool is_zero) {
 
   // Get the individual pixels for the sprite.
   DataWord pat_lo, pat_hi;
-  ppu_eval_get_sprite(sprite_data, &pat_lo, &pat_hi);
+  EvalGetSprite(sprite_data, &pat_lo, &pat_hi);
 
   // Add the sprite to the soam buffer.
   DataWord sprite_x = sprite_data[3];
@@ -780,13 +776,11 @@ static void ppu_eval_fill_soam_buffer(DataWord *sprite_data, bool is_zero) {
 
 /*
  * Fetches the pattern bytes for a given sprite.
- *
- * Assumes the PPU has been initialized.
  */
-static void ppu_eval_get_sprite(DataWord *sprite_data, DataWord *pat_lo,
-                                                     DataWord *pat_hi) {
+void Ppu::EvalGetSprite(DataWord *sprite_data, DataWord *pat_lo,
+                                               DataWord *pat_hi) {
   // Get some basic information about the current sprite being prepared.
-  DataWord screen_y = current_scanline;
+  DataWord screen_y = current_scanline_;
   DataWord sprite_y = sprite_data[0];
 
   // Calculate position and offset from the sprite.
@@ -819,7 +813,7 @@ static void ppu_eval_get_sprite(DataWord *sprite_data, DataWord *pat_lo,
               | index_offset;
   } else {
     DoubleWord tile_table = (ctrl_ & FLAG_SPRITE_TABLE) ? PATTERN_TABLE_HIGH
-                                                         : PATTERN_TABLE_LOW;
+                                                        : PATTERN_TABLE_LOW;
     tile_addr = tile_offset | (tile_index << X8_TILE_SHIFT) | tile_table;
   }
 
@@ -829,8 +823,8 @@ static void ppu_eval_get_sprite(DataWord *sprite_data, DataWord *pat_lo,
 
   // Check if the bytes should be horizontally flipped.
   if (sprite_data[2] & FLAG_SPRITE_HFLIP) {
-    *pat_lo = reverse_word(*pat_lo);
-    *pat_hi = reverse_word(*pat_hi);
+    *pat_lo = ReverseWord(*pat_lo);
+    *pat_hi = ReverseWord(*pat_hi);
   }
 
   return;
@@ -838,15 +832,13 @@ static void ppu_eval_get_sprite(DataWord *sprite_data, DataWord *pat_lo,
 
 /*
  * Switches the active sprite scanline buffers once per scanline.
- *
- * Assumes the PPU has been initialized.
  */
-static void ppu_eval_fetch_sprites(void) {
-  if (current_cycle == 257) {
+void Ppu::EvalFetchSprites(void) {
+  if (current_cycle_ == 257) {
     // In place switch.
-    soam_eval_buf_ ^= ppu->soam_render_buf;
-    ppu->soam_render_buf ^= soam_eval_buf_;
-    soam_eval_buf_ ^= ppu->soam_render_buf;
+    soam_eval_buf_ ^= soam_render_buf_;
+    soam_render_buf_ ^= soam_eval_buf_;
+    soam_eval_buf_ ^= soam_render_buf_;
   }
 
   return;
@@ -854,13 +846,12 @@ static void ppu_eval_fetch_sprites(void) {
 
 /*
  * Generates an NMI in the CPU emulation when appropriate.
- *
- * Assumes the PPU has been initialized.
  */
-static void ppu_signal(void) {
+void Ppu::Signal(void) {
   // NMIs should be generated when they are enabled in ppuctrl and
   // the ppu is in vblank.
-  nmi_line = (ctrl_ & FLAG_ENABLE_VBLANK) && (status_ & FLAG_VBLANK);
+  // FIXME
+  //nmi_line = (ctrl_ & FLAG_ENABLE_VBLANK) && (status_ & FLAG_VBLANK);
   return;
 }
 
@@ -868,22 +859,22 @@ static void ppu_signal(void) {
  * Increments the scanline, cycle, and frame type and correctly wraps them.
  * Each ppu frame has 341 cycles and 262 scanlines.
  */
-static void ppu_inc(void) {
+void Ppu::Inc(void) {
   // Increment the cycle.
-  current_cycle++;
+  current_cycle_++;
 
   // Increment the scanline if it is time to wrap the cycle.
-  if ((current_cycle > 340) || (frame_odd
-          && (current_cycle > 339) && (current_scanline >= 261)
-          && ((ppu->mask & FLAG_RENDER_BG)
-          || (ppu->mask & FLAG_RENDER_SPRITES)))) {
-    current_scanline++;
-    current_cycle = 0;
+  if ((current_cycle_ > 340) || (frame_odd_
+          && (current_cycle_ > 339) && (current_scanline_ >= 261)
+          && ((mask_ & FLAG_RENDER_BG)
+          || (mask_ & FLAG_RENDER_SPRITES)))) {
+    current_scanline_++;
+    current_cycle_ = 0;
 
     // Wrap the scanline and toggle the frame if it is time to do so.
-    if (current_scanline > 261) {
-      current_scanline = 0;
-      frame_odd = !frame_odd;
+    if (current_scanline_ > 261) {
+      current_scanline_ = 0;
+      frame_odd_ = !frame_odd_;
     }
   }
 
@@ -893,12 +884,10 @@ static void ppu_inc(void) {
 /*
  * Takes in an address from cpu memory and uses it to write to the
  * corresponding mmio in the ppu.
- *
- * Assumes the ppu has been initialized.
  */
-void ppu_write(DoubleWord reg_addr, DataWord val) {
+void Ppu::Write(DoubleWord reg_addr, DataWord val) {
   // Fill the PPU bus with the value being written.
-  ppu->bus = val;
+  bus_ = val;
 
   // Determine which register is being accessed.
   switch(reg_addr & PPU_MMIO_MASK) {
@@ -906,12 +895,13 @@ void ppu_write(DoubleWord reg_addr, DataWord val) {
       ctrl_ = val;
       // Update the scrolling nametable selection.
       temp_vram_addr_ = (temp_vram_addr_ & ~SCROLL_NT_MASK)
-               | (((DoubleWord) (ctrl_ & FLAG_NAMETABLE)) << SCROLL_NT_SHIFT);
+                      | ((static_cast<DoubleWord>(ctrl_ & FLAG_NAMETABLE))
+                      << SCROLL_NT_SHIFT);
       break;
     case PPU_MASK_ACCESS:
-      ppu->mask = val;
-      palette_update_mask(val);
-      memory_palette_update();
+      mask_ = val;
+      palette_->UpdateMask(val);
+      memory_->PaletteUpdate();
       break;
     case PPU_STATUS_ACCESS:
       // Read only.
@@ -921,17 +911,17 @@ void ppu_write(DoubleWord reg_addr, DataWord val) {
       oam_addr_ = val;
       break;
     case OAM_DATA_ACCESS:
-      ppu_oam_dma(val);
+      OamDma(val);
       break;
     case PPU_SCROLL_ACCESS:
-      ppu_mmio_scroll_write(val);
+      MmioScrollWrite(val);
       break;
     case PPU_ADDR_ACCESS:
-      ppu_mmio_addr_write(val);
+      MmioAddrWrite(val);
       break;
     case PPU_DATA_ACCESS:
-      memory_vram_write(val, vram_addr_);
-      ppu_mmio_vram_addr_inc();
+      memory_->VramWrite(val, vram_addr_);
+      MmioVramAddrInc();
       break;
   }
 
@@ -940,25 +930,22 @@ void ppu_write(DoubleWord reg_addr, DataWord val) {
 
 /*
  * Writes the the PPU scroll register. Toggles the write bit.
- *
- * Assumes the PPU has been initialized.
  */
-static void ppu_mmio_scroll_write(DataWord val) {
+void Ppu::MmioScrollWrite(DataWord val) {
   // Determine which write should be done.
-  if (ppu->write_toggle) {
+  if (write_toggle_) {
     // Update scroll Y.
     temp_vram_addr_ = (temp_vram_addr_
-             & (SCROLL_X_MASK | SCROLL_NT_MASK))
-             | ((((DoubleWord) val) << COARSE_Y_SHIFT) & COARSE_Y_MASK)
-             | ((((DoubleWord) val) << FINE_Y_SHIFT) & FINE_Y_MASK);
-    ppu->write_toggle = false;
+        & (SCROLL_X_MASK | SCROLL_NT_MASK))
+        | (((static_cast<DoubleWord>(val)) << COARSE_Y_SHIFT) & COARSE_Y_MASK)
+        | (((static_cast<DoubleWord>(val)) << FINE_Y_SHIFT) & FINE_Y_MASK);
+    write_toggle_ = false;
   } else {
     // Update scroll X.
-    ppu->fine_x = val & FINE_X_MASK;
-    temp_vram_addr_ = (temp_vram_addr_
-                        & (SCROLL_Y_MASK | SCROLL_NT_MASK))
-                        | (val >> COARSE_X_SHIFT);
-    ppu->write_toggle = true;
+    fine_x_ = val & FINE_X_MASK;
+    temp_vram_addr_ = (temp_vram_addr_ & (SCROLL_Y_MASK | SCROLL_NT_MASK))
+                    | (val >> COARSE_X_SHIFT);
+    write_toggle_ = true;
   }
 
   return;
@@ -966,21 +953,20 @@ static void ppu_mmio_scroll_write(DataWord val) {
 
 /*
  * Writes to the PPU addr register. Toggles the write bit.
- *
- * Assumes the PPU has been initialized.
  */
-static void ppu_mmio_addr_write(DataWord val) {
+void Ppu::MmioAddrWrite(DataWord val) {
   // Determine which write should be done.
-  if (ppu->write_toggle) {
+  if (write_toggle_) {
     // Write the low byte and update v.
     temp_vram_addr_ = (temp_vram_addr_ & PPU_ADDR_HIGH_MASK) | val;
     vram_addr_ = temp_vram_addr_;
-    ppu->write_toggle = false;
+    write_toggle_ = false;
   } else {
     // Write the high byte.
     temp_vram_addr_ = (temp_vram_addr_ & PPU_ADDR_LOW_MASK)
-        | ((((DoubleWord) val) << PPU_ADDR_HIGH_SHIFT) & PPU_ADDR_HIGH_MASK);
-    ppu->write_toggle = true;
+        | (((static_cast<DoubleWord>(val)) << PPU_ADDR_HIGH_SHIFT)
+        & PPU_ADDR_HIGH_MASK);
+    write_toggle_ = true;
   }
 
   return;
@@ -989,25 +975,23 @@ static void ppu_mmio_addr_write(DataWord val) {
 /*
  * Increments the vram address after a PPU data access, implementing the
  * buggy behavior expected during rendering.
- *
- * Assumes the PPU has been initialized.
  */
-static void ppu_mmio_vram_addr_inc(void) {
+void Ppu::MmioVramAddrInc(void) {
   // Determine how the increment should work.
-  if (ppu_is_disabled() || (current_scanline >= 240
-                            && current_scanline <= 260)) {
+  if (IsDisabled() || (current_scanline_ >= 240
+                   && current_scanline_ <= 260)) {
     // When the PPU is inactive, vram is incremented correctly.
     vram_addr_ = (ctrl_ & FLAG_VRAM_VINC) ? (vram_addr_ + 32)
-                                                  : (vram_addr_ + 1);
+                                          : (vram_addr_ + 1);
   } else {
     // Writing to PPU data during rendering causes a X and Y increment.
     // This only happens when the PPU would not otherwise be incrementing them.
-    if (!((((current_cycle > 0) && (current_cycle <= 256))
-         || (current_cycle > 320)) && ((current_cycle % 8) == 0))) {
-      ppu_render_xinc();
+    if (!((((current_cycle_ > 0) && (current_cycle_ <= 256))
+         || (current_cycle_ > 320)) && ((current_cycle_ % 8) == 0))) {
+      RenderXinc();
     }
-    if (current_cycle != 256) {
-      ppu_render_yinc();
+    if (current_cycle_ != 256) {
+      RenderYinc();
     }
   }
 
@@ -1017,35 +1001,33 @@ static void ppu_mmio_vram_addr_inc(void) {
 /*
  * Takes in an address from cpu memory and uses it to read from
  * the corresponding mmio in the ppu.
- *
- * Assumes the ppu has been initialized.
  */
-DataWord ppu_read(DoubleWord reg_addr) {
+DataWord Ppu::Read(DoubleWord reg_addr) {
   // Determine which register is being read from.
   switch(reg_addr & PPU_MMIO_MASK) {
     case PPU_STATUS_ACCESS:
       // PPU status contains only 3 bits (high 3).
-      ppu->bus = (ppu->bus & ~PPU_STATUS_MASK)
-               | (status_ & PPU_STATUS_MASK);
+      bus_ = (bus_ & ~PPU_STATUS_MASK)
+           | (status_ & PPU_STATUS_MASK);
       // Reads to PPU status reset the write toggle and clear the vblank flag.
       status_ &= ~FLAG_VBLANK;
-      ppu->write_toggle = false;
+      write_toggle_ = false;
       break;
     case OAM_DATA_ACCESS:
-      ppu->bus = ppu_oam_read();
+      bus_ = OamRead();
       break;
     case PPU_DATA_ACCESS:
       // Reading from mappable VRAM (not the palette) returns the value to an
       // internal bus.
       if (reg_addr < PPU_PALETTE_OFFSET) {
-        ppu->bus = ppu->vram_buf;
-        ppu->vram_buf = memory_->VramRead(vram_addr_);
+        bus_ = vram_buf_;
+        vram_buf_ = memory_->VramRead(vram_addr_);
       } else {
-        ppu->bus = memory_->VramRead(vram_addr_);
-        ppu->vram_buf = memory_->VramRead((vram_addr_ & VRAM_NT_ADDR_MASK)
-                                                   | PPU_NT_OFFSET);
+        bus_ = memory_->VramRead(vram_addr_);
+        vram_buf_ = memory_->VramRead((vram_addr_ & VRAM_NT_ADDR_MASK)
+                                                  | PPU_NT_OFFSET);
       }
-      ppu_mmio_vram_addr_inc();
+      MmioVramAddrInc();
       break;
     case PPU_CTRL_ACCESS:
     case PPU_MASK_ACCESS:
@@ -1058,56 +1040,53 @@ DataWord ppu_read(DoubleWord reg_addr) {
   }
 
   // The requested value should now be on the bus, so we return.
-  return ppu->bus;
+  return bus_;
 }
 
 /*
  * Directly writes the given value to OAM, incrementing the OAM address.
- *
- * Assumes the ppu has been initialized.
  */
-void ppu_oam_dma(DataWord val) {
+void Ppu::OamDma(DataWord val) {
   // Writes during rendering are ignored.
-  if (ppu_is_disabled() || (current_scanline >= 240
-                        && current_scanline <= 260)) {
-    ppu->primary_oam[oam_addr_] = val;
+  if (IsDisabled() || (current_scanline_ >= 240
+                   && current_scanline_ <= 260)) {
+    primary_oam_[oam_addr_] = val;
     oam_addr_++;
   }
 
   // The PPU bus is filled with the value, incase we are coming from a CPU DMA.
-  ppu->bus = val;
+  bus_ = val;
   return;
 }
 
 /*
  * Reads a byte from primary OAM, accounting for the internal signal which may
  * force the value to 0xFF.
- *
- * Assumes the ppu has been initialized.
  */
-static DataWord ppu_oam_read(void) {
+DataWord Ppu::OamRead(void) {
   // If the PPU is in the middle of sprite rendering, we return the buffered
   // value that would of been read on this cycle.
-  if ((current_scanline < 240) && (current_cycle > 64)
-                               && (current_cycle <= 256)) {
-    return ppu->oam_buffer[(current_cycle - 1) >> 1];
+  if ((current_scanline_ < 240) && (current_cycle_ > 64)
+                                && (current_cycle_ <= 256)) {
+    return oam_buffer_[(current_cycle_ - 1) >> 1];
   } else {
     // Otherwise, we return the value in OAM at the current address.
-    return ppu->primary_oam[oam_addr_] | oam_mask_;
+    return primary_oam_[oam_addr_] | oam_mask_;
   }
 }
 
 /*
- * Frees the global ppu structure.
- *
- * Assumes the ppu has been initialized.
+ * Deletes the given PPU class.
  */
-void ppu_free(void) {
-  // Free the ppu structure.
-  free(ppu);
+Ppu::~Ppu() {
+  // Free the ppu structures.
+  delete[] primary_oam_;
+  delete[] soam_buffer_[0];
+  delete[] soam_buffer_[1];
+  delete[] oam_buffer_;
 
   // Free the NES palette data.
-  palette_free();
+  delete palette_;
 
   return;
 }

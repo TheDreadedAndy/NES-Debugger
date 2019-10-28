@@ -1,8 +1,9 @@
-#include <stdlib.h>
-#include <SDL2/SDL.h>
-
 #ifndef _NES_AUDIO
 #define _NES_AUDIO
+
+#include <cstdlib>
+
+#include <SDL2/SDL.h>
 
 /*
  * Allows samples to be sent to an SDL audio device and played back to

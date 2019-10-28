@@ -2,10 +2,13 @@
  * TODO
  */
 
-#include <stdlib.h>
-#include <stdbool.h>
-#include <SDL2/SDL.h>
 #include "./audio_player.h"
+
+#include <new>
+#include <cstdlib>
+
+#include <SDL2/SDL.h>
+
 #include "../util/util.h"
 
 // The max number of samples the device buffer can hold.

@@ -1,10 +1,10 @@
-#include <stdlib.h>
-#include <stdio.h>
-#include "./data.h"
-
-// Avoid multiple definitions.
 #ifndef _NES_UTIL
 #define _NES_UTIL
+
+#include <cstdlib>
+#include <cstdio>
+
+#include "./data.h"
 
 // Returns a randomized array of type word_t. The array is created with new,
 // and must be free'd with delete.

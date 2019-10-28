@@ -2,12 +2,13 @@
  * TODO
  */
 
-#include <stdio.h>
-#include <stdbool.h>
-#include <stdint.h>
-#include <SDL2/SDL.h>
-#include "./window.h"
 #include "./renderer.h"
+
+#include <cstdlib>
+
+#include <SDL2/SDL.h>
+
+#include "./window.h"
 #include "./hardware_renderer.h"
 #include "./software_renderer.h"
 

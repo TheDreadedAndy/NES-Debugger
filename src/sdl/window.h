@@ -1,12 +1,11 @@
-#include <stdio.h>
-#include <stdbool.h>
+#ifndef _NES_SDL
+#define _NES_SDL
+
 #include <SDL2/SDL.h>
+
 #include "./renderer.h"
 #include "./audio_player.h"
 #include "./input.h"
-
-#ifndef _NES_SDL
-#define _NES_SDL
 
 /*
  * Maintains all of the data necessary to interact with SDL.

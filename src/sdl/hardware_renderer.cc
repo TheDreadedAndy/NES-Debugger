@@ -2,13 +2,17 @@
  * TODO
  */
 
-#include <stdio.h>
-#include <stdbool.h>
-#include <stdint.h>
+#include "./hardware_renderer.h"
+
+#include <new>
+#include <cstdio>
+#include <cstdlib>
+#include <cstdint>
+
 #include <SDL2/SDL.h>
+
 #include "./window.h"
 #include "./renderer.h"
-#include "./hardware_renderer.h"
 #include "../util/contracts.h"
 
 /*

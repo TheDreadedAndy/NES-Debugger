@@ -14,11 +14,14 @@
  * need be.
  */
 
-#include <stdio.h>
-#include <stdbool.h>
-#include <stdint.h>
-#include <SDL2/SDL.h>
 #include "./window.h"
+
+#include <new>
+#include <cstdio>
+#include <cstdint>
+
+#include <SDL2/SDL.h>
+
 #include "./input.h"
 #include "./renderer.h"
 #include "./audio_player.h"

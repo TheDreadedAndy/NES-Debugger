@@ -1,9 +1,9 @@
-#include <stdlib.h>
-#include <SDL2/SDL.h>
-#include "../util/data.h"
-
 #ifndef _NES_INPUT
 #define _NES_INPUT
+
+#include <SDL2/SDL.h>
+
+#include "../util/data.h"
 
 // The number of buttons on the NES controller.
 #define NUM_BUTTONS 8

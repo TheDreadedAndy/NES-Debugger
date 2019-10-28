@@ -1,14 +1,20 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdbool.h>
-#include <time.h>
-#include "./data.h"
+/*
+ * TODO
+ */
+
 #include "./util.h"
 
+#include <new>
+#include <cstdio>
+#include <cstdlib>
+#include <ctime>
 #ifdef _NES_OSWIN
+#include <cstring>
+
 #include <windows.h>
-#include <string.h>
 #endif
+
+#include "./data.h"
 
 // The size of the buffer used to hold the opened files name in open_file()
 #define NAME_BUFFER_SIZE 1024U

@@ -2,15 +2,17 @@
  * TODO
  */
 
-#include <stdio.h>
-#include <stdbool.h>
-#include <stdint.h>
+#include "./software_renderer.h"
+
+#include <new>
+#include <cstdio>
+#include <cstdint>
+
 #include <SDL2/SDL.h>
+
 #include "../util/contracts.h"
 #include "./window.h"
 #include "./renderer.h"
-#include "./software_renderer.h"
-#include "../ppu/palette.h"
 
 /*
  * Attempts to create a software rendering object.

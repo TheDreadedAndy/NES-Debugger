@@ -1,8 +1,8 @@
 #ifndef _NES_PPU
 #define _NES_PPU
 
-#include <stdlib.h>
-#include <stdbool.h>
+#include <cstdlib>
+
 #include "../util/data.h"
 #include "../ppu/palette.h"
 #include "../memory/memory.h"

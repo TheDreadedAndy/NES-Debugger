@@ -7,12 +7,14 @@
  * changed to remap the NES controller buttons.
  */
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <stdbool.h>
-#include <string.h>
-#include <SDL2/SDL.h>
 #include "./input.h"
+
+#include <cstdlib>
+#include <cstdio>
+#include <cstring>
+
+#include <SDL2/SDL.h>
+
 #include "./window.h"
 #include "../util/util.h"
 #include "../util/contracts.h"

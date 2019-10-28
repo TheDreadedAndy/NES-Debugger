@@ -1,8 +1,8 @@
 #ifndef _NES_VID
 #define _NES_VID
 
-#include <stdlib.h>
-#include <stdbool.h>
+#include <cstdio>
+
 #include <SDL2/SDL.h>
 
 /*

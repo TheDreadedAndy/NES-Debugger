@@ -1,8 +1,9 @@
-#include <stdlib.h>
-#include "../util/data.h"
-
 #ifndef _NES_CONTROLLER
 #define _NES_CONTROLLER
+
+#include <cstdlib>
+
+#include "../util/data.h"
 
 // The memory mapped addresses controller data can be accessed from.
 #define IO_JOY1_ADDR 0x4016U

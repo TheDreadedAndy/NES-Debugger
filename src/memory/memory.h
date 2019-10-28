@@ -1,8 +1,9 @@
 #ifndef _NES_MEM
 #define _NES_MEM
 
-#include <stdlib.h>
-#include <stdint.h>
+#include <cstdlib>
+#include <cstdint>
+
 #include "../util/data.h"
 #include "./header.h"
 

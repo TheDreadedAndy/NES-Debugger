@@ -2,13 +2,15 @@
  * TODO
  */
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <stdint.h>
-#include <stdbool.h>
+#include "./palette.h"
+
+#include <new>
+#include <cstdlib>
+#include <cstdio>
+#include <cstdint>
+
 #include "../util/data.h"
 #include "../util/util.h"
-#include "./palette.h"
 
 // The number of different NES colors in a given palette.
 #define PALETTE_SIZE 0x40U

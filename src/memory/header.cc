@@ -9,11 +9,14 @@
  * from having to include its own logic to decode the header.
  */
 
-#include <stdlib.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <string.h>
 #include "./header.h"
+
+#include <new>
+#include <cstdlib>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+
 #include "../util/util.h"
 #include "../util/data.h"
 #include "../util/contracts.h"

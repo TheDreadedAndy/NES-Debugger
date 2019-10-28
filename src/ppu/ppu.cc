@@ -2,16 +2,18 @@
  * TODO
  */
 
-#include <stdlib.h>
-#include <stdbool.h>
+#include "./ppu.h"
+
+#include <new>
+#include <cstdlib>
+
 #include "../util/data.h"
 #include "../util/util.h"
 #include "../util/contracts.h"
-#include "./ppu.h"
-#include "./palette.h"
 #include "../cpu/2A03.h"
 #include "../sdl/renderer.h"
 #include "../memory/memory.h"
+#include "./palette.h"
 
 /* Emulation constants */
 

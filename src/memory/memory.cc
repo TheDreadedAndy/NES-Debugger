@@ -6,23 +6,24 @@
  * TODO
  */
 
-#include <stdlib.h>
-#include <stdint.h>
-#include <stdio.h>
-#include "../util/util.h"
 #include "./memory.h"
-#include "./header.h"
-/*
-#include "./nrom.h"
-#include "./sxrom.h"
-*/
-#include "./uxrom.h"
+
+#include <new>
+#include <cstdlib>
+#include <cstdint>
+#include <cstdio>
+
+#include "../util/util.h"
 #include "../util/data.h"
 #include "../ppu/ppu.h"
 #include "../ppu/palette.h"
 #include "../cpu/2A03.h"
 #include "../io/controller.h"
 #include "../apu/apu.h"
+#include "./header.h"
+//#include "./nrom.h"
+//#include "./sxrom.h"
+#include "./uxrom.h"
 
 // Size of NES palette data.
 #define PALETTE_DATA_SIZE 0x20U

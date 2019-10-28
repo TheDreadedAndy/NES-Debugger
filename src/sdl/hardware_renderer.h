@@ -1,10 +1,11 @@
-#include <stdlib.h>
-#include <stdint.h>
-#include <SDL2/SDL.h>
-#include "./renderer.h"
-
 #ifndef _NES_HWRENDER
 #define _NES_HWRENDER
+
+#include <cstdint>
+
+#include <SDL2/SDL.h>
+
+#include "./renderer.h"
 
 /*
  * Hardware rendering implementation of a Render class.

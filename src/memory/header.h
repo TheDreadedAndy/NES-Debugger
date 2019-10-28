@@ -1,9 +1,7 @@
-#include <stdlib.h>
-#include <stdio.h>
-#include <stdbool.h>
-
 #ifndef _NES_INES
 #define _NES_INES
+
+#include <cstdio>
 
 // Total size of any NES header in bytes.
 #define HEADER_SIZE 16U

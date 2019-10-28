@@ -8,15 +8,18 @@
  * This implementation can address up to 256KB of cart memory.
  */
 
-#include <stdlib.h>
-#include <stdint.h>
-#include <stdio.h>
-#include "../util/util.h"
-#include "./memory.h"
-#include "./header.h"
 #include "./uxrom.h"
+
+#include <new>
+#include <cstdlib>
+#include <cstdint>
+#include <cstdio>
+
+#include "../util/util.h"
 #include "../util/data.h"
 #include "../io/controller.h"
+#include "./memory.h"
+#include "./header.h"
 
 // Constants used to size and access memory.
 #define BANK_SIZE 0x4000U

@@ -1,11 +1,12 @@
-#include <stdlib.h>
-#include <stdint.h>
-#include "./memory.h"
-#include "./header.h"
-#include "../util/data.h"
-
 #ifndef _NES_UXROM
 #define _NES_UXROM
+
+#include <cstdlib>
+#include <cstdint>
+
+#include "../util/data.h"
+#include "./memory.h"
+#include "./header.h"
 
 // The defined mapper number that this memory system belongs to.
 #define UXROM_MAPPER 2

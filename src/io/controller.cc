@@ -3,8 +3,10 @@
  * to be produced by an NES. Currently only supports a standard controller.
  */
 
-#include <stdlib.h>
 #include "./controller.h"
+
+#include <cstdlib>
+
 #include "../sdl/input.h"
 #include "../util/data.h"
 

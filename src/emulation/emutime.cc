@@ -6,21 +6,22 @@
  * This file uses posix standard functions and is, thus, not portable.
  */
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <stdbool.h>
-#include <time.h>
 #include "./emutime.h"
+
+#include <cstdlib>
+#include <cstdio>
+#include <ctime>
+
 #include "../sdl/window.h"
 #include "../util/contracts.h"
 
 // For ease of use, the timespec structure is redefined here.
-typedef struct timespec emutime_t;
+typedef struct timespec Emutime;
 
 /* Helper functions */
-static void emutime_diff(emutime_t *time1, emutime_t *time2, emutime_t *res);
-static void emutime_get(emutime_t *time);
-static bool emutime_gt(emutime_t *time1, emutime_t *time2);
+static void EmutimeDiff(Emutime *time1, Emutime *time2, Emutime *res);
+static void EmutimeGet(Emutime *time);
+static bool EmutimeGt(Emutime *time1, Emutime *time2);
 
 /*
  * Ensures that the program waits at least 1 / tic_rate seconds between calls
@@ -28,13 +29,13 @@ static bool emutime_gt(emutime_t *time1, emutime_t *time2);
  *
  * Assumes the provided tic rate is non-zero.
  */
-void emutime_sync_frame_rate(long tic_rate) {
+void EmutimeSyncFrameRate(long tic_rate) {
   // Used to track when this function was last called.
-  static emutime_t last_time = { .tv_sec = 0, .tv_nsec = 0 };
+  static Emutime last_time = { .tv_sec = 0, .tv_nsec = 0 };
 
   // Determine the minimum time at which this function can return.
   long wait_nsecs = NSECS_PER_SEC / tic_rate;
-  emutime_t wait_spec = { .tv_sec = 0, .tv_nsec = wait_nsecs };
+  Emutime wait_spec = { .tv_sec = 0, .tv_nsec = wait_nsecs };
   wait_spec.tv_sec = last_time.tv_sec;
   wait_spec.tv_nsec += last_time.tv_nsec;
   if (wait_spec.tv_nsec >= NSECS_PER_SEC) {
@@ -43,15 +44,15 @@ void emutime_sync_frame_rate(long tic_rate) {
   }
 
   // Pause the program until the minimum time has been reached.
-  emutime_t current_time, diff;
-  emutime_get(&current_time);
-  if (emutime_gt(&wait_spec, &current_time)) {
-    emutime_diff(&wait_spec, &current_time, &diff);
+  Emutime current_time, diff;
+  EmutimeGet(&current_time);
+  if (EmutimeGt(&wait_spec, &current_time)) {
+    EmutimeDiff(&wait_spec, &current_time, &diff);
     nanosleep(&diff, NULL);
   }
 
   // Update the last call time.
-  emutime_get(&last_time);
+  EmutimeGet(&last_time);
 
   return;
 }
@@ -63,27 +64,27 @@ void emutime_sync_frame_rate(long tic_rate) {
  * This function may not display the correct frame rate if the tic rate
  * is changed to a lower number while frames are being counted.
  */
-void emutime_update_frame_counter(long tic_rate) {
+void EmutimeUpdateFrameCounter(long tic_rate, Window *window) {
   // Counts how many frames have been run
   static long frames_counted = 0;
   frames_counted++;
 
   // Tracks how much time has passed between frames.
-  static emutime_t last_time = { .tv_sec = 0, .tv_nsec = 0 };
+  static Emutime last_time = { .tv_sec = 0, .tv_nsec = 0 };
 
   // Determine if it is time to update the frame rate display.
-  emutime_t current_time, diff;
+  Emutime current_time, diff;
   if (frames_counted >= tic_rate) {
     // Update the frame rate display.
-    emutime_get(&current_time);
-    emutime_diff(&current_time, &last_time, &diff);
+    EmutimeGet(&current_time);
+    EmutimeDiff(&current_time, &last_time, &diff);
     float secs_passed = ((float) diff.tv_sec) + (((float) diff.tv_nsec)
                                               / ((float) NSECS_PER_SEC));
-    window_display_fps(((float) frames_counted) / secs_passed);
+    window->DisplayFps(((float) frames_counted) / secs_passed);
     frames_counted = 0;
 
     // Update the last called time.
-    emutime_get(&last_time);
+    EmutimeGet(&last_time);
   }
 
   return;
@@ -92,7 +93,7 @@ void emutime_update_frame_counter(long tic_rate) {
 /*
  * Gets the current time and stores it in a time spec structure.
  */
-static void emutime_get(emutime_t *time) {
+static void EmutimeGet(Emutime *time) {
 #ifdef _NES_OSLIN
   clock_gettime(CLOCK_MONOTONIC_RAW, time);
 #else
@@ -106,7 +107,7 @@ static void emutime_get(emutime_t *time) {
  *
  * Assumes the timespec structures are non-null.
  */
-static bool emutime_gt(emutime_t *time1, emutime_t *time2) {
+static bool EmutimeGt(Emutime *time1, Emutime *time2) {
   return (time1->tv_sec > time2->tv_sec) || ((time1->tv_sec == time2->tv_sec)
                                          && (time1->tv_nsec > time2->tv_nsec));
 }
@@ -116,8 +117,8 @@ static bool emutime_gt(emutime_t *time1, emutime_t *time2) {
  *
  * Assumes the first time is greater than the second time.
  */
-static void emutime_diff(emutime_t *time1, emutime_t *time2, emutime_t *res) {
-  CONTRACT(emutime_gt(time1, time2));
+static void EmutimeDiff(Emutime *time1, Emutime *time2, Emutime *res) {
+  CONTRACT(EmutimeGt(time1, time2));
 
   // Borrow from seconds in nanoseconds, if needed.
   if (time1->tv_nsec < time2->tv_nsec) {

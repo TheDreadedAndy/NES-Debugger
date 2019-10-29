@@ -1,23 +1,33 @@
-#include <stdlib.h>
-#include <stdint.h>
-#include <stdbool.h>
-#include "./microdata.h"
-#include "./micromem.h"
-
 #ifndef _NES_STATE
 #define _NES_STATE
+
+#include <cstdlib>
+#include <cstdint>
+
+/*
+ *  System state is managed by a fixed size queue of
+ *  micro instructions.
+ */
+typedef struct {
+  micro_t *queue;
+  size_t front;
+  size_t back;
+  size_t size;
+} StateQueue;
 
 /*
  * Each micro instruction encodes the opperations that the CPU must
  * perform in that cycle.
  *
- * The CPU can perform one data op, one memory op, and a PC increment.
+ * The CPU can perform one data op, one memory op, and a PC increment
+ * in a given cycle.
  */
-typedef struct micro {
-  micromem_t *mem;
-  microdata_t *data;
+typedef void CpuOperation(void);
+typedef struct {
+  CpuOperation *mem;
+  CpuOperation *data;
   bool inc_pc;
-} micro_t;
+} OperationCycle;
 
 /*
  * A PC operation is simply a boolean value that determines
@@ -26,31 +36,39 @@ typedef struct micro {
 #define PC_NOP false
 #define PC_INC true
 
-// These are the functions that the 2A03 emulation will use to interact with
-// the processor state structure.
+class CpuState {
+  private:
+    // Holds the system state, which is represented as a queue/stack
+    // of micro ops.
+    StateQueue *state_;
 
-// Creates the state structure.
-void state_init(void);
+    // Holds the last micro operation returned.
+    OperationCycle *last_op_
 
-// Frees the state structure.
-void state_free(void);
+  public:
+    // Inits the state class, creating the state queue.
+    CpuState(void);
 
-// Adds a micro op to the state queue.
-void state_add_cycle(micromem_t *mem, microdata_t *data, bool inc_pc);
+    // Adds an operation cycle to the state queue.
+    void AddCycle(CpuOperation *mem, CpuOperation *data, bool inc_pc);
 
-// Pushes a micro op to the state queue.
-void state_push_cycle(micromem_t *mem, microdata_t *data, bool inc_pc);
+    // Pushes an operation cycle to the state queue.
+    void PushCycle(CpuOperation *mem, CpuOperation *data, bool inc_pc);
 
-// Dequeues and returns the next micro op.
-micro_t *state_next_cycle(void);
+    // Dequeues and returns the next operation cycle.
+    OperationCycle *NextCycle(void);
 
-// Returns the last micro op dequeued by state_next_cycle().
-micro_t *state_last_cycle(void);
+    // Returns the last operation cycle dequeued from the state queue.
+    OperationCycle *GetLastCycle(void);
 
-// Clears the state queue.
-void state_clear(void);
+    // Clears the state queue.
+    void Clear(void);
 
-// Returns the number of operations in the state queue.
-int state_get_size(void);
+    // Returns the number of operation cycles in the state queue.
+    int GetSize(void);
+
+    // Deletes the given state object.
+    ~CpuState();
+};
 
 #endif

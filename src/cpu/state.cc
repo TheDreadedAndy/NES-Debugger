@@ -13,6 +13,7 @@
 
 #include "./state.h"
 
+#include <new>
 #include <cstdlib>
 #include <cstdint>
 #include <cstdio>
@@ -43,18 +44,15 @@ CpuState::CpuState(void) {
  * Uses the given data to create an operation cycle and add it
  * to the state queue.
  */
-void CpuState::AddCycle(OperationCycle *mem,
-                        OperationCycle *data, bool inc_pc) {
-  CONTRACT(state_ != NULL);
-  CONTRACT(state_->queue != NULL);
-
-  // Fill the new microop with the given data.
+void CpuState::AddCycle(CpuOperation *mem,
+                        CpuOperation *data, bool inc_pc) {
+  // Fill the new operation cycle with the given data.
   OperationCycle *micro = &(state_->queue[state_->back]);
   micro->mem = mem;
   micro->data = data;
   micro->inc_pc = inc_pc;
 
-  // Add the microop to the queue.
+  // Add the operation cycle to the queue.
   state_->size++;
   CONTRACT(state_->size <= STATE_MAX_OPS);
   state_->back = (state_->back + 1) & STATE_MASK;
@@ -64,19 +62,14 @@ void CpuState::AddCycle(OperationCycle *mem,
 
 /*
  * Pushes a cycle to the state queue.
- *
- * Assumes the state has been initialized.
  */
-void state_push_cycle(micromem_t *mem, microdata_t *data, bool inc_pc) {
-  CONTRACT(state_ != NULL);
-  CONTRACT(state_->queue != NULL);
-
-  // Add the microop to the queue.
+void CpuState::PushCycle(CpuOperation *mem, CpuOperation *data, bool inc_pc) {
+  // Add the operation cycle to the queue.
   state_->size++;
   CONTRACT(state_->size <= STATE_MAX_OPS);
   state_->front = (state_->front - 1) & STATE_MASK;
 
-  // Fill the new microop with the given data.
+  // Fill the new operation cycle with the given data.
   OperationCycle *micro = &(state_->queue[state_->front]);
   micro->mem = mem;
   micro->data = data;
@@ -88,65 +81,48 @@ void state_push_cycle(micromem_t *mem, microdata_t *data, bool inc_pc) {
 /*
  * Dequeues the next state cycle and returns it.
  *
- * Assumes the state has been initialized.
- *
- * The returned micro structure must not be free'd.
+ * The returned operation cycle must not be free'd.
  */
-OperationCycle *state_next_cycle(void) {
-  CONTRACT(state_ != NULL);
-  CONTRACT(state_->queue != NULL);
+OperationCycle *CpuState::NextCycle(void) {
   CONTRACT(state_->size > 0);
-  CONTRACT(last_micro != NULL);
 
   // Get the next cycle.
   OperationCycle *micro = &(state_->queue[state_->front]);
 
   // Copy it into the structure which can be accessed by the user.
-  last_micro->mem = micro->mem;
-  last_micro->data = micro->data;
-  last_micro->inc_pc = micro->inc_pc;
+  last_op_->mem = micro->mem;
+  last_op_->data = micro->data;
+  last_op_->inc_pc = micro->inc_pc;
 
   // Remove it from the queue.
   state_->front = (state_->front + 1) & STATE_MASK;
   state_->size--;
 
-  return last_micro;
+  return last_op_;
 }
 
 /*
- * Returns the last state cycle dequeued by state_next_cycle.
+ * Returns the last state cycle dequeued by NextCycle().
  *
- * Assumes the state has been initialized.
- *
- * The returned micro structure must not be free'd.
+ * The returned operation cycle must not be free'd.
  */
-OperationCycle *state_last_cycle(void) {
-  CONTRACT(last_micro != NULL);
-
-  return last_micro;
+OperationCycle *CpuState::GetLastCycle(void) {
+  return last_op_;
 }
 
 /*
  * Returns the number of elements in the queue of the given state.
- *
- * Assumes the state has been initialized.
  */
-int state_get_size(void) {
-  CONTRACT(state_ != NULL);
-  CONTRACT(state_->size <= STATE_MAX_OPS);
+int CpuState::GetSize(void) {
   return state_->size;
 }
 
 /*
  * Emptys the state queue.
- *
- * Assumes the state has been initialized.
  */
-void state_clear(void) {
-  CONTRACT(state_ != NULL);
-
+void CpuState::Clear(void) {
   // We need only set the size and index fields to zero, since off-queue
-  // micro op structures are undefined.
+  // operation cycles are undefined.
   state_->front = 0;
   state_->back = 0;
   state_->size = 0;
@@ -155,14 +131,11 @@ void state_clear(void) {
 }
 
 /*
- * Frees the state structure.
- *
- * Assumes the state has been initialized.
+ * Frees the state queue and last operation.
  */
-void state_free(void) {
-  CONTRACT(state_ != NULL);
-  free(state_->queue);
-  free(state_);
-  free(last_micro);
+CpuState::~CpuState() {
+  delete[] state_->queue;
+  delete state_;
+  delete last_op_;
   return;
 }

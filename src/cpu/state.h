@@ -4,16 +4,7 @@
 #include <cstdlib>
 #include <cstdint>
 
-/*
- *  System state is managed by a fixed size queue of
- *  micro instructions.
- */
-typedef struct {
-  micro_t *queue;
-  size_t front;
-  size_t back;
-  size_t size;
-} StateQueue;
+#include "./cpu.h"
 
 /*
  * Each micro instruction encodes the opperations that the CPU must
@@ -22,12 +13,23 @@ typedef struct {
  * The CPU can perform one data op, one memory op, and a PC increment
  * in a given cycle.
  */
-typedef void CpuOperation(void);
+typedef void (Cpu::*CpuOperation)(void);
 typedef struct {
   CpuOperation *mem;
   CpuOperation *data;
   bool inc_pc;
 } OperationCycle;
+
+/*
+ *  System state is managed by a fixed size queue of
+ *  micro instructions.
+ */
+typedef struct {
+  OperationCycle *queue;
+  size_t front;
+  size_t back;
+  size_t size;
+} StateQueue;
 
 /*
  * A PC operation is simply a boolean value that determines
@@ -43,7 +45,7 @@ class CpuState {
     StateQueue *state_;
 
     // Holds the last micro operation returned.
-    OperationCycle *last_op_
+    OperationCycle *last_op_;
 
   public:
     // Inits the state class, creating the state queue.

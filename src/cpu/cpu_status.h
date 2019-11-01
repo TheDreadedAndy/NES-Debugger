@@ -18,9 +18,9 @@ typedef struct {
 
 // Uses the given CPU status structure to create a status bit vector with
 // the specified value of B flag.
-DataWord StatusCreateVector(CpuStatus *status, bool b_flag);
+DataWord StatusGetVector(CpuStatus *status, bool b_flag);
 
 // Loads the given bit vector into the given CPU status structure.
-void StatusLoadVector(CpuStatus *status, DataWord vector);
+void StatusSetVector(CpuStatus *status, DataWord vector);
 
 #endif

@@ -16,6 +16,9 @@
 /*
  * This structure represents the register file for the 6502 CPU, and
  * is used in the CPU emulation.
+ *
+ * Note that some of these fields are abstractions to make emulation more
+ * efficient, and did not exist within the 6502.
  */
 typedef struct {
   DataWord a;
@@ -32,7 +35,9 @@ typedef struct {
 } CpuRegFile;
 
 /*
- * TODO
+ * Represents an emulated 6502 CPU. The state of the CPU is managed
+ * using a CPU state queue. The CPU must be given a memory object to use
+ * when it is initialized.
  */
 class Cpu {
   private:
@@ -89,6 +94,96 @@ class Cpu {
     void DecodePull(CpuOperation *op);
     void PollNmiLine(void);
     void PollIrqLine(void);
+
+    /* Data operations */
+    void Nop(void);
+    void DataIncS(void);
+    void DataIncX(void);
+    void DataIncY(void);
+    void DataIncMdr(void);
+    void DataDecS(void);
+    void DataDecX(void);
+    void DataDecY(void);
+    void DataDecMdr(void);
+    void DataMovAX(void);
+    void DataMovAY(void);
+    void DataMovSX(void);
+    void DataMovXA(void);
+    void DataMovXS(void);
+    void DataMovYA(void);
+    void DataMovMdrPcl(void);
+    void DataMovMdrA(void);
+    void DataMovMdrX(void);
+    void DataMovMdrY(void);
+    void DataClc(void);
+    void DataCld(void);
+    void DataCli(void);
+    void DataClv(void);
+    void DataSec(void);
+    void DataSed(void);
+    void DataSei(void);
+    void DataCmpMdrA(void);
+    void DataCmpMdrX(void);
+    void DataCmpMdrY(void);
+    void DataAslMdr(void);
+    void DataAslA(void);
+    void DataLsrMdr(void);
+    void DataLsrA(void);
+    void DataRolMdr(void);
+    void DataRolA(void);
+    void DataRorMdr(void);
+    void DataRorA(void);
+    void DataEorMdrA(void);
+    void DataAndMdrA(void);
+    void DataOraMdrA(void);
+    void DataAdcMdrA(void);
+    void DataSbcMdrA(void);
+    void DataBitMdrA(void);
+    void DataAddAddrlX(void);
+    void DataAddAddrlY(void);
+    void DataAddPtrlX(void);
+    void DataFixaAddrh(void);
+    void DataFixAddrh(void);
+    void DataFixPch(void);
+    void DataBranch(void);
+
+    /* Memory operations */
+    void MemFetch(void);
+    void MemReadPcNodest(void);
+    void MemReadPcMdr(void);
+    void MemReadPcPch(void);
+    void MemReadPcZpAddr(void);
+    void MemReadPcAddrl(void);
+    void MemReadPcAddrh(void);
+    void MemReadPcZpPtr(void);
+    void MemReadPcPtrl(void);
+    void MemReadPcPtrh(void);
+    void MemReadAddrMdr(void);
+    void MemReadPtrMdr(void);
+    void MemReadPtrAddrl(void);
+    void MemReadPtr1Addrh(void);
+    void MemReadPtr1Pch(void);
+    void MemWriteMdrAddr(void);
+    void MemWriteAAddr(void);
+    void MemWriteXAddr(void);
+    void MemWriteYAddr(void);
+    void MemPushPcl(void);
+    void MemPushPch(void);
+    void MemPushA(void);
+    void MemPushP(void);
+    void MemPushPB(void);
+    void MemBrk(void);
+    void MemIrq(void);
+    void MemPullPcl(void);
+    void MemPullPch(void);
+    void MemPullA(void);
+    void MemPullP(void);
+    void MemNmiPcl(void);
+    void MemNmiPch(void);
+    void MemResetPcl(void);
+    void MemResetPch(void);
+    void MemIrqPcl(void);
+    void MemIrqPch(void);
 
   public:
     // Interrupt lines, which can be set by the PPU/APU.

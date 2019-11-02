@@ -29,14 +29,13 @@
  * into a register representation of CPU status.
  */
 DataWord StatusGetVector(CpuStatus *status, bool b_flag) {
-  DataWord vector = 0U;
-  vector = (b_flag) ? vector | 0x30U : vector | 0x20U;
-  vector = (status->carry) ? vector | 0x01U : vector;
-  vector = (status->zero) ? vector | 0x02U : vector;
-  vector = (status->irq_disable) ? vector | 0x04U : vector;
-  vector = (status->decimal) ? vector | 0x08U : vector;
-  vector = (status->overflow) ? vector | 0x40U : vector;
-  reg_Status = (status->negative) ? vector | 0x80U : vector;
+  DataWord vector = (status->carry)
+                  | (status->zero << 1U)
+                  | (status->irq_disable << 2U)
+                  | (status->decimal << 3U)
+                  | ((b_flag << 4) | 0x20U)
+                  | (status->overflow << 6U)
+                  | (status->negative << 7U);
   return vector;
 }
 
@@ -45,11 +44,11 @@ DataWord StatusGetVector(CpuStatus *status, bool b_flag) {
  * representation of CPU status.
  */
 void StatusSetVector(CpuStatus *status, DataWord vector) {
-  status->carry = static_cast<bool>(vector & 0x01U);
-  status->zero = static_cast<bool>(vector & 0x02U);
-  status->irq_disable = static_cast<bool>(vector & 0x04U);
-  status->decimal = static_cast<bool>(vector & 0x08U);
-  status->overflow = static_cast<bool>(vector & 0x40U);
-  status->negative = static_cast<bool>(vector & 0x80U);
+  status->carry = static_cast<bool>(vector & STATUS_FLAG_C);
+  status->zero = static_cast<bool>(vector & STATUS_FLAG_Z);
+  status->irq_disable = static_cast<bool>(vector & STATUS_FLAG_I);
+  status->decimal = static_cast<bool>(vector & STATUS_FLAG_D);
+  status->overflow = static_cast<bool>(vector & STATUS_FLAG_V);
+  status->negative = static_cast<bool>(vector & STATUS_FLAG_N);
   return;
 }

@@ -287,9 +287,10 @@ void Cpu::DataCmpMdrA(void) {
  * Subtracts the MDR from Register X, and stores the N, Z, and C flags
  * of the result.
  */
-void Cpu::Data_cmp_mdr_x(void) {
-  regs_->p = (regs_->p & 0x7CU) | ((regs_->x - regs_->mdr) & 0x80U) | (regs_->x >= regs_->mdr)
-                        | ((regs_->x == regs_->mdr) << 1U);
+void Cpu::DataCmpMdrX(void) {
+  regs_->p.negative = ((regs_->x - regs_->mdr) & STATUS_FLAG_N);
+  regs_->p.carry = (regs_->x >= regs_->mdr);
+  regs_->p.zero = (regs_->x == regs_->mdr);
   return;
 }
 
@@ -297,9 +298,10 @@ void Cpu::Data_cmp_mdr_x(void) {
  * Subtracts the MDR from Register Y, and stores the N, Z, and C flags
  * of the result.
  */
-void Cpu::Data_cmp_mdr_y(void) {
-  regs_->p = (regs_->p & 0x7CU) | ((regs_->y - regs_->mdr) & 0x80U) | (regs_->y >= regs_->mdr)
-                        | ((regs_->y == regs_->mdr) << 1U);
+void Cpu::DataCmpMdrY(void) {
+  regs_->p.negative = ((regs_->y - regs_->mdr) & STATUS_FLAG_N);
+  regs_->p.carry = (regs_->y >= regs_->mdr);
+  regs_->p.zero = (regs_->y == regs_->mdr);
   return;
 }
 
@@ -307,10 +309,11 @@ void Cpu::Data_cmp_mdr_y(void) {
  * Shifts the MDR left once, storing the lost bit in C and setting the
  * N and Z flags.
  */
-void Cpu::Data_asl_mdr(void) {
-  word_t carry = (regs_->mdr >> 7U) & 0x01U;
-  regs_->mdr = (regs_->mdr << 1U) & 0xFEU;
-  regs_->p = (regs_->p & 0x7CU) | (regs_->mdr & 0x80U) | ((regs_->mdr == 0U) << 1U) | carry;
+void Cpu::DataAslMdr(void) {
+  regs_->p.carry = (regs_->mdr >> 7U) & 0x01U;
+  regs_->mdr = regs_->mdr << 1U;
+  regs_->p.negative = (regs_->mdr & STATUS_FLAG_N);
+  regs_->p.zero = (regs_->mdr == 0);
   return;
 }
 
@@ -318,10 +321,11 @@ void Cpu::Data_asl_mdr(void) {
  * Shifts A left once, storing the lost bit in C and setting the
  * N and Z flags.
  */
-void Cpu::Data_asl_a(void) {
-  word_t carry = (regs_->a >> 7U) & 0x01U;
-  regs_->a = (regs_->a << 1U) & 0xFEU;
-  regs_->p = (regs_->p & 0x7CU) | (regs_->a & 0x80U) | ((regs_->a == 0U) << 1U) | carry;
+void Cpu::DataAslA(void) {
+  regs_->p.carry = (regs_->a >> 7U) & 0x01U;
+  regs_->a = regs_->a << 1U;
+  regs_->p.negative = regs_->a & STATUS_FLAG_N;
+  regs_->p.zero = (regs_->a == 0);
   return;
 }
 
@@ -329,10 +333,11 @@ void Cpu::Data_asl_a(void) {
  * Shifts the MDR right once, storing the lost bit in C and setting the
  * N and Z flags.
  */
-void Cpu::Data_lsr_mdr(void) {
-  word_t carry = regs_->mdr & 0x01U;
+void Cpu::DataLsrMdr(void) {
+  regs_->p.carry = regs_->mdr & 0x01U;
   regs_->mdr = (regs_->mdr >> 1U) & 0x7FU;
-  regs_->p = (regs_->p & 0x7CU) | (regs_->mdr & 0x80U) | ((regs_->mdr == 0U) << 1U) | carry;
+  regs_->p.negative = regs_->mdr & STATUS_FLAG_N;
+  regs_->p.zero = (regs_->mdr == 0);
   return;
 }
 
@@ -340,10 +345,11 @@ void Cpu::Data_lsr_mdr(void) {
  * Shifts A right once, storing the lost bit in C and setting the
  * N and Z flags.
  */
-void Cpu::Data_lsr_a(void) {
-  word_t carry = regs_->a & 0x01U;
+void Cpu::DataLsrA(void) {
+  regs_->p.carry = regs_->a & 0x01U;
   regs_->a = (regs_->a >> 1U) & 0x7FU;
-  regs_->p = (regs_->p & 0x7CU) | (regs_->a & 0x80U) | ((regs_->a == 0U) << 1U) | carry;
+  regs_->p.negative = regs_->a & STATUS_FLAG_N;
+  regs_->p.zero = (regs_->a == 0);
   return;
 }
 
@@ -351,10 +357,11 @@ void Cpu::Data_lsr_a(void) {
  * Shifts the MDR left once, back filling with C. Stores the lost bit in C,
  * sets the N and Z flags.
  */
-void Cpu::Data_rol_mdr(void) {
-  word_t carry = (regs_->mdr >> 7U) & 0x01U;
-  regs_->mdr = ((regs_->mdr << 1U) & 0xFEU) | (regs_->p & 0x01U);
-  regs_->p = (regs_->p & 0x7CU) | (regs_->mdr & 0x80U) | ((regs_->mdr == 0U) << 1U) | carry;
+void Cpu::DataRolMdr(void) {
+  regs_->p.carry = (regs_->mdr >> 7U) & 0x01U;
+  regs_->mdr = ((regs_->mdr << 1U) & 0xFEU) | regs_->p.carry;
+  regs_->p.negative = regs_->mdr & STATUS_FLAG_N;
+  regs_->p.zero = (regs_->mdr == 0);
   return;
 }
 
@@ -362,10 +369,11 @@ void Cpu::Data_rol_mdr(void) {
  * Shifts A left once, back filling with C. Stores the lost bit in C, sets
  * the N and Z flags.
  */
-void Cpu::Data_rol_a(void) {
-  word_t carry = (regs_->a >> 7U) & 0x01U;
-  regs_->a = ((regs_->a << 1U) & 0xFEU) | (regs_->p & 0x01U);
-  regs_->p = (regs_->p & 0x7CU) | (regs_->a & 0x80U) | ((regs_->a == 0U) << 1U) | carry;
+void Cpu::DataRolA(void) {
+  regs_->p.carry = (regs_->a >> 7U) & 0x01U;
+  regs_->a = ((regs_->a << 1U) & 0xFEU) | regs_->p.carry;
+  regs_->p.negative = regs_->a & STATUS_FLAG_N;
+  regs_->p.zero = (regs_->a == 0);
   return;
 }
 
@@ -373,10 +381,11 @@ void Cpu::Data_rol_a(void) {
  * Shifts the MDR right once, back filling with C. Stores the lost bit in C,
  * sets the N and Z flags.
  */
-void Cpu::Data_ror_mdr(void) {
-  word_t carry = regs_->mdr & 0x01U;
-  regs_->mdr = ((regs_->mdr >> 1U) & 0x7FU) | ((regs_->p << 7U) & 0x80U);
-  regs_->p = (regs_->p & 0x7CU) | (regs_->mdr & 0x80U) | ((regs_->mdr == 0U) << 1U) | carry;
+void Cpu::DataRorMdr(void) {
+  regs_->p.carry = regs_->mdr & 0x01U;
+  regs_->mdr = ((regs_->mdr >> 1U) & 0x7FU) | (regs_->p.carry << 7U);
+  regs_->p.negative = regs_->mdr & STATUS_FLAG_N;
+  regs_->p.zero = (regs_->mdr == 0);
   return;
 }
 
@@ -384,37 +393,41 @@ void Cpu::Data_ror_mdr(void) {
  * Shifts A right once, back filling with C. Stores the lost bit in C,
  * sets the N and Z flags.
  */
-void Cpu::Data_ror_a(void) {
-  word_t carry = regs_->a & 0x01U;
-  regs_->a = ((regs_->a >> 1U) & 0x7FU) | ((regs_->p << 7U) & 0x80U);
-  regs_->p = (regs_->p & 0x7CU) | (regs_->a & 0x80U) | ((regs_->a == 0U) << 1U) | carry;
+void Cpu::DataRorA(void) {
+  regs_->p.carry = regs_->a & 0x01U;
+  regs_->a = ((regs_->a >> 1U) & 0x7FU) | (regs_->p.carry << 7U);
+  regs_->p.negative = regs_->a & STATUS_FLAG_N;
+  regs_->p.zero = (regs_->a == 0);
   return;
 }
 
 /*
  * XOR's the MDR and A. Sets the N and Z flags.
  */
-void Cpu::Data_eor_mdr_a(void) {
+void Cpu::DataEorMdrA(void) {
   regs_->a = regs_->a ^ regs_->mdr;
-  regs_->p = (regs_->p & 0x7DU) | (regs_->a & 0x80U) | ((regs_->a == 0U) << 1U);
+  regs_->p.negative = regs_->a & STATUS_FLAG_N;
+  regs_->p.zero = (regs_->a == 0);
   return;
 }
 
 /*
  * AND's the MDR and A. Sets the N and Z flags.
  */
-void Cpu::Data_and_mdr_a(void) {
+void Cpu::DataAndMdrA(void) {
   regs_->a = regs_->a & regs_->mdr;
-  regs_->p = (regs_->p & 0x7DU) | (regs_->a & 0x80U) | ((regs_->a == 0U) << 1U);
+  regs_->p.negative = regs_->a & STATUS_FLAG_N;
+  regs_->p.zero = (regs_->a == 0);
   return;
 }
 
 /*
  * OR's the MDR and A. Sets the N and Z flags.
  */
-void Cpu::Data_ora_mdr_a(void) {
+void Cpu::DataOraMdrA(void) {
   regs_->a = regs_->a | regs_->mdr;
-  regs_->p = (regs_->p & 0x7DU) | (regs_->a & 0x80U) | ((regs_->a == 0U) << 1U);
+  regs_->p.negative = regs_->a & STATUS_FLAG_N;
+  regs_->p.zero = (regs_->a == 0);
   return;
 }
 
@@ -422,13 +435,15 @@ void Cpu::Data_ora_mdr_a(void) {
  * Adds the MDR, A, and the C flag, storing the result in A.
  * Sets the N, V, Z, and C flags.
  */
-void Cpu::Data_adc_mdr_a(void) {
-  mword_t res;
-  res.dw = regs_->a + regs_->mdr + (regs_->p & 0x01U);
-  word_t ovf = (((~(regs_->a ^ regs_->mdr)) & (regs_->a ^ res.w[WORD_LO])) & 0x80) >> 1U;
+void Cpu::DataAdcMdrA(void) {
+  MultiWord res;
+  res.dw = regs_->a + regs_->mdr + regs_->p.carry;
+  regs_->p.overflow = (((~(regs_->a ^ regs_->mdr))
+                    & (regs_->a ^ res.w[WORD_LO])) & 0x80);
   regs_->a = res.w[WORD_LO];
-  regs_->p = (regs_->p & 0x3CU) | (regs_->a & 0x80U) | ((regs_->a == 0U) << 1U)
-                        | ovf | res.w[WORD_HI];
+  regs_->p.negative = regs_->a & STATUS_FLAG_N;
+  regs_->p.zero = (regs_->a == 0);
+  regs_->p.carry = res.w[WORD_HI];
   return;
 }
 
@@ -436,15 +451,17 @@ void Cpu::Data_adc_mdr_a(void) {
  * Subtracts the MDR from A, using C as a borrow flag. The result
  * is equal to A - MDR - (1 - C). Sets the N, V, Z, and C flags.
  */
-void Cpu::Data_sbc_mdr_a(void) {
+void Cpu::DataSbcMdrA(void) {
   // See documentation for proof of this line. Gives the correct result
   // without issues in the carry out.
-  mword_t res;
-  res.dw = regs_->a + ((~regs_->mdr) & WORD_MASK) + (regs_->p & 0x01U);
-  word_t ovf = (((regs_->a ^ regs_->mdr) & (regs_->a ^ res.w[WORD_LO])) & 0x80) >> 1U;
+  MultiWord res;
+  res.dw = regs_->a + ((~regs_->mdr) & WORD_MASK) + regs_->p.carry;
+  regs_->p.overflow = (((regs_->a ^ regs_->mdr)
+                    & (regs_->a ^ res.w[WORD_LO])) & 0x80);
   regs_->a = res.w[WORD_LO];
-  regs_->p = (regs_->p & 0x3CU) | (regs_->a & 0x80U) | ((regs_->a == 0U) << 1U)
-                        | ovf | res.w[WORD_HI];
+  regs_->p.negative = regs_->a & STATUS_FLAG_N;
+  regs_->p.zero = (regs_->a == 0);
+  regs_->p.carry = res.w[WORD_HI];
   return;
 }
 
@@ -452,8 +469,10 @@ void Cpu::Data_sbc_mdr_a(void) {
  * Moves the two high bits of the MDR to the state register (N and V).
  * Sets the zero flag according to A AND MDR.
  */
-void Cpu::Data_bit_mdr_a(void) {
-  regs_->p = (regs_->p & 0x3DU) | (regs_->mdr & 0xC0U) | (((regs_->a & regs_->mdr) == 0U) << 1U);
+void Cpu::DataBitMdrA(void) {
+  regs_->p.negative = regs_->mdr & STATUS_FLAG_N;
+  regs_->p.overflow = regs_->mdr & STATUS_FLAG_V;
+  regs_->p.zero = ((regs_->a & regs_->mdr) == 0);
   return;
 }
 
@@ -461,10 +480,11 @@ void Cpu::Data_bit_mdr_a(void) {
  * Adds X to the low address byte, storing the carry out in the carry
  * abstraction register.
  */
-void Cpu::Data_add_addrl_x(void) {
-  dword_t res = ((dword_t) (regs_->addr.w[WORD_LO])) + ((dword_t) regs_->x);
-  regs_->addr.w[WORD_LO] = (word_t) res;
-  regs_->addr_carry = res >> 8U;
+void Cpu::DataAddAddrlX(void) {
+  MultiWord res;
+  res.dw = regs_->addr.w[WORD_LO] + regs_->x;
+  regs_->addr.w[WORD_LO] = res.w[WORD_LO];
+  regs_->addr_carry = res.w[WORD_HI];
   return;
 }
 
@@ -472,17 +492,18 @@ void Cpu::Data_add_addrl_x(void) {
  * Adds Y to the low address byte, storing the carry out in the carry
  * abstraction register.
  */
-void Cpu::Data_add_addrl_y(void) {
-  dword_t res = ((dword_t) (regs_->addr.w[WORD_LO])) + ((dword_t) regs_->y);
-  regs_->addr.w[WORD_LO] = (word_t) res;
-  regs_->addr_carry = res >> 8U;
+void Cpu::DataAddAddrlY(void) {
+  MultiWord res;
+  res.dw = regs_->addr.w[WORD_LO] + regs_->x;
+  regs_->addr.w[WORD_LO] = res.w[WORD_LO];
+  regs_->addr_carry = res.w[WORD_HI];
   return;
 }
 
 /*
  * Adds X to the low pointer byte. Page crossings are ignored.
  */
-void Cpu::Data_add_ptrl_x(void) {
+void Cpu::DataAddPtrlX(void) {
   regs_->ptr.w[WORD_LO] = regs_->ptr.w[WORD_LO] + regs_->x;
   return;
 }
@@ -491,11 +512,11 @@ void Cpu::Data_add_ptrl_x(void) {
  * Performs the last addressing operation again if the address crossed a
  * page bound and needed to be fixed.
  */
-void Cpu::Data_fixa_addrh(void) {
+void Cpu::DataFixaAddrh(void) {
   if (regs_->addr_carry > 0) {
     regs_->addr.w[WORD_HI] += regs_->addr_carry;
-    micro_t *micro = state_last_cycle();
-    state_push_cycle(micro->mem, &data_nop, PC_NOP);
+    OperationCycle *op = state_->GetLastCycle();
+    state_->PushCycle(op->mem, &Nop, PC_NOP);
   }
   return;
 }
@@ -503,7 +524,7 @@ void Cpu::Data_fixa_addrh(void) {
 /*
  * Adds the carry out from the last addressing data operation to addr_hi.
  */
-void Cpu::Data_fix_addrh(void) {
+void Cpu::DataFixAddrh(void) {
   regs_->addr.w[WORD_HI] = regs_->addr.w[WORD_HI] + regs_->addr_carry;
   return;
 }
@@ -511,7 +532,7 @@ void Cpu::Data_fix_addrh(void) {
 /*
  * Adds the carry out from the last addressing data operation to PCH.
  */
-void Cpu::Data_fix_pch(void) {
+void Cpu::DataFixPch(void) {
   regs_->pc.w[WORD_HI] = regs_->pc.w[WORD_HI] + regs_->addr_carry;
   return;
 }
@@ -519,7 +540,7 @@ void Cpu::Data_fix_pch(void) {
 /*
  * Branch instructions are of the form xxy10000, and are broken into
  * three cases:
- * 1) If the flag indicated by xx has value y, then the reletive address
+ * 1) If the flag indicated by xx has value y, then the relative address
  * is added to the PC.
  * 2) If case 1 results in a page crossing on the pc, an extra cycle is
  * added.
@@ -527,34 +548,36 @@ void Cpu::Data_fix_pch(void) {
  *
  * This function implements that behavior.
  */
-void Cpu::Data_branch(void) {
+void Cpu::DataBranch(void) {
   // Calculate whether or not the branch was taken.
-  word_t flag = (regs_->inst >> 6U) & 0x03U;
-  bool cond = (bool) ((regs_->inst >> 5U) & 1U);
+  DataWord flag = (regs_->inst >> 6U) & 0x03U;
+  bool cond = regs_->inst & 0x20U;
   // Black magic that pulls the proper flag from the status reg.
-  flag = (flag & 2U) ? ((regs_->p >> (flag & 1U)) & 1U)
-                     : ((regs_->p >> ((~flag) & 0x07U)) & 1U);
-  bool taken = (((bool) flag) == cond);
+  DataWord status = StatusGetVector(&(regs_->p));
+  flag = (flag & 2U) ? ((status >> (flag & 1U)) & 1U)
+                     : ((status >> ((~flag) & 0x07U)) & 1U);
+  bool taken = ((static_cast<bool>(flag)) == cond);
 
   // Add the reletive address to pc_lo. Reletive addressing is signed.
-  dword_t res = regs_->pc.w[WORD_LO] + regs_->mdr;
-  regs_->addr_carry = res >> 8U;
-  // Effectively sign extend the MDR in the carry out.
-  if (regs_->mdr & 0x80U) { regs_->addr_carry += 0xFFU; }
+  MultiWord res;
+  res.dw = regs_->pc.w[WORD_LO] + regs_->mdr;
+  // Effectively sign extends the MDR in the carry out.
+  regs_->addr_carry = (regs_->mdr & 0x80) ? (res.w[WORD_HI] + 0xFFU)
+                                          : res.w[WORD_HI];
 
   // Execute the proper cycles according to the above results.
   if (!taken) {
     // Case 3.
-    cpu_fetch(state_last_cycle());
+    Fetch(state_->GetLastCycle());
   } else if (regs_->addr_carry) {
     // Case 2.
-    regs_->pc.w[WORD_LO] = res;
-    state_add_cycle(&mem_nop, &data_fix_pch, PC_NOP);
-    state_add_cycle(&mem_fetch, &data_nop, PC_INC);
+    regs_->pc.w[WORD_LO] = res.w[WORD_LO];
+    state_->AddCycle(&Nop, &DataFixPch, PC_NOP);
+    state_->AddCycle(&MemFetch, &Nop, PC_INC);
   } else {
     // Case 1.
-    regs_->pc.w[WORD_LO] = res;
-    state_add_cycle(&mem_fetch, &data_nop, PC_INC);
+    regs_->pc.w[WORD_LO] = res.w[WORD_LO];
+    state_->AddCycle(&MemFetch, &Nop, PC_INC);
   }
 
   return;

@@ -26,89 +26,44 @@
  * are handled by MMIO and, thus, part of memory.c.
  */
 
-#include <stdlib.h>
-#include <stdint.h>
-#include <stdbool.h>
-#include <stdio.h>
-#include "./2A03.h"
-#include "./regs.h"
+#include "./cpu.h"
+
+#include <cstdlib>
+#include <cstdint>
+#include <cstdio>
+
 #include "../memory/memory.h"
 #include "../memory/header.h"
 #include "./machinecode.h"
-#include "./state.h"
-#include "./micromem.h"
-#include "./microdata.h"
+#include "./cpu_state.h"
+
+//TODO: Fix this connection.
 #include "../ppu/ppu.h"
 
 // DMA transfers take at least 513 cycles.
 #define DMA_CYCLE_LENGTH 513U
 
-/* Global Variables */
-
-// Global interrupt lines, accessable from outside this file.
-// Since multiple sources can assert an IRQ, its line is a counter of sources.
-word_t irq_line = 0;
-bool nmi_line = false;
-
-// Internal interrupt lines, used only in CPU emulation.
-bool nmi_edge = false;
-static bool irq_level = false;
-
-// Some instructions need to be able to poll on one cycle and interrupt later,
-// this flag acknowledges these cases.
-bool irq_ready = false;
-
-// Used for DMA transfer to OAM. The transfer adds a cycle on odd frames.
-static bool cycle_even = false;
-static size_t dma_cycles_remaining = 0;
-static mword_t dma_addr = { 0 };
-
-/* Helper functions. */
-static bool cpu_can_poll(void);
-static void cpu_execute_dma(void);
-static void cpu_decode_inst(void);
-static void cpu_decode_izpx(microdata_t *micro_op);
-static void cpu_decode_zp(microdata_t *micro_op);
-static void cpu_decode_imm(microdata_t *micro_op);
-static void cpu_decode_abs(microdata_t *micro_op);
-static void cpu_decode_izp_y(microdata_t *micro_op);
-static void cpu_decode_zpx(microdata_t *micro_op);
-static void cpu_decode_zpy(microdata_t *micro_op);
-static void cpu_decode_abx(microdata_t *micro_op);
-static void cpu_decode_aby(microdata_t *micro_op);
-static void cpu_decode_nomem(microdata_t *micro_op);
-static void cpu_decode_rw_zp(microdata_t *micro_op);
-static void cpu_decode_rw_abs(microdata_t *micro_op);
-static void cpu_decode_rw_zpx(microdata_t *micro_op);
-static void cpu_decode_rw_abx(microdata_t *micro_op);
-static void cpu_decode_w_izpx(micromem_t *micro_op);
-static void cpu_decode_w_zp(micromem_t *micro_op);
-static void cpu_decode_w_abs(micromem_t *micro_op);
-static void cpu_decode_w_izp_y(micromem_t *micro_op);
-static void cpu_decode_w_zpx(micromem_t *micro_op);
-static void cpu_decode_w_zpy(micromem_t *micro_op);
-static void cpu_decode_w_abx(micromem_t *micro_op);
-static void cpu_decode_w_aby(micromem_t *micro_op);
-static void cpu_decode_push(micromem_t *micro_op);
-static void cpu_decode_pull(micromem_t *micro_op);
-static void cpu_poll_nmi_line(void);
-static void cpu_poll_irq_line(void);
-
 /*
  * Initializes everything related to the cpu so that the emulation can begin.
  */
-void cpu_init(FILE *rom_file, header_t *header) {
+Cpu::Cpu(Memory *memory) {
   // Init all cpu structures.
-  memory_init(rom_file, header);
-  state_init();
-  regfile_init();
+  memory_ = memory;
+  state_ = new CpuState;
+  regs_ = new CpuRegFile;
+
+  // Setup the cpu register file.
+  // On startup, IRQ's are disabled and the high byte of the stack pointer
+  // is set to 0x01.
+  regs_->p.irq_disable = true;
+  regs_->s.w[WORD_HI] = MEMORY_STACK_HIGH;
 
   // Load the reset location into the pc.
-  R->pc.w[WORD_LO] = memory_read(MEMORY_RESET_ADDR);
-  R->pc.w[WORD_HI] = memory_read(MEMORY_RESET_ADDR + 1);
+  R->pc.w[WORD_LO] = memory_->Read(MEMORY_RESET_ADDR);
+  R->pc.w[WORD_HI] = memory_->Read(MEMORY_RESET_ADDR + 1);
 
   // Queue the first cycle to be emulated.
-  state_add_cycle(&mem_fetch, &data_nop, PC_INC);
+  state_->AddCycle(&MemFetch, &Nop, PC_INC);
   return;
 }
 

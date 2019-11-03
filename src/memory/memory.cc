@@ -66,6 +66,15 @@ Memory *Memory::Create(FILE *rom_file) {
 }
 
 /*
+ * Stores the provided header and allocates the palette array.
+ */
+Memory::Memory(RomHeader *header) {
+  header_ = header;
+  palette_data_ = new uint32_t[PALETTE_DATA_SIZE];
+  return;
+}
+
+/*
  * Reads an xRGB color from the palette.
  */
 uint32_t Memory::PaletteRead(DoubleWord addr) {
@@ -111,11 +120,15 @@ void Memory::PaletteUpdate(void) {
 }
 
 /*
- * Stores the provided header and allocates the palette array.
+ * Provides the memory object with access to its associated CPU, PPU, and APU
+ * objects.
+ *
+ * This function must be called before the memory object can be used.
  */
-Memory::Memory(RomHeader *header) {
-  header_ = header;
-  palette_data_ = new uint32_t[PALETTE_DATA_SIZE];
+void Memory::Connect(Cpu *cpu, Ppu *ppu, Apu *apu) {
+  cpu_ = cpu;
+  ppu_ = ppu;
+  apu_ = apu;
   return;
 }
 

@@ -105,7 +105,7 @@ class Memory {
 
     // Gives the memory access to its associated Ppu/Cpu classes.
     // Must be called before any other function.
-    virtual void Connect(Cpu *cpu, Ppu *ppu, Apu *apu) = 0;
+    void Connect(Cpu *cpu, Ppu *ppu, Apu *apu);
 
     // Creates a derived memory object for the mapper of the given
     // rom file. Returns NULL on failure.

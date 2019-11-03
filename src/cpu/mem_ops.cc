@@ -9,22 +9,14 @@
  * initialized.
  */
 
-#include <stdlib.h>
-#include <stdio.h>
-#include "./micromem.h"
-#include "./microdata.h"
-#include "./2A03.h"
-#include "./state.h"
-#include "./regs.h"
-#include "../memory/memory.h"
+#include "./cpu.h"
 
-/*
- * Does nothing.
- */
-void mem_nop(void) {
-  // I mean, yeah.
-  return;
-}
+#include <cstdlib>
+#include <cstdio>
+
+#include "../memory/memory.h"
+#include "./cpu_status.h"
+#include "./cpu_state.h"
 
 /*
  * Fetches the next instruction and adds its cycles to the state queue.
@@ -32,32 +24,32 @@ void mem_nop(void) {
  *
  * Assumes all the cpu structures have been initialized.
  */
-void mem_fetch(void) {
-  cpu_fetch(state_last_cycle());
+void Cpu::MemFetch(void) {
+  Fetch(state_->GetLastCycle());
   return;
 }
 
 /*
  * Reads a byte from the pc address, then discards it.
  */
-void mem_read_pc_nodest(void) {
-  memory_read(R->pc.dw);
+void Cpu::MemReadPcNodest(void) {
+  memory_->Read(regs_->pc.dw);
   return;
 }
 
 /*
  * Reads a byte from the pc address into the mdr.
  */
-void mem_read_pc_mdr(void) {
-  R->mdr = memory_read(R->pc.dw);
+void Cpu::MemReadPcMdr(void) {
+  regs_->mdr = memory_->Read(regs_->pc.dw);
   return;
 }
 
 /*
  * Reads a byte from the pc address into the pch.
  */
-void mem_read_pc_pch(void) {
-  R->pc.w[WORD_HI] = memory_read(R->pc.dw);
+void Cpu::MemReadPcPch(void) {
+  regs_->pc.w[WORD_HI] = memory_->Read(regs_->pc.dw);
   return;
 }
 
@@ -65,24 +57,24 @@ void mem_read_pc_pch(void) {
  * Reads a byte from the pc address into the address low register.
  * Zeros out the address high register.
  */
-void mem_read_pc_zp_addr(void) {
-  R->addr.dw = memory_read(R->pc.dw);
+void Cpu::MemReadPcZpAddr(void) {
+  regs_->addr.dw = memory_->Read(regs_->pc.dw);
   return;
 }
 
 /*
  * Reads a byte from the pc address into the address low register.
  */
-void mem_read_pc_addrl(void) {
-  R->addr.w[WORD_LO] = memory_read(R->pc.dw);
+void Cpu::MemReadPcAddrl(void) {
+  regs_->addr.w[WORD_LO] = memory_->Read(regs_->pc.dw);
   return;
 }
 
 /*
  * Reads a byte from the pc address into the address high register.
  */
-void mem_read_pc_addrh(void) {
-  R->addr.w[WORD_HI] = memory_read(R->pc.dw);
+void Cpu::MemReadPcAddrh(void) {
+  regs_->addr.w[WORD_HI] = memory_->Read(regs_->pc.dw);
   return;
 }
 
@@ -90,48 +82,48 @@ void mem_read_pc_addrh(void) {
  * Reads a byte from the pc address into the pointer low register.
  * Zeros out the pointer high register.
  */
-void mem_read_pc_zp_ptr(void) {
-  R->ptr.dw = memory_read(R->pc.dw);
+void Cpu::MemReadPcZpPtr(void) {
+  regs_->ptr.dw = memory_->Read(regs_->pc.dw);
   return;
 }
 
 /*
  * Reads a byte from the pc address into the pointer low register.
  */
-void mem_read_pc_ptrl(void) {
-  R->ptr.w[WORD_LO] = memory_read(R->pc.dw);
+void Cpu::MemReadPcPtrl(void) {
+  regs_->ptr.w[WORD_LO] = memory_->Read(regs_->pc.dw);
   return;
 }
 
 /*
  * Reads a byte from the pc address into the pointer high register.
  */
-void mem_read_pc_ptrh(void) {
-  R->ptr.w[WORD_HI] = memory_read(R->pc.dw);
+void Cpu::MemReadPcPtrh(void) {
+  regs_->ptr.w[WORD_HI] = memory_->Read(regs_->pc.dw);
   return;
 }
 
 /*
  * Reads a byte from the addr address into the mdr.
  */
-void mem_read_addr_mdr(void) {
-  R->mdr = memory_read(R->addr.dw);
+void Cpu::MemReadAddrMdr(void) {
+  regs_->mdr = memory_->Read(regs_->addr.dw);
   return;
 }
 
 /*
  * Reads a byte from the ptr address into the mdr.
  */
-void mem_read_ptr_mdr(void) {
-  R->mdr = memory_read(R->ptr.dw);
+void Cpu::MemReadPtrMdr(void) {
+  regs_->mdr = memory_->Read(regs_->ptr.dw);
   return;
 }
 
 /*
  * Reads a byte from the ptr address into the address low register.
  */
-void mem_read_ptr_addrl(void) {
-  R->addr.w[WORD_LO] = memory_read(R->ptr.dw);
+void Cpu::MemReadPtrAddrl(void) {
+  regs_->addr.w[WORD_LO] = memory_->Read(regs_->ptr.dw);
   return;
 }
 
@@ -139,10 +131,10 @@ void mem_read_ptr_addrl(void) {
  * Reads a byte from the ptr address (offset by 1) into the address high
  * register.
  */
-void mem_read_ptr1_addrh(void) {
-  R->ptr.w[WORD_LO]++;
-  R->addr.w[WORD_HI] = memory_read(R->ptr.dw);
-  R->ptr.w[WORD_LO]--;
+void Cpu::MemReadPtr1Addrh(void) {
+  regs_->ptr.w[WORD_LO]++;
+  regs_->addr.w[WORD_HI] = memory_->Read(regs_->ptr.dw);
+  regs_->ptr.w[WORD_LO]--;
   return;
 }
 
@@ -150,82 +142,82 @@ void mem_read_ptr1_addrh(void) {
  * Reads a byte from the ptr address (offset by 1) into the address high
  * register.
  */
-void mem_read_ptr1_pch(void) {
-  R->ptr.w[WORD_LO]++;
-  R->pc.w[WORD_HI] = memory_read(R->ptr.dw);
-  R->ptr.w[WORD_LO]--;
+void Cpu::MemReadPtr1Pch(void) {
+  regs_->ptr.w[WORD_LO]++;
+  regs_->pc.w[WORD_HI] = memory_->Read(regs_->ptr.dw);
+  regs_->ptr.w[WORD_LO]--;
   return;
 }
 
 /*
  * Writes the mdr to the addr address.
  */
-void mem_write_mdr_addr(void) {
-  memory_write(R->mdr, R->addr.dw);
+void Cpu::MemWriteMdrAddr(void) {
+  memory_->Write(regs_->addr.dw, regs_->mdr);
   return;
 }
 
 /*
  * Writes A to the addr address.
  */
-void mem_write_a_addr(void) {
-  memory_write(R->A, R->addr.dw);
+void Cpu::MemWriteAAddr(void) {
+  memory_->Write(regs_->addr.dw, regs_->a);
   return;
 }
 
 /*
  * Writes X to the addr address.
  */
-void mem_write_x_addr(void) {
-  memory_write(R->X, R->addr.dw);
+void Cpu::MemWriteXAddr(void) {
+  memory_->Write(regs_->addr.dw, regs_->x);
   return;
 }
 
 /*
  * Writes Y to the addr address.
  */
-void mem_write_y_addr(void) {
-  memory_write(R->Y, R->addr.dw);
+void Cpu::MemWriteYAddr(void) {
+  memory_->Write(regs_->addr.dw, regs_->y);
   return;
 }
 
 /*
  * Writes the pcl to the stack.
  */
-void mem_push_pcl(void) {
-  memory_write(R->pc.w[WORD_LO], R->S.dw);
+void Cpu::MemPushPcl(void) {
+  memory_->Write(regs_->s.dw, regs_->pc.w[WORD_LO]);
   return;
 }
 
 /*
  * Writes the pch to the stack.
  */
-void mem_push_pch(void) {
-  memory_write(R->pc.w[WORD_HI], R->S.dw);
+void Cpu::MemPushPch(void) {
+  memory_->Write(regs_->s.dw, regs_->pc.w[WORD_HI]);
   return;
 }
 
 /*
  * Writes A to the stack.
  */
-void mem_push_a(void) {
-  memory_write(R->A, R->S.dw);
+void Cpu::MemPushA(void) {
+  memory_->Write(regs_->s.dw, regs_->a);
   return;
 }
 
 /*
  * Writes the cpu state to the stack. Clears the B flag.
  */
-void mem_push_p(void) {
-  memory_write((R->P | 0x20U), R->S.dw);
+void Cpu::MemPushP(void) {
+  memory_->Write(regs_->s.dw, StatusGetVector(&(regs_->p), false));
   return;
 }
 
 /*
  * Writes the cpu state to the stack. Sets the B flag.
  */
-void mem_push_p_b(void) {
-  memory_write((R->P | 0x30U), R->S.dw);
+void Cpu::MemPushPB(void) {
+  memory_->Write(regs_->s.dw, StatusGetVector(&(regs_->p), true));
   return;
 }
 
@@ -233,21 +225,21 @@ void mem_push_p_b(void) {
  * Pushes the state register on the stack with the B flag set, then adds the
  * next cycles of the interrupt according to hijacking behavior.
  */
-void mem_brk(void) {
-  memory_write((R->P | 0x30U), R->S.dw);
+void Cpu::MemBrk(void) {
+  memory_->Write(regs_->s.dw, StatusGetVector(&(regs_->p), true));
 
   // Allows an nmi to hijack the brk instruction.
-  if (nmi_edge) {
-    nmi_edge = false;
-    irq_ready = false;
-    state_add_cycle(&mem_nmi_pcl, &data_sei, PC_NOP);
-    state_add_cycle(&mem_nmi_pch, &data_nop, PC_NOP);
-    state_add_cycle(&mem_fetch, &data_nop, PC_INC);
+  if (nmi_edge_) {
+    nmi_edge_ = false;
+    irq_ready_ = false;
+    state_->AddCycle(&MemNmiPcl, &DataSei, PC_NOP);
+    state_->AddCycle(&MemNmiPch, &Nop, PC_NOP);
+    state_->AddCycle(&MemFetch, &Nop, PC_INC);
   } else {
-    irq_ready = false;
-    state_add_cycle(&mem_irq_pcl, &data_sei, PC_NOP);
-    state_add_cycle(&mem_irq_pch, &data_nop, PC_NOP);
-    state_add_cycle(&mem_fetch, &data_nop, PC_INC);
+    irq_ready_ = false;
+    state_->AddCycle(&MemIrqPcl, &DataSei, PC_NOP);
+    state_->AddCycle(&MemIrqPch, &Nop, PC_NOP);
+    state_->AddCycle(&MemFetch, &Nop, PC_INC);
   }
 
   return;
@@ -257,19 +249,19 @@ void mem_brk(void) {
  * Pushes the state register on the stack with the B flag clear, then adds
  * the next cycles of the interrupt according to hijacking behavior.
  */
-void mem_irq(void) {
-  memory_write((R->P | 0x20U), R->S.dw);
+void Cpu::MemIrq(void) {
+  memory_->Write(regs_->s.dw, StatusGetVector(&(regs_->p), false));
 
   // Allows an nmi to hijack an irq interrupt.
-  if (nmi_edge) {
-    nmi_edge = false;
-    state_add_cycle(&mem_nmi_pcl, &data_sei, PC_NOP);
-    state_add_cycle(&mem_nmi_pch, &data_nop, PC_NOP);
-    state_add_cycle(&mem_fetch, &data_nop, PC_INC);
+  if (nmi_edge_) {
+    nmi_edge_ = false;
+    state_->AddCycle(&MemNmiPcl, &DataSei, PC_NOP);
+    state_->AddCycle(&MemNmiPch, &Nop, PC_NOP);
+    state_->AddCycle(&MemFetch, &Nop, PC_INC);
   } else {
-    state_add_cycle(&mem_irq_pcl, &data_sei, PC_NOP);
-    state_add_cycle(&mem_irq_pch, &data_nop, PC_NOP);
-    state_add_cycle(&mem_fetch, &data_nop, PC_INC);
+    state_->AddCycle(&MemIrqPcl, &DataSei, PC_NOP);
+    state_->AddCycle(&MemIrqPch, &Nop, PC_NOP);
+    state_->AddCycle(&MemFetch, &Nop, PC_INC);
   }
 
   return;
@@ -278,80 +270,81 @@ void mem_irq(void) {
 /*
  * Pulls the pcl from the stack.
  */
-void mem_pull_pcl(void) {
-  R->pc.w[WORD_LO] = memory_read(R->S.dw);
+void Cpu::MemPullPcl(void) {
+  regs_->pc.w[WORD_LO] = memory_->Read(regs_->s.dw);
   return;
 }
 
 /*
  * Pulls the pch from the stack.
  */
-void mem_pull_pch(void) {
-  R->pc.w[WORD_HI] = memory_read(R->S.dw);
+void Cpu::MemPullPch(void) {
+  regs_->pc.w[WORD_HI] = memory_->Read(regs_->s.dw);
   return;
 }
 
 /*
  * Pulls A from the stack. This is the only memory op that sets flags.
  */
-void mem_pull_a(void) {
-  R->A = memory_read(R->S.dw);
-  R->P = (R->P & 0x7DU) | (R->A & 0x80U) | ((R->A == 0U) << 1U);
+void Cpu::MemPullA(void) {
+  regs_->a = memory_->Read(regs_->s.dw);
+  regs_->p.negative = regs_->a & STATUS_FLAG_N;
+  regs_->p.zero = (regs_->a == 0);
   return;
 }
 
 /*
  * Pulls the cpu state from the stack. Zeros out the B flag.
  */
-void mem_pull_p(void) {
-  R->P = memory_read(R->S.dw) & 0xCFU;
+void Cpu::MemPullP(void) {
+  StatusSetVector(&(regs_->p), memory_->Read(regs_->s.dw));
   return;
 }
 
 /*
  * Reads from the nmi address into the pcl.
  */
-void mem_nmi_pcl(void) {
-  R->pc.w[WORD_LO] = memory_read(MEMORY_NMI_ADDR);
+void Cpu::MemNmiPcl(void) {
+  regs_->pc.w[WORD_LO] = memory_->Read(MEMORY_NMI_ADDR);
   return;
 }
 
 /*
  * Reads from the nmi address (offset by 1) into the pch.
  */
-void mem_nmi_pch(void) {
-  R->pc.w[WORD_HI] = memory_read(MEMORY_NMI_ADDR + 1U);
+void Cpu::MemNmiPch(void) {
+  regs_->pc.w[WORD_HI] = memory_->Read(MEMORY_NMI_ADDR + 1U);
   return;
 }
 
 /*
  * Reads from the reset address into the pcl.
  */
-void mem_reset_pcl(void) {
-  R->pc.w[WORD_LO] = memory_read(MEMORY_RESET_ADDR);
+void Cpu::MemResetPcl(void) {
+  regs_->pc.w[WORD_LO] = memory_->Read(MEMORY_RESET_ADDR);
   return;
 }
 
 /*
  * Reads from the reset address (offset by 1) into the pch.
  */
-void mem_reset_pch(void) {
-  R->pc.w[WORD_HI] = memory_read(MEMORY_RESET_ADDR + 1U);
+void Cpu::MemResetPch(void) {
+  regs_->pc.w[WORD_HI] = memory_->Read(MEMORY_RESET_ADDR + 1U);
   return;
 }
 
 /*
  * Reads from the irq address into the pcl.
  */
-void mem_irq_pcl(void) {
-  R->pc.w[WORD_LO] = memory_read(MEMORY_IRQ_ADDR);
+void Cpu::MemIrqPcl(void) {
+  regs_->pc.w[WORD_LO] = memory_->Read(MEMORY_IRQ_ADDR);
   return;
 }
 
 /*
  * Reads from the irq address (offset by 1) into the pch.
  */
-void mem_irq_pch(void) {
-  R->pc.w[WORD_HI] = memory_read(MEMORY_IRQ_ADDR + 1U);
+void Cpu::MemIrqPch(void) {
+  regs_->pc.w[WORD_HI] = memory_->Read(MEMORY_IRQ_ADDR + 1U);
   return;
 }

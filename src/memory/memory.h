@@ -12,6 +12,7 @@
 #define MEMORY_IRQ_ADDR 0xFFFEU
 #define MEMORY_RESET_ADDR 0xFFFCU
 #define MEMORY_NMI_ADDR 0xFFFAU
+#define PPU_OAM_ADDR 0x2004U
 
 // CPU memory map offsets.
 #define PPU_OFFSET 0x2000U

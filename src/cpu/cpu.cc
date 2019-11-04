@@ -37,9 +37,6 @@
 #include "./machinecode.h"
 #include "./cpu_state.h"
 
-//TODO: Fix this connection.
-#include "../ppu/ppu.h"
-
 // DMA transfers take at least 513 cycles.
 #define DMA_CYCLE_LENGTH 513U
 
@@ -69,90 +66,79 @@ Cpu::Cpu(Memory *memory) {
 
 /*
  * Executes the next cycle in the cpu emulation using the cpu structures.
- *
- * Assumes the cpu has been initialized.
  */
-void cpu_run_cycle(void) {
+void Cpu::RunCycle(void) {
   // Check if the CPU is suspended and executing a DMA.
-  if (dma_cycles_remaining > 0) {
-    cpu_execute_dma();
-    cycle_even = !cycle_even;
+  if (dma_cycles_remaining_ > 0) {
+    ExecuteDma();
+    cycle_even_ = !cycle_even_;
     return;
   }
 
   // Poll the interrupt detectors, if it is time to do so.
-  if (cpu_can_poll()) {
+  if (CanPoll()) {
     // irq_ready should only be reset from a fetch call handling it
     // or from interrupts being blocked.
-    irq_ready = (irq_ready || irq_level) && !((bool) (R->P & 0x04));
+    irq_ready_ = (irq_ready_ || irq_level_) && !(regs_->p.irq_disable);
   }
 
   // Fetch and run the next micro instructions for the cycle.
-  micro_t *next_micro = state_next_cycle();
-  next_micro->mem();
-  next_micro->data();
-  if (next_micro->inc_pc) { R->pc.dw++; }
+  OperationCycle *next_op = state_->NextCycle();
+  next_op->mem();
+  next_op->data();
+  if (next_op->inc_pc) { regs_->pc.dw++; }
 
   // Poll the interrupt lines and update the detectors.
-  cpu_poll_nmi_line();
-  cpu_poll_irq_line();
+  PollNmiLine();
+  PollIrqLine();
 
   // Toggle the cycle evenness.
-  cycle_even = !cycle_even;
+  cycle_even_ = !cycle_even_;
 
   return;
 }
 
 /*
  * Checks if the cpu should poll for interrupts on this cycle.
- *
- * Assumes the CPU has been initialized.
  */
-static bool cpu_can_poll(void) {
+bool Cpu::CanPoll(void) {
   // Interrupt polling (internal) happens when the cpu is about
   // to finish an instruction and said instruction is not an interrupt.
-  return (state_get_size() == 2) && (R->inst != INST_BRK);
+  return (state_->GetSize() == 2) && (regs_->inst != INST_BRK);
 }
 
 /*
  * Starts an OAM DMA transfer at the given address.
- *
- * Assumes that the CPU has been initialized.
  */
-void cpu_start_dma(word_t addr) {
+void Cpu::StartDma(word_t addr) {
   // Starts the dma transfer by setting the high CPU memory byte and reseting
   // the cycle counter.
-  dma_addr.w[WORD_HI] = addr;
-  dma_cycles_remaining = DMA_CYCLE_LENGTH;
+  dma_addr_.w[WORD_HI] = addr;
+  dma_cycles_remaining_ = DMA_CYCLE_LENGTH;
 
   // If the CPU is on an odd cycle, the DMA takes one cycle longer.
-  if (!cycle_even) { dma_cycles_remaining++; }
+  if (!cycle_even_) { dma_cycles_remaining_++; }
 
   return;
 }
 
 /*
  * Executes a cycle of the DMA transfer.
- *
- * Assumes the CPU has been initialized.
  */
-static void cpu_execute_dma(void) {
-  // Current cpu memory address to read from.
-  static word_t dma_mdr = 0;
-
+void Cpu::ExecuteDma(void) {
   // The CPU is idle until there are <= 512 dma cycles remaining.
-  if ((dma_cycles_remaining < DMA_CYCLE_LENGTH) && !cycle_even) {
+  if ((dma_cycles_remaining_ < DMA_CYCLE_LENGTH) && !cycle_even_) {
     // Odd cycle, so we write to OAM.
-    ppu_oam_dma(dma_mdr);
-  } else if (dma_cycles_remaining < DMA_CYCLE_LENGTH) {
+    memory_->Write(PPU_OAM_ADDR, dma_mdr_);
+  } else if (dma_cycles_remaining_ < DMA_CYCLE_LENGTH) {
     // Even cycle, so we read from memory.
-    dma_mdr = memory_read(dma_addr.dw);
-    dma_addr.w[WORD_LO]++;
+    dma_mdr_ = memory_->Read(dma_addr_.dw);
+    dma_addr_.w[WORD_LO]++;
   } else {
-    dma_mdr = 0;
-    dma_addr.w[WORD_LO] = 0;
+    dma_mdr_ = 0;
+    dma_addr_.w[WORD_LO] = 0;
   }
-  dma_cycles_remaining--;
+  dma_cycles_remaining_--;
 
   return;
 }
@@ -162,26 +148,25 @@ static void cpu_execute_dma(void) {
  * if an interrupt should be started. Adjusts the PC as necessary, since
  * branch calls which lead into a fetch do not.
  *
- * Assumes that all cpu structures have been initialized.
- * Should only be called from mem_fetch().
+ * This functions should only be called from MemFetch().
  */
-void cpu_fetch(micro_t *micro) {
+void Cpu::Fetch(OperationCycle *op) {
   // Fetch the next instruction to the instruction register.
-  if (!nmi_edge && !irq_ready) {
+  if (!nmi_edge_ && !irq_ready_) {
     // A non-interrupt fetch should always be paired with a PC increment.
     // We set the micro ops pc_inc field here, in case we were coming
     // from a branch.
-    micro->inc_pc = PC_INC;
-    R->inst = memory_read(R->pc.dw);
+    op->inc_pc = PC_INC;
+    regs_->inst = memory_->Read(regs_->pc.dw);
   } else {
     // All interrupts fill the instruction register with 0x00 (BRK).
-    R->inst = INST_BRK;
+    regs_->inst = INST_BRK;
     // Interrupts should not increment the PC.
-    micro->inc_pc = PC_NOP;
+    op->inc_pc = PC_NOP;
   }
 
   // Decode the instruction.
-  cpu_decode_inst();
+  DecodeInst();
 
   return;
 }
@@ -190,35 +175,32 @@ void cpu_fetch(micro_t *micro) {
  * Decodes the next instruction (or interrupt) into micro instructions and
  * adds them to the state queue. Resets the interrupt flags if one is
  * processed.
- *
- * Assumes that all cpu structures have been initialized.
- * Should only be called from cpu_fetch().
  */
 static void cpu_decode_inst(void) {
   // We only decode the instruction if there are no interrupts.
-  if (nmi_edge) {
+  if (nmi_edge_) {
     // An nmi signal has priority over an irq, and resets the ready flag for it.
-    nmi_edge = false;
-    irq_ready = false;
+    nmi_edge_ = false;
+    irq_ready_ = false;
 
     // Since an nmi was detected, we queue its cycles and return.
-    state_add_cycle(&mem_read_pc_nodest, &data_nop, PC_NOP);
-    state_add_cycle(&mem_push_pch, &data_dec_s, PC_NOP);
-    state_add_cycle(&mem_push_pcl, &data_dec_s, PC_NOP);
-    state_add_cycle(&mem_push_p, &data_dec_s, PC_NOP);
-    state_add_cycle(&mem_nmi_pcl, &data_sei, PC_NOP);
-    state_add_cycle(&mem_nmi_pch, &data_nop, PC_NOP);
-    state_add_cycle(&mem_fetch, &data_nop, PC_INC);
+    state_->AddCycle(&MemReadPcNodest, &Nop, PC_NOP);
+    state_->AddCycle(&MemPushPch, &DataDecS, PC_NOP);
+    state_->AddCycle(&MemPushPcl, &DataDecS, PC_NOP);
+    state_->AddCycle(&MemPushP, &DataDecS, PC_NOP);
+    state_->AddCycle(&MemNmiPcl, &DataSei, PC_NOP);
+    state_->AddCycle(&MemNmiPch, &Nop, PC_NOP);
+    state_->AddCycle(&MemFetch, &Nop, PC_INC);
     return;
-  } else if (irq_ready) {
+  } else if (irq_ready_) {
     // The irq has been handled, so we reset the flag.
-    irq_ready = false;
+    irq_ready_ = false;
 
     // Since an irq was detected, we queue its cycles and return.
-    state_add_cycle(&mem_read_pc_nodest, &data_nop, PC_NOP);
-    state_add_cycle(&mem_push_pch, &data_dec_s, PC_NOP);
-    state_add_cycle(&mem_push_pcl, &data_dec_s, PC_NOP);
-    state_add_cycle(&mem_irq, &data_dec_s, PC_NOP);
+    state_->AddCycle(&MemReadPcNodest, &Nop, PC_NOP);
+    state_->AddCycle(&MemPushPch, &DataDecS, PC_NOP);
+    state_->AddCycle(&MemPushPcl, &DataDecS, PC_NOP);
+    state_->AddCycle(&MemIrq, &DataDecS, PC_NOP);
     return;
   }
 
@@ -230,195 +212,195 @@ static void cpu_decode_inst(void) {
    * addressing mode (with one micro op being changed to perform the desired
    * instruction).
    */
-  switch (R->inst) {
+  switch (regs_->inst) {
     case INST_ORA_IZPX:
-      cpu_decode_izpx(&data_ora_mdr_a);
+      DecodeIzpx(&DataOraMdrA);
       break;
     case INST_ORA_ZP:
-      cpu_decode_zp(&data_ora_mdr_a);
+      DecodeZp(&DataOraMdrA);
       break;
     case INST_ORA_IMM:
-      cpu_decode_imm(&data_ora_mdr_a);
+      DecodeImm(&DataOraMdrA);
       break;
     case INST_ORA_ABS:
-      cpu_decode_abs(&data_ora_mdr_a);
+      DecodeAbs(&DataOraMdrA);
       break;
     case INST_ORA_IZP_Y:
-      cpu_decode_izp_y(&data_ora_mdr_a);
+      DecodeIzpY(&DataOraMdrA);
       break;
     case INST_ORA_ZPX:
-      cpu_decode_zpx(&data_ora_mdr_a);
+      DecodeZpx(&DataOraMdrA);
       break;
     case INST_ORA_ABY:
-      cpu_decode_aby(&data_ora_mdr_a);
+      DecodeAby(&DataOraMdrA);
       break;
     case INST_ORA_ABX:
-      cpu_decode_abx(&data_ora_mdr_a);
+      DecodeAbx(&DataOraMdrA);
       break;
     case INST_AND_IZPX:
-      cpu_decode_izpx(&data_and_mdr_a);
+      DecodeIzpx(&DataAndMdrA);
       break;
     case INST_AND_ZP:
-      cpu_decode_zp(&data_and_mdr_a);
+      DecodeZp(&DataAndMdrA);
       break;
     case INST_AND_IMM:
-      cpu_decode_imm(&data_and_mdr_a);
+      DecodeImm(&DataAndMdrA);
       break;
     case INST_AND_ABS:
-      cpu_decode_abs(&data_and_mdr_a);
+      DecodeAbs(&DataAndMdrA);
       break;
     case INST_AND_IZP_Y:
-      cpu_decode_izp_y(&data_and_mdr_a);
+      DecodeIzpY(&DataAndMdrA);
       break;
     case INST_AND_ZPX:
-      cpu_decode_zpx(&data_and_mdr_a);
+      DecodeZpx(&DataAndMdrA);
       break;
     case INST_AND_ABY:
-      cpu_decode_aby(&data_and_mdr_a);
+      DecodeAby(&DataAndMdrA);
       break;
     case INST_AND_ABX:
-      cpu_decode_abx(&data_and_mdr_a);
+      DecodeAbx(&DataAndMdrA);
       break;
     case INST_EOR_IZPX:
-      cpu_decode_izpx(&data_eor_mdr_a);
+      DecodeIzpx(&DataEorMdrA);
       break;
     case INST_EOR_ZP:
-      cpu_decode_zp(&data_eor_mdr_a);
+      DecodeZp(&DataEorMdrA);
       break;
     case INST_EOR_IMM:
-      cpu_decode_imm(&data_eor_mdr_a);
+      DecodeImm(&DataEorMdrA);
       break;
     case INST_EOR_ABS:
-      cpu_decode_abs(&data_eor_mdr_a);
+      DecodeAbs(&DataEorMdrA);
       break;
     case INST_EOR_IZP_Y:
-      cpu_decode_izp_y(&data_eor_mdr_a);
+      DecodeIzpY(&DataEorMdrA);
       break;
     case INST_EOR_ZPX:
-      cpu_decode_zpx(&data_eor_mdr_a);
+      DecodeZpx(&DataEorMdrA);
       break;
     case INST_EOR_ABY:
-      cpu_decode_aby(&data_eor_mdr_a);
+      DecodeAby(&DataEorMdrA);
       break;
     case INST_EOR_ABX:
-      cpu_decode_abx(&data_eor_mdr_a);
+      DecodeAbx(&DataEorMdrA);
       break;
     case INST_ADC_IZPX:
-      cpu_decode_izpx(&data_adc_mdr_a);
+      DecodeIzpx(&DataAdcMdrA);
       break;
     case INST_ADC_ZP:
-      cpu_decode_zp(&data_adc_mdr_a);
+      DecodeZp(&DataAdcMdrA);
       break;
     case INST_ADC_IMM:
-      cpu_decode_imm(&data_adc_mdr_a);
+      DecodeImm(&DataAdcMdrA);
       break;
     case INST_ADC_ABS:
-      cpu_decode_abs(&data_adc_mdr_a);
+      DecodeAbs(&DataAdcMdrA);
       break;
     case INST_ADC_IZP_Y:
-      cpu_decode_izp_y(&data_adc_mdr_a);
+      DecodeIzpY(&DataAdcMdrA);
       break;
     case INST_ADC_ZPX:
-      cpu_decode_zpx(&data_adc_mdr_a);
+      DecodeZpx(&DataAdcMdrA);
       break;
     case INST_ADC_ABY:
-      cpu_decode_aby(&data_adc_mdr_a);
+      DecodeAby(&DataAdcMdrA);
       break;
     case INST_ADC_ABX:
-      cpu_decode_abx(&data_adc_mdr_a);
+      DecodeAbx(&DataAdcMdrA);
       break;
     case INST_STA_IZPX:
-      cpu_decode_w_izpx(&mem_write_a_addr);
+      cpu_decode_w_izpx(&MemWriteAAddr);
       break;
     case INST_STA_ZP:
-      cpu_decode_w_zp(&mem_write_a_addr);
+      cpu_decode_w_zp(&MemWriteAAddr);
       break;
     case INST_STA_ABS:
-      cpu_decode_w_abs(&mem_write_a_addr);
+      cpu_decode_w_abs(&MemWriteAAddr);
       break;
     case INST_STA_IZP_Y:
-      cpu_decode_w_izp_y(&mem_write_a_addr);
+      cpu_decode_w_izp_y(&MemWriteAAddr);
       break;
     case INST_STA_ZPX:
-      cpu_decode_w_zpx(&mem_write_a_addr);
+      cpu_decode_w_zpx(&MemWriteAAddr);
       break;
     case INST_STA_ABY:
-      cpu_decode_w_aby(&mem_write_a_addr);
+      cpu_decode_w_aby(&MemWriteAAddr);
       break;
     case INST_STA_ABX:
-      cpu_decode_w_abx(&mem_write_a_addr);
+      cpu_decode_w_abx(&MemWriteAAddr);
       break;
     case INST_LDA_IZPX:
-      cpu_decode_izpx(&data_mov_mdr_a);
+      DecodeIzpx(&data_mov_mdr_a);
       break;
     case INST_LDA_ZP:
-      cpu_decode_zp(&data_mov_mdr_a);
+      DecodeZp(&data_mov_mdr_a);
       break;
     case INST_LDA_IMM:
-      cpu_decode_imm(&data_mov_mdr_a);
+      DecodeImm(&data_mov_mdr_a);
       break;
     case INST_LDA_ABS:
-      cpu_decode_abs(&data_mov_mdr_a);
+      DecodeAbs(&data_mov_mdr_a);
       break;
     case INST_LDA_IZP_Y:
-      cpu_decode_izp_y(&data_mov_mdr_a);
+      DecodeIzpY(&data_mov_mdr_a);
       break;
     case INST_LDA_ZPX:
-      cpu_decode_zpx(&data_mov_mdr_a);
+      DecodeZpx(&data_mov_mdr_a);
       break;
     case INST_LDA_ABY:
-      cpu_decode_aby(&data_mov_mdr_a);
+      DecodeAby(&data_mov_mdr_a);
       break;
     case INST_LDA_ABX:
-      cpu_decode_abx(&data_mov_mdr_a);
+      DecodeAbx(&data_mov_mdr_a);
       break;
     case INST_CMP_IZPX:
-      cpu_decode_izpx(&data_cmp_mdr_a);
+      DecodeIzpx(&data_cmp_mdr_a);
       break;
     case INST_CMP_ZP:
-      cpu_decode_zp(&data_cmp_mdr_a);
+      DecodeZp(&data_cmp_mdr_a);
       break;
     case INST_CMP_IMM:
-      cpu_decode_imm(&data_cmp_mdr_a);
+      DecodeImm(&data_cmp_mdr_a);
       break;
     case INST_CMP_ABS:
-      cpu_decode_abs(&data_cmp_mdr_a);
+      DecodeAbs(&data_cmp_mdr_a);
       break;
     case INST_CMP_IZP_Y:
-      cpu_decode_izp_y(&data_cmp_mdr_a);
+      DecodeIzpY(&data_cmp_mdr_a);
       break;
     case INST_CMP_ZPX:
-      cpu_decode_zpx(&data_cmp_mdr_a);
+      DecodeZpx(&data_cmp_mdr_a);
       break;
     case INST_CMP_ABY:
-      cpu_decode_aby(&data_cmp_mdr_a);
+      DecodeAby(&data_cmp_mdr_a);
       break;
     case INST_CMP_ABX:
-      cpu_decode_abx(&data_cmp_mdr_a);
+      DecodeAbx(&data_cmp_mdr_a);
       break;
     case INST_SBC_IZPX:
-      cpu_decode_izpx(&data_sbc_mdr_a);
+      DecodeIzpx(&DataSbcMdrA);
       break;
     case INST_SBC_ZP:
-      cpu_decode_zp(&data_sbc_mdr_a);
+      DecodeZp(&DataSbcMdrA);
       break;
     case INST_SBC_IMM:
-      cpu_decode_imm(&data_sbc_mdr_a);
+      DecodeImm(&DataSbcMdrA);
       break;
     case INST_SBC_ABS:
-      cpu_decode_abs(&data_sbc_mdr_a);
+      DecodeAbs(&DataSbcMdrA);
       break;
     case INST_SBC_IZP_Y:
-      cpu_decode_izp_y(&data_sbc_mdr_a);
+      DecodeIzpY(&DataSbcMdrA);
       break;
     case INST_SBC_ZPX:
-      cpu_decode_zpx(&data_sbc_mdr_a);
+      DecodeZpx(&DataSbcMdrA);
       break;
     case INST_SBC_ABY:
-      cpu_decode_aby(&data_sbc_mdr_a);
+      DecodeAby(&DataSbcMdrA);
       break;
     case INST_SBC_ABX:
-      cpu_decode_abx(&data_sbc_mdr_a);
+      DecodeAbx(&DataSbcMdrA);
       break;
     case INST_ASL_ZP:
       cpu_decode_rw_zp(&data_asl_mdr);
@@ -490,19 +472,19 @@ static void cpu_decode_inst(void) {
       cpu_decode_w_zpy(&mem_write_x_addr);
       break;
     case INST_LDX_IMM:
-      cpu_decode_imm(&data_mov_mdr_x);
+      DecodeImm(&data_mov_mdr_x);
       break;
     case INST_LDX_ZP:
-      cpu_decode_zp(&data_mov_mdr_x);
+      DecodeZp(&data_mov_mdr_x);
       break;
     case INST_LDX_ABS:
-      cpu_decode_abs(&data_mov_mdr_x);
+      DecodeAbs(&data_mov_mdr_x);
       break;
     case INST_LDX_ZPY:
-      cpu_decode_zpy(&data_mov_mdr_x);
+      DecodeZpy(&data_mov_mdr_x);
       break;
     case INST_LDX_ABY:
-      cpu_decode_aby(&data_mov_mdr_x);
+      DecodeAby(&data_mov_mdr_x);
       break;
     case INST_DEC_ZP:
       cpu_decode_rw_zp(&data_dec_mdr);
@@ -529,22 +511,22 @@ static void cpu_decode_inst(void) {
       cpu_decode_rw_abx(&data_inc_mdr);
       break;
     case INST_BIT_ZP:
-      cpu_decode_zp(&data_bit_mdr_a);
+      DecodeZp(&data_bit_mdr_a);
       break;
     case INST_BIT_ABS:
-      cpu_decode_abs(&data_bit_mdr_a);
+      DecodeAbs(&data_bit_mdr_a);
       break;
     case INST_JMP:
-      state_add_cycle(&mem_read_pc_mdr, &data_nop, PC_INC);
-      state_add_cycle(&mem_read_pc_pch, &data_mov_mdr_pcl, PC_NOP);
-      state_add_cycle(&mem_fetch, &data_nop, PC_INC);
+      state_->AddCycle(&MemReadPcMdr, &Nop, PC_INC);
+      state_->AddCycle(&mem_read_pc_pch, &data_mov_mdr_pcl, PC_NOP);
+      state_->AddCycle(&MemFetch, &Nop, PC_INC);
       break;
     case INST_JMPI:
-      state_add_cycle(&mem_read_pc_ptrl, &data_nop, PC_INC);
-      state_add_cycle(&mem_read_pc_ptrh, &data_nop, PC_INC);
-      state_add_cycle(&mem_read_ptr_mdr, &data_nop, PC_NOP);
-      state_add_cycle(&mem_read_ptr1_pch, &data_mov_mdr_pcl, PC_NOP);
-      state_add_cycle(&mem_fetch, &data_nop, PC_INC);
+      state_->AddCycle(&mem_read_pc_ptrl, &Nop, PC_INC);
+      state_->AddCycle(&mem_read_pc_ptrh, &Nop, PC_INC);
+      state_->AddCycle(&mem_read_ptr_mdr, &Nop, PC_NOP);
+      state_->AddCycle(&mem_read_ptr1_pch, &data_mov_mdr_pcl, PC_NOP);
+      state_->AddCycle(&MemFetch, &Nop, PC_INC);
       break;
     case INST_STY_ZP:
       cpu_decode_w_zp(&mem_write_y_addr);
@@ -556,37 +538,37 @@ static void cpu_decode_inst(void) {
       cpu_decode_w_zpx(&mem_write_y_addr);
       break;
     case INST_LDY_IMM:
-      cpu_decode_imm(&data_mov_mdr_y);
+      DecodeImm(&data_mov_mdr_y);
       break;
     case INST_LDY_ZP:
-      cpu_decode_zp(&data_mov_mdr_y);
+      DecodeZp(&data_mov_mdr_y);
       break;
     case INST_LDY_ABS:
-      cpu_decode_abs(&data_mov_mdr_y);
+      DecodeAbs(&data_mov_mdr_y);
       break;
     case INST_LDY_ZPX:
-      cpu_decode_zpx(&data_mov_mdr_y);
+      DecodeZpx(&data_mov_mdr_y);
       break;
     case INST_LDY_ABX:
-      cpu_decode_abx(&data_mov_mdr_y);
+      DecodeAbx(&data_mov_mdr_y);
       break;
     case INST_CPY_IMM:
-      cpu_decode_imm(&data_cmp_mdr_y);
+      DecodeImm(&data_cmp_mdr_y);
       break;
     case INST_CPY_ZP:
-      cpu_decode_zp(&data_cmp_mdr_y);
+      DecodeZp(&data_cmp_mdr_y);
       break;
     case INST_CPY_ABS:
-      cpu_decode_abs(&data_cmp_mdr_y);
+      DecodeAbs(&data_cmp_mdr_y);
       break;
     case INST_CPX_IMM:
-      cpu_decode_imm(&data_cmp_mdr_x);
+      DecodeImm(&data_cmp_mdr_x);
       break;
     case INST_CPX_ZP:
-      cpu_decode_zp(&data_cmp_mdr_x);
+      DecodeZp(&data_cmp_mdr_x);
       break;
     case INST_CPX_ABS:
-      cpu_decode_abs(&data_cmp_mdr_x);
+      DecodeAbs(&data_cmp_mdr_x);
       break;
     case INST_BPL:
     case INST_BMI:
@@ -597,41 +579,41 @@ static void cpu_decode_inst(void) {
     case INST_BNE:
     case INST_BEQ:
       // The branch micro instruction handles all branches.
-      state_add_cycle(&mem_read_pc_mdr, &data_nop, PC_INC);
-      state_add_cycle(&mem_nop, &data_branch, PC_NOP);
+      state_->AddCycle(&MemReadPcMdr, &Nop, PC_INC);
+      state_->AddCycle(&Nop, &data_branch, PC_NOP);
       break;
     case INST_BRK:
-      state_add_cycle(&mem_read_pc_nodest, &data_nop, PC_INC);
-      state_add_cycle(&mem_push_pch, &data_dec_s, PC_NOP);
-      state_add_cycle(&mem_push_pcl, &data_dec_s, PC_NOP);
-      state_add_cycle(&mem_brk, &data_dec_s, PC_NOP);
+      state_->AddCycle(&MemReadPcNodest, &Nop, PC_INC);
+      state_->AddCycle(&MemPushPch, &DataDecS, PC_NOP);
+      state_->AddCycle(&MemPushPcl, &DataDecS, PC_NOP);
+      state_->AddCycle(&mem_brk, &DataDecS, PC_NOP);
       break;
     case INST_JSR:
-      state_add_cycle(&mem_read_pc_mdr, &data_nop, PC_INC);
-      state_add_cycle(&mem_nop, &data_nop, PC_NOP);
-      state_add_cycle(&mem_push_pch, &data_dec_s, PC_NOP);
-      state_add_cycle(&mem_push_pcl, &data_dec_s, PC_NOP);
-      state_add_cycle(&mem_read_pc_pch, &data_mov_mdr_pcl, PC_NOP);
-      state_add_cycle(&mem_fetch, &data_nop, PC_INC);
+      state_->AddCycle(&MemReadPcMdr, &Nop, PC_INC);
+      state_->AddCycle(&Nop, &Nop, PC_NOP);
+      state_->AddCycle(&MemPushPch, &DataDecS, PC_NOP);
+      state_->AddCycle(&MemPushPcl, &DataDecS, PC_NOP);
+      state_->AddCycle(&mem_read_pc_pch, &data_mov_mdr_pcl, PC_NOP);
+      state_->AddCycle(&MemFetch, &Nop, PC_INC);
       break;
     case INST_RTI:
-      state_add_cycle(&mem_read_pc_nodest, &data_nop, PC_NOP);
-      state_add_cycle(&mem_nop, &data_inc_s, PC_NOP);
-      state_add_cycle(&mem_pull_p, &data_inc_s, PC_NOP);
-      state_add_cycle(&mem_pull_pcl, &data_inc_s, PC_NOP);
-      state_add_cycle(&mem_pull_pch, &data_nop, PC_NOP);
-      state_add_cycle(&mem_fetch, &data_nop, PC_INC);
+      state_->AddCycle(&MemReadPcNodest, &Nop, PC_NOP);
+      state_->AddCycle(&Nop, &DataIncS, PC_NOP);
+      state_->AddCycle(&mem_pull_p, &DataIncS, PC_NOP);
+      state_->AddCycle(&mem_pull_pcl, &DataIncS, PC_NOP);
+      state_->AddCycle(&mem_pull_pch, &Nop, PC_NOP);
+      state_->AddCycle(&MemFetch, &Nop, PC_INC);
       break;
     case INST_RTS:
-      state_add_cycle(&mem_read_pc_nodest, &data_nop, PC_NOP);
-      state_add_cycle(&mem_nop, &data_inc_s, PC_NOP);
-      state_add_cycle(&mem_pull_pcl, &data_inc_s, PC_NOP);
-      state_add_cycle(&mem_pull_pch, &data_nop, PC_NOP);
-      state_add_cycle(&mem_nop, &data_nop, PC_INC);
-      state_add_cycle(&mem_fetch, &data_nop, PC_INC);
+      state_->AddCycle(&MemReadPcNodest, &Nop, PC_NOP);
+      state_->AddCycle(&Nop, &DataIncS, PC_NOP);
+      state_->AddCycle(&mem_pull_pcl, &DataIncS, PC_NOP);
+      state_->AddCycle(&mem_pull_pch, &Nop, PC_NOP);
+      state_->AddCycle(&Nop, &Nop, PC_INC);
+      state_->AddCycle(&MemFetch, &Nop, PC_INC);
       break;
     case INST_PHP:
-      cpu_decode_push(&mem_push_p_b);
+      cpu_decode_push(&MemPushPB);
       break;
     case INST_PHA:
       cpu_decode_push(&mem_push_a);
@@ -643,13 +625,13 @@ static void cpu_decode_inst(void) {
       cpu_decode_pull(&mem_pull_a);
       break;
     case INST_SEC:
-      cpu_decode_nomem(&data_sec);
+      cpu_decode_nomem(&DataSec);
       break;
     case INST_SEI:
-      cpu_decode_nomem(&data_sei);
+      cpu_decode_nomem(&DataSei);
       break;
     case INST_SED:
-      cpu_decode_nomem(&data_sed);
+      cpu_decode_nomem(&DataSed);
       break;
     case INST_CLI:
       cpu_decode_nomem(&data_cli);
@@ -694,10 +676,10 @@ static void cpu_decode_inst(void) {
       cpu_decode_nomem(&data_mov_s_x);
       break;
     case INST_NOP:
-      cpu_decode_nomem(&data_nop);
+      cpu_decode_nomem(&Nop);
       break;
     default:
-      printf("Instruction %x is not implemented\n", R->inst);
+      printf("Instruction %x is not implemented\n", regs_->inst);
       abort();
   }
   return;
@@ -707,32 +689,32 @@ static void cpu_decode_inst(void) {
  * Queues an indexed indirect zero page read instruction using the given
  * micro operation.
  */
-static void cpu_decode_izpx(microdata_t *micro_op) {
-  state_add_cycle(&mem_read_pc_zp_ptr, &data_nop, PC_INC);
-  state_add_cycle(&mem_read_ptr_addrl, &data_add_ptrl_x, PC_NOP);
-  state_add_cycle(&mem_read_ptr_addrl, &data_nop, PC_NOP);
-  state_add_cycle(&mem_read_ptr1_addrh, &data_nop, PC_NOP);
-  state_add_cycle(&mem_read_addr_mdr, &data_nop, PC_NOP);
-  state_add_cycle(&mem_fetch, micro_op, PC_INC);
+void Cpu::DecodeIzpx(microdata_t *micro_op) {
+  state_->AddCycle(&mem_read_pc_zp_ptr, &Nop, PC_INC);
+  state_->AddCycle(&mem_read_ptr_addrl, &data_add_ptrl_x, PC_NOP);
+  state_->AddCycle(&mem_read_ptr_addrl, &Nop, PC_NOP);
+  state_->AddCycle(&mem_read_ptr1_addrh, &Nop, PC_NOP);
+  state_->AddCycle(&MemReadAddrMdr, &Nop, PC_NOP);
+  state_->AddCycle(&MemFetch, micro_op, PC_INC);
   return;
 }
 
 /*
  * Queues a zero page read instruction using the given micro operation.
  */
-static void cpu_decode_zp(microdata_t *micro_op) {
-  state_add_cycle(&mem_read_pc_zp_addr, &data_nop, PC_INC);
-  state_add_cycle(&mem_read_addr_mdr, &data_nop, PC_NOP);
-  state_add_cycle(&mem_fetch, micro_op, PC_INC);
+void Cpu::DecodeZp(microdata_t *micro_op) {
+  state_->AddCycle(&mem_read_pc_zp_addr, &Nop, PC_INC);
+  state_->AddCycle(&MemReadAddrMdr, &Nop, PC_NOP);
+  state_->AddCycle(&MemFetch, micro_op, PC_INC);
   return;
 }
 
 /*
  * Queues a read immediate instruction using the given micro operation.
  */
-static void cpu_decode_imm(microdata_t *micro_op) {
-  state_add_cycle(&mem_read_pc_mdr, &data_nop, PC_INC);
-  state_add_cycle(&mem_fetch, micro_op, PC_INC);
+void Cpu::DecodeImm(microdata_t *micro_op) {
+  state_->AddCycle(&MemReadPcMdr, &Nop, PC_INC);
+  state_->AddCycle(&MemFetch, micro_op, PC_INC);
   return;
 }
 
@@ -740,11 +722,11 @@ static void cpu_decode_imm(microdata_t *micro_op) {
  * Queues an absolute addressed read instruction using the given micro
  * operation.
  */
-static void cpu_decode_abs(microdata_t *micro_op) {
-  state_add_cycle(&mem_read_pc_addrl, &data_nop, PC_INC);
-  state_add_cycle(&mem_read_pc_addrh, &data_nop, PC_INC);
-  state_add_cycle(&mem_read_addr_mdr, &data_nop, PC_NOP);
-  state_add_cycle(&mem_fetch, micro_op, PC_INC);
+void Cpu::DecodeAbs(microdata_t *micro_op) {
+  state_->AddCycle(&MemReadPcAddrl, &Nop, PC_INC);
+  state_->AddCycle(&MemReadPcAddrh, &Nop, PC_INC);
+  state_->AddCycle(&MemReadAddrMdr, &Nop, PC_NOP);
+  state_->AddCycle(&MemFetch, micro_op, PC_INC);
   return;
 }
 
@@ -752,12 +734,12 @@ static void cpu_decode_abs(microdata_t *micro_op) {
  * Queues an indirect indexed zero page read instruction using the given micro
  * operation.
  */
-static void cpu_decode_izp_y(microdata_t *micro_op) {
-  state_add_cycle(&mem_read_pc_zp_ptr, &data_nop, PC_INC);
-  state_add_cycle(&mem_read_ptr_addrl, &data_nop, PC_NOP);
-  state_add_cycle(&mem_read_ptr1_addrh, &data_add_addrl_y, PC_NOP);
-  state_add_cycle(&mem_read_addr_mdr, &data_fixa_addrh, PC_NOP);
-  state_add_cycle(&mem_fetch, micro_op, PC_INC);
+void Cpu::DecodeIzpY(microdata_t *micro_op) {
+  state_->AddCycle(&mem_read_pc_zp_ptr, &Nop, PC_INC);
+  state_->AddCycle(&mem_read_ptr_addrl, &Nop, PC_NOP);
+  state_->AddCycle(&mem_read_ptr1_addrh, &data_add_addrl_y, PC_NOP);
+  state_->AddCycle(&MemReadAddrMdr, &data_fixa_addrh, PC_NOP);
+  state_->AddCycle(&MemFetch, micro_op, PC_INC);
   return;
 }
 
@@ -765,11 +747,11 @@ static void cpu_decode_izp_y(microdata_t *micro_op) {
  * Queues a zero page X indexed read instruction using the given micro
  * operation.
  */
-static void cpu_decode_zpx(microdata_t *micro_op) {
-  state_add_cycle(&mem_read_pc_zp_addr, &data_nop, PC_INC);
-  state_add_cycle(&mem_read_addr_mdr, &data_add_addrl_x, PC_NOP);
-  state_add_cycle(&mem_read_addr_mdr, &data_nop, PC_NOP);
-  state_add_cycle(&mem_fetch, micro_op, PC_INC);
+void Cpu::DecodeZpx(microdata_t *micro_op) {
+  state_->AddCycle(&mem_read_pc_zp_addr, &Nop, PC_INC);
+  state_->AddCycle(&MemReadAddrMdr, &DataAddAddrlX, PC_NOP);
+  state_->AddCycle(&MemReadAddrMdr, &Nop, PC_NOP);
+  state_->AddCycle(&MemFetch, micro_op, PC_INC);
   return;
 }
 
@@ -777,11 +759,11 @@ static void cpu_decode_zpx(microdata_t *micro_op) {
  * Queues a zero page Y indexed read instruction using the given micro
  * operation.
  */
-static void cpu_decode_zpy(microdata_t *micro_op) {
-  state_add_cycle(&mem_read_pc_zp_addr, &data_nop, PC_INC);
-  state_add_cycle(&mem_read_addr_mdr, &data_add_addrl_y, PC_NOP);
-  state_add_cycle(&mem_read_addr_mdr, &data_nop, PC_NOP);
-  state_add_cycle(&mem_fetch, micro_op, PC_INC);
+void Cpu::DecodeZpy(microdata_t *micro_op) {
+  state_->AddCycle(&mem_read_pc_zp_addr, &Nop, PC_INC);
+  state_->AddCycle(&MemReadAddrMdr, &data_add_addrl_y, PC_NOP);
+  state_->AddCycle(&MemReadAddrMdr, &Nop, PC_NOP);
+  state_->AddCycle(&MemFetch, micro_op, PC_INC);
   return;
 }
 
@@ -789,11 +771,11 @@ static void cpu_decode_zpy(microdata_t *micro_op) {
  * Queues an absolute addressed Y indexed read instruction using the given
  * micro operation.
  */
-static void cpu_decode_aby(microdata_t *micro_op) {
-  state_add_cycle(&mem_read_pc_addrl, &data_nop, PC_INC);
-  state_add_cycle(&mem_read_pc_addrh, &data_add_addrl_y, PC_INC);
-  state_add_cycle(&mem_read_addr_mdr, &data_fixa_addrh, PC_NOP);
-  state_add_cycle(&mem_fetch, micro_op, PC_INC);
+void Cpu::DecodeAby(microdata_t *micro_op) {
+  state_->AddCycle(&MemReadPcAddrl, &Nop, PC_INC);
+  state_->AddCycle(&MemReadPcAddrh, &data_add_addrl_y, PC_INC);
+  state_->AddCycle(&MemReadAddrMdr, &data_fixa_addrh, PC_NOP);
+  state_->AddCycle(&MemFetch, micro_op, PC_INC);
   return;
 }
 
@@ -801,11 +783,11 @@ static void cpu_decode_aby(microdata_t *micro_op) {
  * Queues an absolute addressed X indexed read instruction using the given
  * micro operation.
  */
-static void cpu_decode_abx(microdata_t *micro_op) {
-  state_add_cycle(&mem_read_pc_addrl, &data_nop, PC_INC);
-  state_add_cycle(&mem_read_pc_addrh, &data_add_addrl_x, PC_INC);
-  state_add_cycle(&mem_read_addr_mdr, &data_fixa_addrh, PC_NOP);
-  state_add_cycle(&mem_fetch, micro_op, PC_INC);
+void Cpu::DecodeAbx(microdata_t *micro_op) {
+  state_->AddCycle(&MemReadPcAddrl, &Nop, PC_INC);
+  state_->AddCycle(&MemReadPcAddrh, &DataAddAddrlX, PC_INC);
+  state_->AddCycle(&MemReadAddrMdr, &data_fixa_addrh, PC_NOP);
+  state_->AddCycle(&MemFetch, micro_op, PC_INC);
   return;
 }
 
@@ -814,8 +796,8 @@ static void cpu_decode_abx(microdata_t *micro_op) {
  * micro operation.
  */
 static void cpu_decode_nomem(microdata_t *micro_op) {
-  state_add_cycle(&mem_read_pc_nodest, &data_nop, PC_NOP);
-  state_add_cycle(&mem_fetch, micro_op, PC_INC);
+  state_->AddCycle(&MemReadPcNodest, &Nop, PC_NOP);
+  state_->AddCycle(&MemFetch, micro_op, PC_INC);
   return;
 }
 
@@ -823,11 +805,11 @@ static void cpu_decode_nomem(microdata_t *micro_op) {
  * Queues a zero page read-write instruction using the given micro operation.
  */
 static void cpu_decode_rw_zp(microdata_t *micro_op) {
-  state_add_cycle(&mem_read_pc_zp_addr, &data_nop, PC_INC);
-  state_add_cycle(&mem_read_addr_mdr, &data_nop, PC_NOP);
-  state_add_cycle(&mem_write_mdr_addr, micro_op, PC_NOP);
-  state_add_cycle(&mem_write_mdr_addr, &data_nop, PC_NOP);
-  state_add_cycle(&mem_fetch, &data_nop, PC_INC);
+  state_->AddCycle(&mem_read_pc_zp_addr, &Nop, PC_INC);
+  state_->AddCycle(&MemReadAddrMdr, &Nop, PC_NOP);
+  state_->AddCycle(&mem_write_mdr_addr, micro_op, PC_NOP);
+  state_->AddCycle(&mem_write_mdr_addr, &Nop, PC_NOP);
+  state_->AddCycle(&MemFetch, &Nop, PC_INC);
   return;
 }
 
@@ -836,12 +818,12 @@ static void cpu_decode_rw_zp(microdata_t *micro_op) {
  * operation.
  */
 static void cpu_decode_rw_abs(microdata_t *micro_op) {
-  state_add_cycle(&mem_read_pc_addrl, &data_nop, PC_INC);
-  state_add_cycle(&mem_read_pc_addrh, &data_nop, PC_INC);
-  state_add_cycle(&mem_read_addr_mdr, &data_nop, PC_NOP);
-  state_add_cycle(&mem_write_mdr_addr, micro_op, PC_NOP);
-  state_add_cycle(&mem_write_mdr_addr, &data_nop, PC_NOP);
-  state_add_cycle(&mem_fetch, &data_nop, PC_INC);
+  state_->AddCycle(&MemReadPcAddrl, &Nop, PC_INC);
+  state_->AddCycle(&MemReadPcAddrh, &Nop, PC_INC);
+  state_->AddCycle(&MemReadAddrMdr, &Nop, PC_NOP);
+  state_->AddCycle(&mem_write_mdr_addr, micro_op, PC_NOP);
+  state_->AddCycle(&mem_write_mdr_addr, &Nop, PC_NOP);
+  state_->AddCycle(&MemFetch, &Nop, PC_INC);
   return;
 }
 
@@ -850,12 +832,12 @@ static void cpu_decode_rw_abs(microdata_t *micro_op) {
  * operation.
  */
 static void cpu_decode_rw_zpx(microdata_t *micro_op) {
-  state_add_cycle(&mem_read_pc_zp_addr, &data_nop, PC_INC);
-  state_add_cycle(&mem_read_addr_mdr, &data_add_addrl_x, PC_NOP);
-  state_add_cycle(&mem_read_addr_mdr, &data_nop, PC_NOP);
-  state_add_cycle(&mem_write_mdr_addr, micro_op, PC_NOP);
-  state_add_cycle(&mem_write_mdr_addr, &data_nop, PC_NOP);
-  state_add_cycle(&mem_fetch, &data_nop, PC_INC);
+  state_->AddCycle(&mem_read_pc_zp_addr, &Nop, PC_INC);
+  state_->AddCycle(&MemReadAddrMdr, &DataAddAddrlX, PC_NOP);
+  state_->AddCycle(&MemReadAddrMdr, &Nop, PC_NOP);
+  state_->AddCycle(&mem_write_mdr_addr, micro_op, PC_NOP);
+  state_->AddCycle(&mem_write_mdr_addr, &Nop, PC_NOP);
+  state_->AddCycle(&MemFetch, &Nop, PC_INC);
   return;
 }
 
@@ -864,13 +846,13 @@ static void cpu_decode_rw_zpx(microdata_t *micro_op) {
  * given micro operation.
  */
 static void cpu_decode_rw_abx(microdata_t *micro_op) {
-  state_add_cycle(&mem_read_pc_addrl, &data_nop, PC_INC);
-  state_add_cycle(&mem_read_pc_addrh, &data_add_addrl_x, PC_INC);
-  state_add_cycle(&mem_read_addr_mdr, &data_fix_addrh, PC_NOP);
-  state_add_cycle(&mem_read_addr_mdr, &data_nop, PC_NOP);
-  state_add_cycle(&mem_write_mdr_addr, micro_op, PC_NOP);
-  state_add_cycle(&mem_write_mdr_addr, &data_nop, PC_NOP);
-  state_add_cycle(&mem_fetch, &data_nop, PC_INC);
+  state_->AddCycle(&MemReadPcAddrl, &Nop, PC_INC);
+  state_->AddCycle(&MemReadPcAddrh, &DataAddAddrlX, PC_INC);
+  state_->AddCycle(&MemReadAddrMdr, &DataFixAddrh, PC_NOP);
+  state_->AddCycle(&MemReadAddrMdr, &Nop, PC_NOP);
+  state_->AddCycle(&mem_write_mdr_addr, micro_op, PC_NOP);
+  state_->AddCycle(&mem_write_mdr_addr, &Nop, PC_NOP);
+  state_->AddCycle(&MemFetch, &Nop, PC_INC);
   return;
 }
 
@@ -879,12 +861,12 @@ static void cpu_decode_rw_abx(microdata_t *micro_op) {
  * micro operation.
  */
 static void cpu_decode_w_izpx(micromem_t *micro_op) {
-  state_add_cycle(&mem_read_pc_zp_ptr, &data_nop, PC_INC);
-  state_add_cycle(&mem_read_ptr_addrl, &data_add_ptrl_x, PC_NOP);
-  state_add_cycle(&mem_read_ptr_addrl, &data_nop, PC_NOP);
-  state_add_cycle(&mem_read_ptr1_addrh, &data_nop, PC_NOP);
-  state_add_cycle(micro_op, &data_nop, PC_NOP);
-  state_add_cycle(&mem_fetch, &data_nop, PC_INC);
+  state_->AddCycle(&mem_read_pc_zp_ptr, &Nop, PC_INC);
+  state_->AddCycle(&mem_read_ptr_addrl, &data_add_ptrl_x, PC_NOP);
+  state_->AddCycle(&mem_read_ptr_addrl, &Nop, PC_NOP);
+  state_->AddCycle(&mem_read_ptr1_addrh, &Nop, PC_NOP);
+  state_->AddCycle(micro_op, &Nop, PC_NOP);
+  state_->AddCycle(&MemFetch, &Nop, PC_INC);
   return;
 }
 
@@ -892,9 +874,9 @@ static void cpu_decode_w_izpx(micromem_t *micro_op) {
  * Queues a zero page write instruction using the given micro operation.
  */
 static void cpu_decode_w_zp(micromem_t *micro_op) {
-  state_add_cycle(&mem_read_pc_zp_addr, &data_nop, PC_INC);
-  state_add_cycle(micro_op, &data_nop, PC_NOP);
-  state_add_cycle(&mem_fetch, &data_nop, PC_INC);
+  state_->AddCycle(&mem_read_pc_zp_addr, &Nop, PC_INC);
+  state_->AddCycle(micro_op, &Nop, PC_NOP);
+  state_->AddCycle(&MemFetch, &Nop, PC_INC);
   return;
 }
 
@@ -903,10 +885,10 @@ static void cpu_decode_w_zp(micromem_t *micro_op) {
  * operation.
  */
 static void cpu_decode_w_abs(micromem_t *micro_op) {
-  state_add_cycle(&mem_read_pc_addrl, &data_nop, PC_INC);
-  state_add_cycle(&mem_read_pc_addrh, &data_nop, PC_INC);
-  state_add_cycle(micro_op, &data_nop, PC_NOP);
-  state_add_cycle(&mem_fetch, &data_nop, PC_INC);
+  state_->AddCycle(&MemReadPcAddrl, &Nop, PC_INC);
+  state_->AddCycle(&MemReadPcAddrh, &Nop, PC_INC);
+  state_->AddCycle(micro_op, &Nop, PC_NOP);
+  state_->AddCycle(&MemFetch, &Nop, PC_INC);
   return;
 }
 
@@ -915,12 +897,12 @@ static void cpu_decode_w_abs(micromem_t *micro_op) {
  * given micro operation.
  */
 static void cpu_decode_w_izp_y(micromem_t *micro_op) {
-  state_add_cycle(&mem_read_pc_zp_ptr, &data_nop, PC_INC);
-  state_add_cycle(&mem_read_ptr_addrl, &data_nop, PC_NOP);
-  state_add_cycle(&mem_read_ptr1_addrh, &data_add_addrl_y, PC_NOP);
-  state_add_cycle(&mem_read_addr_mdr, &data_fix_addrh, PC_NOP);
-  state_add_cycle(micro_op, &data_nop, PC_NOP);
-  state_add_cycle(&mem_fetch, &data_nop, PC_INC);
+  state_->AddCycle(&mem_read_pc_zp_ptr, &Nop, PC_INC);
+  state_->AddCycle(&mem_read_ptr_addrl, &Nop, PC_NOP);
+  state_->AddCycle(&mem_read_ptr1_addrh, &data_add_addrl_y, PC_NOP);
+  state_->AddCycle(&MemReadAddrMdr, &DataFixAddrh, PC_NOP);
+  state_->AddCycle(micro_op, &Nop, PC_NOP);
+  state_->AddCycle(&MemFetch, &Nop, PC_INC);
   return;
 }
 
@@ -929,10 +911,10 @@ static void cpu_decode_w_izp_y(micromem_t *micro_op) {
  * operation.
  */
 static void cpu_decode_w_zpx(micromem_t *micro_op) {
-  state_add_cycle(&mem_read_pc_zp_addr, &data_nop, PC_INC);
-  state_add_cycle(&mem_read_addr_mdr, &data_add_addrl_x, PC_NOP);
-  state_add_cycle(micro_op, &data_nop, PC_NOP);
-  state_add_cycle(&mem_fetch, &data_nop, PC_INC);
+  state_->AddCycle(&mem_read_pc_zp_addr, &Nop, PC_INC);
+  state_->AddCycle(&MemReadAddrMdr, &DataAddAddrlX, PC_NOP);
+  state_->AddCycle(micro_op, &Nop, PC_NOP);
+  state_->AddCycle(&MemFetch, &Nop, PC_INC);
   return;
 }
 
@@ -941,10 +923,10 @@ static void cpu_decode_w_zpx(micromem_t *micro_op) {
  * operation.
  */
 static void cpu_decode_w_zpy(micromem_t *micro_op) {
-  state_add_cycle(&mem_read_pc_zp_addr, &data_nop, PC_INC);
-  state_add_cycle(&mem_read_addr_mdr, &data_add_addrl_y, PC_NOP);
-  state_add_cycle(micro_op, &data_nop, PC_NOP);
-  state_add_cycle(&mem_fetch, &data_nop, PC_INC);
+  state_->AddCycle(&mem_read_pc_zp_addr, &Nop, PC_INC);
+  state_->AddCycle(&MemReadAddrMdr, &data_add_addrl_y, PC_NOP);
+  state_->AddCycle(micro_op, &Nop, PC_NOP);
+  state_->AddCycle(&MemFetch, &Nop, PC_INC);
   return;
 }
 
@@ -953,11 +935,11 @@ static void cpu_decode_w_zpy(micromem_t *micro_op) {
  * micro operation.
  */
 static void cpu_decode_w_aby(micromem_t *micro_op) {
-  state_add_cycle(&mem_read_pc_addrl, &data_nop, PC_INC);
-  state_add_cycle(&mem_read_pc_addrh, &data_add_addrl_y, PC_INC);
-  state_add_cycle(&mem_read_addr_mdr, &data_fix_addrh, PC_NOP);
-  state_add_cycle(micro_op, &data_nop, PC_NOP);
-  state_add_cycle(&mem_fetch, &data_nop, PC_INC);
+  state_->AddCycle(&MemReadPcAddrl, &Nop, PC_INC);
+  state_->AddCycle(&MemReadPcAddrh, &data_add_addrl_y, PC_INC);
+  state_->AddCycle(&MemReadAddrMdr, &DataFixAddrh, PC_NOP);
+  state_->AddCycle(micro_op, &Nop, PC_NOP);
+  state_->AddCycle(&MemFetch, &Nop, PC_INC);
   return;
 }
 
@@ -966,11 +948,11 @@ static void cpu_decode_w_aby(micromem_t *micro_op) {
  * micro operation.
  */
 static void cpu_decode_w_abx(micromem_t *micro_op) {
-  state_add_cycle(&mem_read_pc_addrl, &data_nop, PC_INC);
-  state_add_cycle(&mem_read_pc_addrh, &data_add_addrl_x, PC_INC);
-  state_add_cycle(&mem_read_addr_mdr, &data_fix_addrh, PC_NOP);
-  state_add_cycle(micro_op, &data_nop, PC_NOP);
-  state_add_cycle(&mem_fetch, &data_nop, PC_INC);
+  state_->AddCycle(&MemReadPcAddrl, &Nop, PC_INC);
+  state_->AddCycle(&MemReadPcAddrh, &DataAddAddrlX, PC_INC);
+  state_->AddCycle(&MemReadAddrMdr, &DataFixAddrh, PC_NOP);
+  state_->AddCycle(micro_op, &Nop, PC_NOP);
+  state_->AddCycle(&MemFetch, &Nop, PC_INC);
   return;
 }
 
@@ -978,9 +960,9 @@ static void cpu_decode_w_abx(micromem_t *micro_op) {
  * Queues a stack push instruction using the given micro operation.
  */
 static void cpu_decode_push(micromem_t *micro_op) {
-  state_add_cycle(&mem_read_pc_nodest, &data_nop, PC_NOP);
-  state_add_cycle(micro_op, &data_dec_s, PC_NOP);
-  state_add_cycle(&mem_fetch, &data_nop, PC_INC);
+  state_->AddCycle(&MemReadPcNodest, &Nop, PC_NOP);
+  state_->AddCycle(micro_op, &DataDecS, PC_NOP);
+  state_->AddCycle(&MemFetch, &Nop, PC_INC);
   return;
 }
 
@@ -988,10 +970,10 @@ static void cpu_decode_push(micromem_t *micro_op) {
  * Queues a stack pull instruction using the given micro operation.
  */
 static void cpu_decode_pull(micromem_t *micro_op) {
-  state_add_cycle(&mem_read_pc_nodest, &data_nop, PC_NOP);
-  state_add_cycle(&mem_nop, &data_inc_s, PC_NOP);
-  state_add_cycle(micro_op, &data_nop, PC_NOP);
-  state_add_cycle(&mem_fetch, &data_nop, PC_INC);
+  state_->AddCycle(&MemReadPcNodest, &Nop, PC_NOP);
+  state_->AddCycle(&Nop, &DataIncS, PC_NOP);
+  state_->AddCycle(micro_op, &Nop, PC_NOP);
+  state_->AddCycle(&MemFetch, &Nop, PC_INC);
   return;
 }
 

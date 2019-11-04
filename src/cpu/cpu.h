@@ -50,6 +50,7 @@ class Cpu {
 
     // Used for DMA transfers to PPU OAM.
     bool cycle_even_;
+    DataWord dma_mdr_;
     size_t dma_cycles_remaining_;
     MultiWord dma_addr_;
 

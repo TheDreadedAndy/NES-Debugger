@@ -13,7 +13,7 @@
  * The CPU can perform one data op, one memory op, and a PC increment
  * in a given cycle.
  */
-typedef void (Cpu::*CpuOperation)(void);
+typedef void (Cpu::**CpuOperation)(void);
 typedef struct {
   CpuOperation *mem;
   CpuOperation *data;

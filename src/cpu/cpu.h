@@ -41,6 +41,9 @@ typedef struct {
  */
 class Cpu {
   private:
+    // Used to edge detect the NMI signal.
+    bool nmi_prev_;
+
     // Interrupt bools, which can be set inside of CPU operations.
     bool nmi_edge_;
     bool irq_level_;

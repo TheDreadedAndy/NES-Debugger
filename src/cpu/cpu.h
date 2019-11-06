@@ -65,37 +65,37 @@ class Cpu {
     CpuState *state_;
 
     // Holds the registers inside the current CPU emulation.
-    CpuRegFile *regs_
+    CpuRegFile *regs_;
 
     /* Helper functions for the CPU emulation */
     bool CanPoll(void);
     void ExecuteDma(void);
     void Fetch(OperationCycle *op_cycle);
     void DecodeInst(void);
-    void DecodeIzpx(CpuOperation *op);
-    void DecodeZp(CpuOperation *op);
-    void DecodeImm(CpuOperation *op);
-    void DecodeAbs(CpuOperation *op);
-    void DecodeIzpY(CpuOperation *op);
-    void DecodeZpx(CpuOperation *op);
-    void DecodeZpy(CpuOperation *op);
-    void DecodeAbx(CpuOperation *op);
-    void DecodeAby(CpuOperation *op);
-    void DecodeNomem(CpuOperation *op);
-    void DecodeRwZp(CpuOperation *op);
-    void DecodeRwAbs(CpuOperation *op);
-    void DecodeRwZpx(CpuOperation *op);
-    void DecodeRwAbx(CpuOperation *op);
-    void DecodeWIzpx(CpuOperation *op);
-    void DecodeWZp(CpuOperation *op);
-    void DecodeWAbs(CpuOperation *op);
-    void DecodeWIzpY(CpuOperation *op);
-    void DecodeWZpx(CpuOperation *op);
-    void DecodeWZpy(CpuOperation *op);
-    void DecodeWAbx(CpuOperation *op);
-    void DecodeWAby(CpuOperation *op);
-    void DecodePush(CpuOperation *op);
-    void DecodePull(CpuOperation *op);
+    void DecodeIzpx(CpuOperation op);
+    void DecodeZp(CpuOperation op);
+    void DecodeImm(CpuOperation op);
+    void DecodeAbs(CpuOperation op);
+    void DecodeIzpY(CpuOperation op);
+    void DecodeZpx(CpuOperation op);
+    void DecodeZpy(CpuOperation op);
+    void DecodeAbx(CpuOperation op);
+    void DecodeAby(CpuOperation op);
+    void DecodeNomem(CpuOperation op);
+    void DecodeRwZp(CpuOperation op);
+    void DecodeRwAbs(CpuOperation op);
+    void DecodeRwZpx(CpuOperation op);
+    void DecodeRwAbx(CpuOperation op);
+    void DecodeWIzpx(CpuOperation op);
+    void DecodeWZp(CpuOperation op);
+    void DecodeWAbs(CpuOperation op);
+    void DecodeWIzpY(CpuOperation op);
+    void DecodeWZpx(CpuOperation op);
+    void DecodeWZpy(CpuOperation op);
+    void DecodeWAbx(CpuOperation op);
+    void DecodeWAby(CpuOperation op);
+    void DecodePush(CpuOperation op);
+    void DecodePull(CpuOperation op);
     void PollNmiLine(void);
     void PollIrqLine(void);
 

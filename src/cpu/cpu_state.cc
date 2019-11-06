@@ -11,7 +11,7 @@
  * to execute all the necessary operations of that cycle.
  */
 
-#include "./state.h"
+#include "./cpu_state.h"
 
 #include <new>
 #include <cstdlib>
@@ -44,8 +44,8 @@ CpuState::CpuState(void) {
  * Uses the given data to create an operation cycle and add it
  * to the state queue.
  */
-void CpuState::AddCycle(CpuOperation *mem,
-                        CpuOperation *data, bool inc_pc) {
+void CpuState::AddCycle(CpuOperation mem,
+                        CpuOperation data, bool inc_pc) {
   // Fill the new operation cycle with the given data.
   OperationCycle *micro = &(state_->queue[state_->back]);
   micro->mem = mem;
@@ -63,7 +63,7 @@ void CpuState::AddCycle(CpuOperation *mem,
 /*
  * Pushes a cycle to the state queue.
  */
-void CpuState::PushCycle(CpuOperation *mem, CpuOperation *data, bool inc_pc) {
+void CpuState::PushCycle(CpuOperation mem, CpuOperation data, bool inc_pc) {
   // Add the operation cycle to the queue.
   state_->size++;
   CONTRACT(state_->size <= STATE_MAX_OPS);

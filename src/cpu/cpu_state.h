@@ -4,8 +4,6 @@
 #include <cstdlib>
 #include <cstdint>
 
-#include "./cpu.h"
-
 /*
  * Each micro instruction encodes the opperations that the CPU must
  * perform in that cycle.
@@ -13,10 +11,11 @@
  * The CPU can perform one data op, one memory op, and a PC increment
  * in a given cycle.
  */
-typedef void (Cpu::**CpuOperation)(void);
+class Cpu;
+typedef void (Cpu::*CpuOperation)(void);
 typedef struct {
-  CpuOperation *mem;
-  CpuOperation *data;
+  CpuOperation mem;
+  CpuOperation data;
   bool inc_pc;
 } OperationCycle;
 
@@ -52,10 +51,10 @@ class CpuState {
     CpuState(void);
 
     // Adds an operation cycle to the state queue.
-    void AddCycle(CpuOperation *mem, CpuOperation *data, bool inc_pc);
+    void AddCycle(CpuOperation mem, CpuOperation data, bool inc_pc);
 
     // Pushes an operation cycle to the state queue.
-    void PushCycle(CpuOperation *mem, CpuOperation *data, bool inc_pc);
+    void PushCycle(CpuOperation mem, CpuOperation data, bool inc_pc);
 
     // Dequeues and returns the next operation cycle.
     OperationCycle *NextCycle(void);

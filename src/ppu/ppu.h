@@ -69,6 +69,9 @@ class Ppu {
     // Holds the Renderer class to be used to draw pixels to the screen.
     Renderer *renderer_;
 
+    // Holds the NMI line used to communicate with the CPU.
+    bool *nmi_line_;
+
     // Helper functions for the PPU emulation.
     bool IsDisabled(void);
     void Disabled(void);
@@ -117,7 +120,7 @@ class Ppu {
     // The current OAM address is incremented by this operation.
     void OamDma(DataWord val);
 
-    Ppu(char *file, Memory *memory, Renderer *renderer);
+    Ppu(char *file, Memory *memory, Renderer *renderer, bool *nmi_line);
     ~Ppu(void);
 };
 

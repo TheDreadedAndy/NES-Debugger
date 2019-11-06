@@ -144,7 +144,7 @@
  *
  * Assumes the provided renderer and memory object are valid.
  */
-Ppu::Ppu(char *file, Memory *memory, Renderer *render) {
+Ppu::Ppu(char *file, Memory *memory, Renderer *render, bool *nmi_line) {
   // Prepare the ppu structure.
   soam_eval_buf_ = 1;
   current_scanline_ = 261;
@@ -163,6 +163,7 @@ Ppu::Ppu(char *file, Memory *memory, Renderer *render) {
   // Stores the given Memory and Renderer class for use in the emulation.
   memory_ = memory;
   renderer_ = render;
+  nmi_line_ = nmi_line;
 
   return;
 }
@@ -852,8 +853,7 @@ void Ppu::EvalFetchSprites(void) {
 void Ppu::Signal(void) {
   // NMIs should be generated when they are enabled in ppuctrl and
   // the ppu is in vblank.
-  // FIXME
-  //nmi_line = (ctrl_ & FLAG_ENABLE_VBLANK) && (status_ & FLAG_VBLANK);
+  *nmi_line_ = (ctrl_ & FLAG_ENABLE_VBLANK) && (status_ & FLAG_VBLANK);
   return;
 }
 

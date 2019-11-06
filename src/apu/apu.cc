@@ -2,12 +2,12 @@
  * TODO
  */
 
-#include <stdlib.h>
-#include <stdbool.h>
 #include "./apu.h"
+
+#include <cstdlib>
+
 #include "../util/util.h"
 #include "../util/data.h"
-#include "../cpu/2A03.h"
 #include "../memory/memory.h"
 #include "../sdl/audio.h"
 
@@ -138,42 +138,48 @@ static const DataWord length_table[] = { 10, 254, 20, 2, 40, 4, 80, 6, 160, 8,
                                          28, 32, 30 };
 
 /*
- * Initializes the APU structures.
+ * Creates an APU object.
+ *
+ * Assumes the provided memory object and irq line are valid.
  */
-void apu_init(void) {
+Apu::Apu(AudioDevice *audio, Memory *memory, DataWord *irq_line) {
+  // Stores the provided audio device, memory object, and CPU IRQ line.
+  audio_ = audio;
+  memory_ = memory;
+  irq_line_ = irq_line;
+
   // Allocate the channels of the APU.
-  pulse_a = xcalloc(1, sizeof(pulse_t));
-  pulse_b = xcalloc(1, sizeof(pulse_t));
-  triangle = xcalloc(1, sizeof(triangle_t));
-  noise = xcalloc(1, sizeof(noise_t));
-  dmc = xcalloc(1, sizeof(dmc_t));
+  pulse_a_ = new ApuPulse;
+  pulse_b_ = new ApuPulse;
+  triangle_ = new ApuTriangle;
+  noise_ = new ApuNoise;
+  dmc_ = new ApuDmc;
 
   // Load in the mixing tables for the APU channels.
-  apu_init_pulse_table();
-  apu_init_tndmc_table();
+  InitPulseTable();
+  InitTndmcTable();
 
   // On power-up, the noise shifter is seeded with the value 1.
-  noise->shift = 1;
+  noise_->shift = 1;
   return;
 }
 
 /*
  * Loads the pulse mixing table from the binary into memory.
  */
-static void apu_init_pulse_table(void) {
+void Apu::InitPulseTable(void) {
   // Get the address of the pulse table.
-  extern const word_t _binary_bins_pulse_table_bin_start[];
+  extern const DataWord _binary_bins_pulse_table_bin_start[];
 
   // Convert the bytes of the table to floats and load them into memory.
-  pulse_table = xmalloc(sizeof(float) * PULSE_TABLE_SIZE);
-  float temp;
-  uint32_t *convert = (uint32_t*) &temp; // I'm sorry.
+  pulse_table_ = new float[PULSE_TABLE_SIZE];
+  union { float f; uint32_t u; } temp;
   for (size_t i = 0; i < PULSE_TABLE_SIZE; i++) {
-    *convert = (_binary_bins_pulse_table_bin_start[(4 * i) + 0])
-             | (_binary_bins_pulse_table_bin_start[(4 * i) + 1] << 8)
-             | (_binary_bins_pulse_table_bin_start[(4 * i) + 2] << 16)
-             | (_binary_bins_pulse_table_bin_start[(4 * i) + 3] << 24);
-    pulse_table[i] = temp;
+    temp.u = (_binary_bins_pulse_table_bin_start[(4 * i) + 0])
+           | (_binary_bins_pulse_table_bin_start[(4 * i) + 1] << 8)
+           | (_binary_bins_pulse_table_bin_start[(4 * i) + 2] << 16)
+           | (_binary_bins_pulse_table_bin_start[(4 * i) + 3] << 24);
+    pulse_table_[i] = temp.f;
   }
 
   return;
@@ -182,20 +188,19 @@ static void apu_init_pulse_table(void) {
 /*
  * Loads the triangle/noise/dmc table from the binary into memory.
  */
-static void apu_init_tndmc_table(void) {
+void Apu::InitTndmcTable(void) {
   // Get the address of the tndmc table.
-  extern const word_t _binary_bins_tndmc_table_bin_start[];
+  extern const DataWord _binary_bins_tndmc_table_bin_start[];
 
   // Convert the bytes of the table to floats and load them into memory.
-  tndmc_table = xmalloc(sizeof(float) * TNDMC_SIZE);
-  float temp;
-  uint32_t *convert = (uint32_t*) &temp;
+  tndmc_table_ = float[TNDMC_SIZE];
+  union { float f; uint32_t u; } temp;
   for (size_t i = 0; i < TNDMC_SIZE; i++) {
-    *convert = (_binary_bins_tndmc_table_bin_start[(4 * i) + 0])
-             | (_binary_bins_tndmc_table_bin_start[(4 * i) + 1] << 8)
-             | (_binary_bins_tndmc_table_bin_start[(4 * i) + 2] << 16)
-             | (_binary_bins_tndmc_table_bin_start[(4 * i) + 3] << 24);
-    tndmc_table[i] = temp;
+    temp.u = (_binary_bins_tndmc_table_bin_start[(4 * i) + 0])
+           | (_binary_bins_tndmc_table_bin_start[(4 * i) + 1] << 8)
+           | (_binary_bins_tndmc_table_bin_start[(4 * i) + 2] << 16)
+           | (_binary_bins_tndmc_table_bin_start[(4 * i) + 3] << 24);
+    tndmc_table_[i] = temp.f;
   }
 
   return;
@@ -203,36 +208,33 @@ static void apu_init_tndmc_table(void) {
 
 /*
  * Runs a cycle of the APU emulation.
- *
- * Assumes the APU has been initialized.
- * Assumes CPU memory has been initialized.
  */
-void apu_run_cycle(void) {
+void Apu::RunCycle(void) {
   // Only the triangle wave updates on odd cycles.
-  if (!cycle_even) {
-    apu_update_triangle();
-    apu_play_sample();
-    cycle_even = !cycle_even;
+  if (!cycle_even_) {
+    UpdateTriangle();
+    PlaySample();
+    cycle_even_ = !cycle_even_;
     return;
   }
 
   // Update the frame counter. Must be done in this order to prevent
   // issues with frame counter resets.
-  apu_inc_frame();
-  if (frame_clock == 0) { apu_run_frame_step(); }
+  IncFrame();
+  if (frame_clock_ == 0) { RunFrameStep(); }
 
   // Update the channels for this cycle.
-  apu_update_pulse(pulse_a);
-  apu_update_pulse(pulse_b);
-  apu_update_triangle();
-  apu_update_noise();
-  apu_update_dmc();
+  UpdatePulse(pulse_a_);
+  UpdatePulse(pulse_b_);
+  Update_triangle();
+  Update_noise();
+  Update_dmc();
 
   // Play a sample, if it is time to do so.
-  apu_play_sample();
+  PlaySample();
 
   // Toggle the cycle evenness.
-  cycle_even = !cycle_even;
+  cycle_even_ = !cycle_even_;
 
   return;
 }
@@ -240,32 +242,32 @@ void apu_run_cycle(void) {
 /*
  * Performs an APU frame step action according to the current step and mode
  * of the frame counter.
- *
- * Assumes the APU has been initialized.
  */
-static void apu_run_frame_step(void) {
+void Apu::RunFrameStep(void) {
   // Clock envelopes.
-  if (!((frame_step == 3) && (frame_control & FLAG_MODE))) {
-    apu_update_pulse_envelope(pulse_a);
-    apu_update_pulse_envelope(pulse_b);
-    apu_update_noise_envelope();
-    apu_update_triangle_linear();
+  if (!((frame_step_ == 3) && (frame_control_ & FLAG_MODE))) {
+    UpdatePulseEnvelope(pulse_a_);
+    UpdatePulseEnvelope(pulse_b_);
+    UpdateNoiseEnvelope();
+    UpdateTriangleLinear();
   }
 
   // Clock length counters and pulse sweep.
-  if ((frame_step == 1) || ((frame_step == 3) && !(frame_control & FLAG_MODE))
-                        || ((frame_step == 4) && (frame_control & FLAG_MODE))) {
-    apu_update_length();
-    apu_update_sweep(pulse_a);
-    apu_update_sweep(pulse_b);
+  if ((frame_step_ == 1) || ((frame_step_ == 3)
+                         && !(frame_control_ & FLAG_MODE))
+                         || ((frame_step_ == 4)
+                         && (frame_control_ & FLAG_MODE))) {
+    UpdateLength();
+    UpdateSweep(pulse_a_);
+    UpdateSweep(pulse_b_);
   }
 
   // Send the frame IRQ. The IRQ should only be added to the line if it is not
   // already there.
-  if ((frame_step == 3) && !(frame_control & (FLAG_MODE | FLAG_IRQ_DISABLE))
-                        && !frame_irq) {
-    frame_irq = true;
-    irq_line++;
+  if ((frame_step_ == 3) && !(frame_control_ & (FLAG_MODE | FLAG_IRQ_DISABLE))
+                         && !frame_irq_) {
+    frame_irq_ = true;
+    (*irq_line_)++;
   }
 
   return;
@@ -276,7 +278,7 @@ static void apu_run_frame_step(void) {
  *
  * Assumes the provided channel is non-null.
  */
-static void apu_update_pulse_envelope(pulse_t *pulse) {
+void Apu::UpdatePulseEnvelope(ApuPulse *pulse) {
   // Check if it is time to update the envelope.
   if (pulse->env_clock == 0) {
     // Reset the envelope clock.
@@ -297,23 +299,21 @@ static void apu_update_pulse_envelope(pulse_t *pulse) {
 
 /*
  * Updates the envelope counter of the noise channel.
- *
- * Assumes the APU has been initialized.
  */
-static void apu_update_noise_envelope(void) {
+void Apu::UpdateNoiseEnvelope(void) {
   // Check if it is time to update the envelope.
-  if (noise->env_clock == 0) {
+  if (noise_->env_clock == 0) {
     // Reset the envelope clock.
-    noise->env_clock = noise->control & VOLUME_MASK;
+    noise_->env_clock = noise_->control & VOLUME_MASK;
     // If the envelope has ended and should be looped, reset the volume.
-    if ((noise->env_volume == 0) && (noise->control & FLAG_ENV_LOOP)) {
-      noise->env_volume = ENV_DECAY_START;
-    } else if (noise->env_volume > 0) {
+    if ((noise_->env_volume == 0) && (noise_->control & FLAG_ENV_LOOP)) {
+      noise_->env_volume = ENV_DECAY_START;
+    } else if (noise_->env_volume > 0) {
       // Otherwise, decay the volume.
-      noise->env_volume--;
+      noise_->env_volume--;
     }
   } else {
-    noise->env_clock--;
+    noise_->env_clock--;
   }
 
   return;
@@ -321,21 +321,19 @@ static void apu_update_noise_envelope(void) {
 
 /*
  * Updates the linear counter of the triangle channel.
- *
- * Assumes the APU has been initialized.
  */
-static void apu_update_triangle_linear(void) {
+void Apu::UpdateTriangleLinear(void) {
   // Reload the linear counter if the flag has been set.
-  if (triangle->linear_reload) {
-    triangle->linear = triangle->control & LINEAR_MASK;
-  } else if (triangle->linear > 0) {
+  if (triangle_->linear_reload) {
+    triangle_->linear = triangle_->control & LINEAR_MASK;
+  } else if (triangle_->linear > 0) {
     // Otherwise, decrement it until it reaches zero.
-    triangle->linear--;
+    triangle_->linear--;
   }
 
   // Clear the linear counter reload flag if the control bit is clear.
-  if (!(triangle->control & FLAG_LINEAR_CONTROL)) {
-    triangle->linear_reload = false;
+  if (!(triangle_->control & FLAG_LINEAR_CONTROL)) {
+    triangle_->linear_reload = false;
   }
 
   return;
@@ -343,28 +341,26 @@ static void apu_update_triangle_linear(void) {
 
 /*
  * Updates the length counter of each channel.
- *
- * Assumes the APU has been initialized.
  */
-static void apu_update_length(void) {
+void Apu::UpdateLength(void) {
   // Decrement pulse A length counter.
-  if ((pulse_a->length > 0) && !(pulse_a->control & FLAG_PULSE_HALT)) {
-    pulse_a->length--;
+  if ((pulse_a_->length > 0) && !(pulse_a_->control & FLAG_PULSE_HALT)) {
+    pulse_a_->length--;
   }
 
   // Decrement pulse B length counter.
-  if ((pulse_b->length > 0) && !(pulse_b->control & FLAG_PULSE_HALT)) {
-    pulse_b->length--;
+  if ((pulse_b_->length > 0) && !(pulse_b_->control & FLAG_PULSE_HALT)) {
+    pulse_b_->length--;
   }
 
   // Decrement triangle length counter.
-  if ((triangle->length > 0) && !(triangle->control & FLAG_TRI_HALT)) {
-    triangle->length--;
+  if ((triangle_->length > 0) && !(triangle_->control & FLAG_TRI_HALT)) {
+    triangle_->length--;
   }
 
   // Decrement noise length counter.
-  if ((noise->length > 0) && !(noise->control & FLAG_NOISE_HALT)) {
-    noise->length--;
+  if ((noise_->length > 0) && !(noise_->control & FLAG_NOISE_HALT)) {
+    noise_->length--;
   }
 
   return;
@@ -373,12 +369,10 @@ static void apu_update_length(void) {
 /*
  * Updates a pulse channels period if the sweep counter is 0 and the channel
  * is not muted.
- *
- * Assumes the APU has been initialized.
  */
-static void apu_update_sweep(pulse_t *pulse) {
+void Apu::UpdateSweep(ApuPulse *pulse) {
   // Update the pulses period, if able.
-  dword_t target_period = apu_get_pulse_target(pulse);
+  DoubleWord target_period = GetPulseTarget(pulse);
   if ((pulse->sweep_counter == 0) && (pulse->sweep & PULSE_SWEEP_ENABLE)
                                   && (pulse->timer >= 8)
                                   && (pulse->length > 0)
@@ -404,14 +398,14 @@ static void apu_update_sweep(pulse_t *pulse) {
  *
  * Assumes the pulse channel is non-null.
  */
-static dword_t apu_get_pulse_target(pulse_t *pulse) {
+DoubleWord Apu::GetPulseTarget(ApuPulse *pulse) {
   // Use the shift amount to get the period change form the timer,
   // then negate it if necessary.
-  dword_t period_change = pulse->timer >> (pulse->sweep
-                        & PULSE_SWEEP_SHIFT_MASK);
+  DoubleWord period_change = pulse->timer >> (pulse->sweep
+                           & PULSE_SWEEP_SHIFT_MASK);
   if (pulse->sweep & PULSE_SWEEP_NEGATE_MASK) {
     // The two pulse channels subtract the period change in different ways.
-    period_change = (pulse == pulse_a) ? ~period_change : -period_change;
+    period_change = (pulse == pulse_a_) ? ~period_change : -period_change;
     period_change = (period_change + pulse->timer) & PULSE_TIMER_MASK;
   } else {
     period_change += pulse->timer;
@@ -424,21 +418,19 @@ static dword_t apu_get_pulse_target(pulse_t *pulse) {
 /*
  * Increments the frame cycle and step counters according to the mode of the
  * frame counter.
- *
- * Assumes the APU has been initialized.
  */
-static void apu_inc_frame(void) {
-  frame_clock++;
+void Apu::IncFrame(void) {
+  frame_clock_++;
 
   // Reset the clock if a step has been completed.
-  if (frame_clock > FRAME_STEP_LENGTH) {
-    frame_clock = 0;
-    frame_step++;
+  if (frame_clock_ > FRAME_STEP_LENGTH) {
+    frame_clock_ = 0;
+    frame_step_++;
 
     // Reset the step if a frame has been completed for the given mode.
-    if ((frame_step >= 5) || ((frame_step >= 4)
-                          && !(frame_control & FLAG_MODE))) {
-      frame_step = 0;
+    if ((frame_step_ >= 5) || ((frame_step_ >= 4)
+                           && !(frame_control_ & FLAG_MODE))) {
+      frame_step_ = 0;
     }
   }
 
@@ -450,11 +442,11 @@ static void apu_inc_frame(void) {
  *
  * Assumes the pulse channel is non-null.
  */
-static void apu_update_pulse(pulse_t *pulse) {
+void Apu::UpdatePulse(ApuPulse *pulse) {
   // Determine what the pulse channel is outputting audio on this cycle.
-  word_t sequence = (pulse_waves[(pulse->control & PULSE_DUTY_MASK)
-                  >> PULSE_DUTY_SHIFT] << pulse->pos) & PULSE_SEQUENCE_MASK;
-  dword_t target_period = apu_get_pulse_target(pulse);
+  DataWord sequence = (pulse_waves[(pulse->control & PULSE_DUTY_MASK)
+                    >> PULSE_DUTY_SHIFT] << pulse->pos) & PULSE_SEQUENCE_MASK;
+  DoubleWord target_period = GetPulseTarget(pulse);
   if (sequence && (pulse->length > 0) && (pulse->timer >= 8)
                && (target_period <= PULSE_TIMER_MASK)) {
     pulse->output = (pulse->control & FLAG_CONST_VOL)
@@ -478,24 +470,23 @@ static void apu_update_pulse(pulse_t *pulse) {
 
 /*
  * Updates the output of the triangle channel.
- *
- * Assumes the APU has been initialized.
  */
-static void apu_update_triangle(void) {
+void Apu::UpdateTriangle(void) {
   // Update the triangle waves output for this cycle. The triangle wave cannot
   // be silenced, it simply stops updating its position. However, the wave can
   // be given a frequency outside the human range of hearing, in which case we
   // force it to zero.
-  triangle->output = (triangle->timer > 1) ? triangle_wave[triangle->pos] : 0U;
+  triangle_->output = (triangle_->timer > 1) ? triangle_wave[triangle_->pos]
+                                             : 0U;
 
   // Update the triangle clock and output wave form using the timer period.
-  if (triangle->clock > 0) {
-    triangle->clock--;
+  if (triangle_->clock > 0) {
+    triangle_->clock--;
   } else {
-    triangle->clock = triangle->timer;
+    triangle_->clock = triangle_->timer;
     // Determine if the position should be updated.
-    if ((triangle->linear > 0) && (triangle->length > 0)) {
-      triangle->pos = (triangle->pos + 1) & 0x1FU;
+    if ((triangle_->linear > 0) && (triangle_->length > 0)) {
+      triangle_->pos = (triangle_->pos + 1) & 0x1FU;
     }
   }
 
@@ -504,25 +495,23 @@ static void apu_update_triangle(void) {
 
 /*
  * Updates the output of the noise channel.
- *
- * Assumes the APU has been initialized.
  */
-static void apu_update_noise(void) {
+void Apu::UpdateNoise(void) {
   // Determine what sound should be output this cycle.
-  if ((noise->length > 0) && !(noise->shift & 0x01U)) {
-    noise->output = (noise->control & FLAG_CONST_VOL)
-                  ? noise->control & VOLUME_MASK
-                  : noise->env_volume;
+  if ((noise_->length > 0) && !(noise_->shift & 0x01U)) {
+    noise_->output = (noise_->control & FLAG_CONST_VOL)
+                   ? noise_->control & VOLUME_MASK
+                   : noise_->env_volume;
   } else {
-    noise->output = 0;
+    noise_->output = 0;
   }
 
   // Check if it is time to update the noise channel.
-  if (noise->clock > 0) {
-    noise->clock--;
+  if (noise_->clock > 0) {
+    noise_->clock--;
   } else {
-    noise->clock = noise->timer;
-    apu_update_noise_shift();
+    noise_->clock = noise_->timer;
+    UpdateNoiseShift();
   }
 
   return;
@@ -530,22 +519,20 @@ static void apu_update_noise(void) {
 
 /*
  * Updates the shift register of the noise channel.
- *
- * Assumes the APU has been initialized.
  */
-static void apu_update_noise_shift(void) {
+void Apu::UpdateNoiseShift(void) {
   // Calculate the new feedback bit of the noise channel using the noise mode.
-  dword_t feedback;
-  if (noise->period & FLAG_NOISE_MODE) {
+  DoubleWord feedback;
+  if (noise_->period & FLAG_NOISE_MODE) {
     // In mode 1, the new bit is bit 0 XOR bit 6.
-    feedback = (noise->shift & 0x01U) ^ ((noise->shift >> 6U) & 0x01U);
+    feedback = (noise_->shift & 0x01U) ^ ((noise_->shift >> 6U) & 0x01U);
   } else {
     // In mode 0, the new bit is bit 0 XOR bit 1.
-    feedback = (noise->shift & 0x01U) ^ ((noise->shift >> 1U) & 0x01U);
+    feedback = (noise_->shift & 0x01U) ^ ((noise_->shift >> 1U) & 0x01U);
   }
 
   // Shift the noise shifter and backfill with the feedback bit.
-  noise->shift = (feedback << 14U) | (noise->shift >> 1U);
+  noise_->shift = (feedback << 14U) | (noise_->shift >> 1U);
 
   return;
 }
@@ -553,78 +540,70 @@ static void apu_update_noise_shift(void) {
 /*
  * Updates the DMC channel, filling the buffer and updating the level as
  * necessary. May optionally generate an IRQ when a sample finishes.
- *
- * Assumes the APU has been initialized.
- * Assumes CPU memory has been initialized.
  */
-static void apu_update_dmc(void) {
+void Apu::UpdateDmc(void) {
   // Check if it is time for the DMC channel to update.
-  if (dmc->clock >= dmc_rates[dmc->rate]) {
-    dmc->clock = 0;
+  if (dmc_->clock >= dmc_rates[dmc_->rate]) {
+    dmc_->clock = 0;
   } else {
-    dmc->clock++;
+    dmc_->clock++;
     return;
   }
 
   // Refill the sample buffer if it is empty.
-  if ((dmc->bits_remaining == 0) && (dmc->bytes_remaining > 0)) {
+  if ((dmc_->bits_remaining == 0) && (dmc_->bytes_remaining > 0)) {
     // TODO: Stall CPU.
     // Load the next word into the sample buffer.
-    dmc->sample_buffer = memory_read(dmc->current_addr);
-    dmc->current_addr = (dmc->current_addr + 1) | DMC_CURRENT_ADDR_BASE;
-    dmc->bytes_remaining--;
-    dmc->silent = false;
+    dmc_->sample_buffer = memory_->Read(dmc_->current_addr);
+    dmc_->current_addr = (dmc_->current_addr + 1) | DMC_CURRENT_ADDR_BASE;
+    dmc_->bytes_remaining--;
+    dmc_->silent = false;
 
-    if ((dmc->bytes_remaining == 0) && (dmc->control & FLAG_DMC_LOOP)) {
-      dmc->current_addr = dmc->addr;
-      dmc->bytes_remaining = dmc->length;
-    } else if ((dmc->bytes_remaining == 0) && (dmc->control & FLAG_DMC_IRQ)
-                                           && !dmc_irq) {
+    if ((dmc_->bytes_remaining == 0) && (dmc_->control & FLAG_DMC_LOOP)) {
+      dmc_->current_addr = dmc_->addr;
+      dmc_->bytes_remaining = dmc_->length;
+    } else if ((dmc_->bytes_remaining == 0) && (dmc_->control & FLAG_DMC_IRQ)
+                                            && !dmc_irq_) {
       // Send an IRQ if dmc IRQ's are eneabled and the sample has ended.
-      dmc_irq = true;
-      irq_line++;
+      dmc_irq_ = true;
+      (*irq_line)++;
     }
-  } else if ((dmc->bits_remaining == 0) && (dmc->bytes_remaining == 0)) {
-    dmc->silent = true;
+  } else if ((dmc_->bits_remaining == 0) && (dmc_->bytes_remaining == 0)) {
+    dmc_->silent = true;
   }
 
   // Use the sample buffer to update the dmc level.
-  dmc->bits_remaining = (dmc->bits_remaining > 0) ? dmc->bits_remaining - 1 : 7;
-  if (!(dmc->silent)) {
-    if ((dmc->sample_buffer & 1) && (dmc->level <= (DMC_LEVEL_MAX - 2))) {
-      dmc->level += 2;
-    } else if (!(dmc->sample_buffer & 1) && (dmc->level >= 2)) {
-      dmc->level -= 2;
+  dmc_->bits_remaining = (dmc_->bits_remaining > 0) ? dmc_->bits_remaining - 1 : 7;
+  if (!(dmc_->silent)) {
+    if ((dmc_->sample_buffer & 1) && (dmc_->level <= (DMC_LEVEL_MAX - 2))) {
+      dmc_->level += 2;
+    } else if (!(dmc_->sample_buffer & 1) && (dmc_->level >= 2)) {
+      dmc_->level -= 2;
     }
   }
-  dmc->sample_buffer >>= 1;
+  dmc_->sample_buffer >>= 1;
 
   return;
 }
 
 /*
  * Sends a sample to the audio system every 40.5 APU cycles.
- *
- * Assumes the APU has been initialized.
  */
-static void apu_play_sample(void) {
-  // Tracks when the next sample should be played.
-  static float sample_clock = 0;
-
+void Apu::PlaySample(void) {
   // Increment the sample clock if a sample is not to be played this cycle.
-  if (sample_clock < 37) {
-    sample_clock++;
+  if (sample_clock_ < 37) {
+    sample_clock_++;
     return;
   }
 
   // Pull the output of the APU from the mixing tables.
-  float pulse_output = pulse_table[pulse_a->output + pulse_b->output];
-  float tndmc_output = tndmc_table[(triangle->output << TRIANGLE_DIM_SHIFT)
-                     | (noise->output << NOISE_DIM_SHIFT) | dmc->level];
+  float pulse_output = pulse_table_[pulse_a_->output + pulse_b_->output];
+  float tndmc_output = tndmc_table_[(triangle_->output << TRIANGLE_DIM_SHIFT)
+                     | (noise_->output << NOISE_DIM_SHIFT) | dmc_->level];
   float output = pulse_output + tndmc_output;
 
   // Add the output to the sample buffer.
-  audio_add_sample(output);
+  audio_->AddSample(output);
 
   // Reset the sample clock.
   sample_clock -= 36.2869375;
@@ -635,42 +614,40 @@ static void apu_play_sample(void) {
 /*
  * Writes the given value to a memory mapped APU register.
  * Writes to invalid addresses are ignored.
- *
- * Assumes the APU has been initialized.
  */
-void apu_write(dword_t reg_addr, word_t val) {
+void Apu::Write(DoubleWord reg_addr, DataWord val) {
   // Determine which register is being accessed.
-  pulse_t *pulse;
+  ApuPulse *pulse;
   switch(reg_addr) {
     case PULSE_A_CONTROL_ADDR:
     case PULSE_B_CONTROL_ADDR:
       // Update the control and envelope register.
-      pulse = (reg_addr == PULSE_A_CONTROL_ADDR) ? pulse_a : pulse_b;
+      pulse = (reg_addr == PULSE_A_CONTROL_ADDR) ? pulse_a_ : pulse_b_;
       pulse->control = val;
       break;
     case PULSE_A_SWEEP_ADDR:
     case PULSE_B_SWEEP_ADDR:
       // Update the sweep unit control register.
-      pulse = (reg_addr == PULSE_A_SWEEP_ADDR) ? pulse_a : pulse_b;
+      pulse = (reg_addr == PULSE_A_SWEEP_ADDR) ? pulse_a_ : pulse_b_;
       pulse->sweep = val;
       pulse->sweep_reload = true;
       break;
     case PULSE_A_TIMERL_ADDR:
     case PULSE_B_TIMERL_ADDR:
       // Update the low byte of the timer.
-      pulse = (reg_addr == PULSE_A_TIMERL_ADDR) ? pulse_a : pulse_b;
+      pulse = (reg_addr == PULSE_A_TIMERL_ADDR) ? pulse_a_ : pulse_b_;
       pulse->timer = (pulse->timer & ~TIMER_LOW_MASK) | val;
       break;
     case PULSE_A_LENGTH_ADDR:
     case PULSE_B_LENGTH_ADDR:
       // Update the pulse length and timer high.
-      pulse = (reg_addr == PULSE_A_LENGTH_ADDR) ? pulse_a : pulse_b;
-      if (((channel_status & FLAG_PULSE_A_ACTIVE) && (pulse == pulse_a))
-         || ((channel_status & FLAG_PULSE_B_ACTIVE) && (pulse == pulse_b))) {
+      pulse = (reg_addr == PULSE_A_LENGTH_ADDR) ? pulse_a_ : pulse_b_;
+      if (((channel_status_ & FLAG_PULSE_A_ACTIVE) && (pulse == pulse_a_))
+         || ((channel_status_ & FLAG_PULSE_B_ACTIVE) && (pulse == pulse_b_))) {
         pulse->length = length_table[(val & LENGTH_MASK) >> LENGTH_SHIFT];
       }
       pulse->timer = (pulse->timer & TIMER_LOW_MASK)
-                   | ((((dword_t) val) & TIMER_HIGH_MASK)
+                   | ((((DoubleWord) val) & TIMER_HIGH_MASK)
                    << TIMER_HIGH_SHIFT);
 
       // Reset the sequencer position and envelope.
@@ -680,81 +657,81 @@ void apu_write(dword_t reg_addr, word_t val) {
       break;
     case TRI_CONTROL_ADDR:
       // Update the linear control register.
-      triangle->control = val;
+      triangle_->control = val;
       break;
     case TRI_TIMERL_ADDR:
       // Update the low byte of the triangle period.
-      triangle->timer = (triangle->timer & ~TIMER_LOW_MASK) | val;
+      triangle_->timer = (triangle_->timer & ~TIMER_LOW_MASK) | val;
       break;
     case TRI_LENGTH_ADDR:
       // Update the triangle length and timer high.
-      if (channel_status & FLAG_TRI_ACTIVE) {
-        triangle->length = length_table[(val & LENGTH_MASK) >> LENGTH_SHIFT];
+      if (channel_status_ & FLAG_TRI_ACTIVE) {
+        triangle_->length = length_table[(val & LENGTH_MASK) >> LENGTH_SHIFT];
       }
-      triangle->timer = (triangle->timer & TIMER_LOW_MASK)
-                      | ((((dword_t) val) & TIMER_HIGH_MASK)
-                      << TIMER_HIGH_SHIFT);
+      triangle_->timer = (triangle_->timer & TIMER_LOW_MASK)
+                       | ((((DoubleWord) val) & TIMER_HIGH_MASK)
+                       << TIMER_HIGH_SHIFT);
 
       // Set the linear counter reload flag, which can be cleared by the
       // control bit.
-      triangle->linear_reload = true;
+      triangle_->linear_reload = true;
       break;
     case NOISE_CONTROL_ADDR:
       // Update the noise envelope and control register.
-      noise->control = val;
+      noise_->control = val;
       break;
     case NOISE_PERIOD_ADDR:
       // Update the period register and timer.
-      noise->period = val;
-      noise->timer = noise_periods[noise->period & NOISE_PERIOD_MASK];
+      noise_->period = val;
+      noise_->timer = noise_periods[noise_->period & NOISE_PERIOD_MASK];
       break;
     case NOISE_LENGTH_ADDR:
       // Update the noise length counter.
-      if (channel_status & FLAG_NOISE_ACTIVE) {
-        noise->length = length_table[(val & LENGTH_MASK) >> LENGTH_SHIFT];
+      if (channel_status_ & FLAG_NOISE_ACTIVE) {
+        noise_->length = length_table[(val & LENGTH_MASK) >> LENGTH_SHIFT];
       }
-      noise->env_clock = noise->control & VOLUME_MASK;
-      noise->env_volume = ENV_DECAY_START;
+      noise_->env_clock = noise_->control & VOLUME_MASK;
+      noise_->env_volume = ENV_DECAY_START;
       break;
     case DMC_CONTROL_ADDR:
       // Update the control bits and rate of the DMC channel.
-      dmc->control = val & DMC_CONTROL_MASK;
-      dmc->rate = val & DMC_RATE_MASK;
-      dmc->clock = 0;
+      dmc_->control = val & DMC_CONTROL_MASK;
+      dmc_->rate = val & DMC_RATE_MASK;
+      dmc_->clock = 0;
       break;
     case DMC_COUNTER_ADDR:
       // Update the PCM output level of the DMC channel.
-      dmc->level = val & DMC_LEVEL_MASK;
+      dmc_->level = val & DMC_LEVEL_MASK;
       break;
     case DMC_ADDRESS_ADDR:
       // Update the base sample address of the DMC channel.
-      dmc->addr = (((dword_t) val) << DMC_ADDR_SHIFT) | DMC_ADDR_BASE;
-      dmc->current_addr = dmc->addr;
+      dmc_->addr = (((DoubleWord) val) << DMC_ADDR_SHIFT) | DMC_ADDR_BASE;
+      dmc_->current_addr = dmc_->addr;
       break;
     case DMC_LENGTH_ADDR:
       // Update the sample length of the DMC channel.
-      dmc->length = (((dword_t) val) << DMC_LENGTH_SHIFT) | DMC_LENGTH_BASE;
-      dmc->bytes_remaining = dmc->length;
+      dmc_->length = (((DoubleWord) val) << DMC_LENGTH_SHIFT) | DMC_LENGTH_BASE;
+      dmc_->bytes_remaining = dmc_->length;
       break;
     case APU_STATUS_ADDR:
-      apu_status_write(val);
+      StatusWrite(val);
       break;
     case FRAME_COUNTER_ADDR:
-      frame_control = val;
+      frame_control_ = val;
       // Clear the frame IRQ if the disable flag was set by the write.
-      if ((frame_control & FLAG_IRQ_DISABLE) && frame_irq) {
-        frame_irq = false;
-        irq_line--;
+      if ((frame_control_ & FLAG_IRQ_DISABLE) && frame_irq_) {
+        frame_irq_ = false;
+        (*irq_line_)--;
       }
 
       // Reset the frame timer.
       // TODO: Add delay.
-      frame_clock = 0;
-      if (frame_control & FLAG_MODE) {
-        frame_step = 1;
-        apu_run_frame_step();
+      frame_clock_ = 0;
+      if (frame_control_ & FLAG_MODE) {
+        frame_step_ = 1;
+        RunFrameStep();
       }
-      frame_step = 0;
+      frame_step_ = 0;
       break;
     default:
       // If the address is invalid, nothing happens.
@@ -770,23 +747,23 @@ void apu_write(dword_t reg_addr, word_t val) {
  *
  * Assumes the APU has been initialized.
  */
-static void apu_status_write(word_t val) {
+static void apu_status_write(DataWord val) {
   // Store the enable status of each channel.
   channel_status = val;
 
   // Clear each channel whose bit was not set.
-  if (!(val & FLAG_NOISE_ACTIVE)) { noise->length = 0; }
-  if (!(val & FLAG_TRI_ACTIVE)) { triangle->length = 0; }
-  if (!(val & FLAG_PULSE_B_ACTIVE)) { pulse_b->length = 0; }
-  if (!(val & FLAG_PULSE_A_ACTIVE)) { pulse_a->length = 0; }
+  if (!(val & FLAG_NOISE_ACTIVE)) { noise_->length = 0; }
+  if (!(val & FLAG_TRI_ACTIVE)) { triangle_->length = 0; }
+  if (!(val & FLAG_PULSE_B_ACTIVE)) { pulse_b_->length = 0; }
+  if (!(val & FLAG_PULSE_A_ACTIVE)) { pulse_a_->length = 0; }
   if (!(val & FLAG_DMC_ACTIVE)) {
-    dmc->bytes_remaining = 0;
-  } else if (dmc->bytes_remaining == 0) {
+    dmc_->bytes_remaining = 0;
+  } else if (dmc_->bytes_remaining == 0) {
     // If the DMC bit was set, the channel should be reset without changing
     // the contents of the delta buffer; but only when there are no bytes
     // remaining in the sample.
-    dmc->current_addr = dmc->addr;
-    dmc->bytes_remaining = dmc->length;
+    dmc_->current_addr = dmc_->addr;
+    dmc_->bytes_remaining = dmc_->length;
   }
 
   // Clear the DMC interrupt, if it is active.
@@ -804,10 +781,10 @@ static void apu_status_write(word_t val) {
  *
  * Assumes the APU has been initialized.
  */
-word_t apu_read(dword_t reg_addr) {
+DataWord apu_read(DoubleWord reg_addr) {
   if (reg_addr == APU_STATUS_ADDR) {
     // Place the status of the APU in a word, and return it.
-    word_t status = 0;
+    DataWord status = 0;
     if (dmc_irq) { status |= FLAG_DMC_IRQ; }
     if (frame_irq) {
       // Reading the status register clears the frame IRQ flag.
@@ -815,11 +792,11 @@ word_t apu_read(dword_t reg_addr) {
       frame_irq = false;
       irq_line--;
     }
-    if (dmc->bytes_remaining > 0) { status |= FLAG_DMC_ACTIVE; }
-    if (noise->length > 0) { status |= FLAG_NOISE_ACTIVE; }
-    if (triangle->length > 0) { status |= FLAG_TRI_ACTIVE; }
-    if (pulse_b->length > 0) { status |= FLAG_PULSE_B_ACTIVE; }
-    if (pulse_a->length > 0) { status |= FLAG_PULSE_A_ACTIVE; }
+    if (dmc_->bytes_remaining > 0) { status |= FLAG_DMC_ACTIVE; }
+    if (noise_->length > 0) { status |= FLAG_NOISE_ACTIVE; }
+    if (triangle_->length > 0) { status |= FLAG_TRI_ACTIVE; }
+    if (pulse_b_->length > 0) { status |= FLAG_PULSE_B_ACTIVE; }
+    if (pulse_a_->length > 0) { status |= FLAG_PULSE_A_ACTIVE; }
     return status;
   } else {
     // Invalid register.

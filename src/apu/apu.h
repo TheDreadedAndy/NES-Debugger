@@ -3,6 +3,7 @@
 
 #include <cstdlib>
 
+#include "../memory/memory.h"
 #include "../util/data.h"
 
 /*
@@ -85,10 +86,21 @@ typedef struct dmc {
 } ApuDmc;
 
 /*
- * TODO
+ * This class contains all the structures, methods, and data necessary to
+ * emulate the NES's APU.
+ *
+ * The APU supports five channels of sound, and can communicate with the
+ * CPU through the generation of IRQ's.
  */
 class Apu {
   private:
+    // Used to play the generated audio to the user.
+    AudioDevice *audio_
+
+    // Used to communicate with a memory and cpu object.
+    Memory *memory_;
+    DataWord *irq_line_;
+
     // The individual channels associated with each APU object.
     ApuPulse *pulse_a_;
     ApuPulse *pulse_b_;
@@ -118,6 +130,9 @@ class Apu {
     float *pulse_table_;
     float *tndmc_table_;
 
+    // Tracks when the next sample should be sent to the audio device buffer.
+    float sample_clock_;
+
     /* Helper functions */
     void InitPulseTable(void);
     void InitTndmcTable(void);
@@ -139,8 +154,7 @@ class Apu {
 
   public:
     // Creates a new APU.
-    // FIXME: needs memory.
-    Apu(void);
+    Apu(AudioDevice *audio, Memory *memory, DataWord *irq_line);
 
     // Runs an APU cycle, updating the channels.
     void RunCycle(void);

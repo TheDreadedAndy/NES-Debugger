@@ -1,12 +1,12 @@
 # Creates a list of main files, headers, and objects (that are not main).
 MAINS = ndb.o
-OBJECTS = $(addprefix build/,$(filter-out $(MAINS),$(patsubst %.c,%.o,$(wildcard */*.c))))
+OBJECTS = $(addprefix build/,$(filter-out $(MAINS),$(patsubst %.cc,%.o,$(wildcard */*.cc))))
 HEADERS = $(wildcard */*.h)
 BINS = $(addprefix build/,$(patsubst %.bin,%.o,$(wildcard bins/*.bin)))
 DIRS = $(sort $(dir $(OBJECTS) $(BINS)))
-CC = gcc
+CC = g++
 LIBS = $(shell sdl2-config --libs)
-override CFLAGS += -Wall -Wshadow -Wextra -Werror -std=c99 -pedantic -O3 $(shell sdl2-config --cflags)
+override CFLAGS += -Wall -Wshadow -Wextra -Werror -pedantic -O3 $(shell sdl2-config --cflags)
 
 # Determine which OS is being compiled for.
 ifeq ($(OS),Windows_NT)
@@ -24,8 +24,8 @@ endif
 default: ndb
 
 # Builds a general object file.
-$(OBJECTS): build/%.o : %.c $(DIRS) $(HEADERS)
-	$(CC) $(CFLAGS) -c $(patsubst build/%.o,%.c,$@) -o $@
+$(OBJECTS): build/%.o : %.cc $(DIRS) $(HEADERS)
+	$(CC) $(CFLAGS) -c $(patsubst build/%.o,%.cc,$@) -o $@
 
 # Setup a binary file to be linked.
 $(BINS): build/%.o : %.bin $(DIRS)
@@ -33,7 +33,7 @@ $(BINS): build/%.o : %.bin $(DIRS)
 
 # General format for building a main file.
 $(patsubst %.o,%,$(MAINS)): $(OBJECTS) $(BINS)
-	$(CC) $(CFLAGS) -c $@.c -o build/$@.o
+	$(CC) $(CFLAGS) -c $@.cc -o build/$@.o
 	$(CC) $(OBJECTS) $(BINS) build/$@.o -o $@ $(LIBS)
 
 $(DIRS):

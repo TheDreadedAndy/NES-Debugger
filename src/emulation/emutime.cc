@@ -31,11 +31,11 @@ static bool EmutimeGt(Emutime *time1, Emutime *time2);
  */
 void EmutimeSyncFrameRate(long tic_rate) {
   // Used to track when this function was last called.
-  static Emutime last_time = { .tv_sec = 0, .tv_nsec = 0 };
+  static Emutime last_time = { 0, 0 };
 
   // Determine the minimum time at which this function can return.
   long wait_nsecs = NSECS_PER_SEC / tic_rate;
-  Emutime wait_spec = { .tv_sec = 0, .tv_nsec = wait_nsecs };
+  Emutime wait_spec = { 0, wait_nsecs };
   wait_spec.tv_sec = last_time.tv_sec;
   wait_spec.tv_nsec += last_time.tv_nsec;
   if (wait_spec.tv_nsec >= NSECS_PER_SEC) {
@@ -70,7 +70,7 @@ void EmutimeUpdateFrameCounter(long tic_rate, Window *window) {
   frames_counted++;
 
   // Tracks how much time has passed between frames.
-  static Emutime last_time = { .tv_sec = 0, .tv_nsec = 0 };
+  static Emutime last_time = { 0, 0 };
 
   // Determine if it is time to update the frame rate display.
   Emutime current_time, diff;

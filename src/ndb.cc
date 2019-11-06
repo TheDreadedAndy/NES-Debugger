@@ -53,7 +53,7 @@ int main(int argc, char *argv[]) {
   // Parses the users command line input.
   char *rom_file = NULL;
   char *pal_file = NULL;
-  bool use_surface_rendering = false;
+  RenderType rendering_type = RENDER_HARDWARE;
   signed char opt;
 
   while ((opt = getopt_long(argc, argv, "hf:p:s", long_opts, NULL)) != -1) {
@@ -65,7 +65,7 @@ int main(int argc, char *argv[]) {
         pal_file = optarg;
         break;
       case 's':
-        use_surface_rendering = true;
+        rendering_type = RENDER_SURFACE;
         break;
       default:
         printf("usage: ndb -f <FILE> -p <PALETTE FILE>\n");
@@ -74,71 +74,58 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  // Prepares the NES emulation for execution.
-  window_init(use_surface_rendering);
-  audio_init();
-  input_load(NULL);
-  start_emulation(rom_file, pal_file);
+  // Create the SDL window used by the emulation.
+  Window *window = Window::Create(NULL, rendering_type);
 
-  // Main emulation loop.
-  while (ndb_running) {
-    // Syncs the emulation to 60 FPS, when possible.
-    emutime_sync_frame_rate(NES_FRAME_RATE);
-
-    // Update the frame rate display.
-    emutime_update_frame_counter(NES_FRAME_RATE);
-
-    // Process any events on the SDL queue.
-    window_process_events();
-
-    // Execute the next frame of emulation.
-    run_emulation_cycle();
-  }
-
-  // Clean up any allocated memory.
-  cpu_free();
-  ppu_free();
-  apu_free();
-  audio_close();
-  window_close();
-
-  return 0;
-}
-
-/*
- * Takes in a file location for an NES rom file, and uses it to prepare
- * the emulation.
- *
- * Assumes the file location is valid.
- */
-static void StartEmulation(char *rom, char *pal) {
   // Open the rom. Prompt the user to select one if they did not already provide
   // one.
-  FILE *rom_file = NULL;
-  if (rom != NULL) {
-    rom_file = fopen(rom, "rb");
+  FILE *rom = NULL;
+  if (rom_file != NULL) {
+    rom = fopen(rom_file, "rb");
   } else {
-    open_file(&rom_file);
+    open_file(&rom);
   }
 
   // Verify that the users file was opened correctly.
-  if (rom_file == NULL) {
+  if (rom == NULL) {
     fprintf(stderr, "Failed to open the specified file.\n");
     abort();
   }
 
-  // Decode the header so that the emulation can be prepared.
-  header_t *header = decode_header(rom_file);
-  if (header == NULL) { exit(-1); }
+  // Use the rom file to create the memory object.
+  Memory *memory = Memory::Create(rom);
 
-  // Initializes the hardware emulation.
-  cpu_init(rom_file, header);
-  ppu_init(pal);
-  apu_init();
+  // Use the memory object to create the NES CPU, PPU, and APU.
+  Cpu *cpu = new Cpu(memory);
+  Ppu *ppu = new Ppu(pal_file, memory, window->renderer_, &(Cpu->nmi_line_));
+  Apu *apu = new Apu(memory, &(Cpu->irq_line_));
 
-  // Clean up and exit.
-  fclose(rom_file);
-  return;
+  // Close the rom file.
+  fclose(rom);
+
+  // Main emulation loop.
+  while (ndb_running) {
+    // Syncs the emulation to 60 FPS, when possible.
+    EmutimeSyncFrameRate(NES_FRAME_RATE);
+
+    // Update the frame rate display.
+    EmutimeUpdateFrameCounter(NES_FRAME_RATE);
+
+    // Process any events on the SDL queue.
+    window_->ProcessEvents();
+
+    // Execute the next frame of emulation.
+    RunEmulationCycle(cpu, ppu, apu);
+  }
+
+  // Clean up any allocated memory.
+  delete apu;
+  delete ppu;
+  delete cpu;
+  delete memory;
+  delete window;
+
+  return 0;
 }
 
 /*
@@ -150,11 +137,11 @@ static void RunEmulationCycle(Cpu *cpu, Ppu *ppu, Apu *apu) {
   for (size_t i = 0; i < EMU_CYCLE_SIZE; i++) {
     // The PPU is clocked at 3x the rate of the CPU, the APU is clocked
     // at 1/2 the rate of the CPU.
-    ppu_run_cycle();
-    ppu_run_cycle();
-    ppu_run_cycle();
-    cpu_run_cycle();
-    apu_run_cycle();
+    ppu_->RunCycle();
+    ppu_->RunCycle();
+    ppu_->RunCycle();
+    cpu_->RunCycle();
+    apu_->RunCycle();
   }
   return;
 }

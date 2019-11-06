@@ -9,7 +9,7 @@
 #include "../util/util.h"
 #include "../util/data.h"
 #include "../memory/memory.h"
-#include "../sdl/audio.h"
+#include "../sdl/audio_player.h"
 
 // These flags can be used to access the APU status.
 #define FLAG_DMC_IRQ 0x80U
@@ -142,7 +142,7 @@ static const DataWord length_table[] = { 10, 254, 20, 2, 40, 4, 80, 6, 160, 8,
  *
  * Assumes the provided memory object and irq line are valid.
  */
-Apu::Apu(AudioDevice *audio, Memory *memory, DataWord *irq_line) {
+Apu::Apu(AudioPlayer *audio, Memory *memory, DataWord *irq_line) {
   // Stores the provided audio device, memory object, and CPU IRQ line.
   audio_ = audio;
   memory_ = memory;
@@ -193,7 +193,7 @@ void Apu::InitTndmcTable(void) {
   extern const DataWord _binary_bins_tndmc_table_bin_start[];
 
   // Convert the bytes of the table to floats and load them into memory.
-  tndmc_table_ = float[TNDMC_SIZE];
+  tndmc_table_ = new float[TNDMC_SIZE];
   union { float f; uint32_t u; } temp;
   for (size_t i = 0; i < TNDMC_SIZE; i++) {
     temp.u = (_binary_bins_tndmc_table_bin_start[(4 * i) + 0])
@@ -226,9 +226,9 @@ void Apu::RunCycle(void) {
   // Update the channels for this cycle.
   UpdatePulse(pulse_a_);
   UpdatePulse(pulse_b_);
-  Update_triangle();
-  Update_noise();
-  Update_dmc();
+  UpdateTriangle();
+  UpdateNoise();
+  UpdateDmc();
 
   // Play a sample, if it is time to do so.
   PlaySample();
@@ -606,7 +606,7 @@ void Apu::PlaySample(void) {
   audio_->AddSample(output);
 
   // Reset the sample clock.
-  sample_clock -= 36.2869375;
+  sample_clock_ -= 36.2869375;
 
   return;
 }

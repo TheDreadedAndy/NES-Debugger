@@ -1,5 +1,3 @@
-#include <stdbool.h>
-
 #ifndef _NES_MAIN
 #define _NES_MAIN
 

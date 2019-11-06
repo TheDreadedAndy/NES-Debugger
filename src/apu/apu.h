@@ -3,6 +3,7 @@
 
 #include <cstdlib>
 
+#include "../sdl/audio_player.h"
 #include "../memory/memory.h"
 #include "../util/data.h"
 
@@ -11,19 +12,19 @@
  */
 typedef struct pulse {
   // Memory mapped registers.
-  dword_t timer;
-  word_t length;
-  word_t sweep;
+  DoubleWord timer;
+  DataWord length;
+  DataWord sweep;
   bool sweep_reload;
-  word_t control;
+  DataWord control;
 
   // Internal registers.
-  word_t sweep_counter;
-  word_t pos;
-  dword_t clock;
-  word_t output;
-  word_t env_clock;
-  word_t env_volume;
+  DataWord sweep_counter;
+  DataWord pos;
+  DoubleWord clock;
+  DataWord output;
+  DataWord env_clock;
+  DataWord env_volume;
 } ApuPulse;
 
 /*
@@ -31,16 +32,16 @@ typedef struct pulse {
  */
 typedef struct triangle {
   // Memory mapped registers.
-  dword_t timer;
-  word_t length;
-  word_t control;
+  DoubleWord timer;
+  DataWord length;
+  DataWord control;
   bool linear_reload;
 
   // Internal registers.
-  dword_t clock;
-  word_t output;
-  word_t linear;
-  word_t pos;
+  DoubleWord clock;
+  DataWord output;
+  DataWord linear;
+  DataWord pos;
 } ApuTriangle;
 
 /*
@@ -48,17 +49,17 @@ typedef struct triangle {
  */
 typedef struct noise {
   // Memory mapped registers.
-  word_t period;
-  word_t length;
-  word_t control;
+  DataWord period;
+  DataWord length;
+  DataWord control;
 
   // Internal registers.
-  dword_t shift;
-  dword_t timer;
-  dword_t clock;
-  word_t env_clock;
-  word_t env_volume;
-  word_t output;
+  DoubleWord shift;
+  DoubleWord timer;
+  DoubleWord clock;
+  DataWord env_clock;
+  DataWord env_volume;
+  DataWord output;
 } ApuNoise;
 
 /*
@@ -66,18 +67,18 @@ typedef struct noise {
  */
 typedef struct dmc {
   // Memory mapped registers.
-  word_t control;
-  word_t rate;
-  word_t level;
-  dword_t addr;
-  dword_t length;
+  DataWord control;
+  DataWord rate;
+  DataWord level;
+  DoubleWord addr;
+  DoubleWord length;
 
   // Internal registers.
-  dword_t current_addr;
-  dword_t bytes_remaining;
-  word_t bits_remaining;
-  word_t sample_buffer;
-  word_t output;
+  DoubleWord current_addr;
+  DoubleWord bytes_remaining;
+  DataWord bits_remaining;
+  DataWord sample_buffer;
+  DataWord output;
   bool silent;
 
   // The DMC updates whenever this value is greater than the corresponding
@@ -95,7 +96,7 @@ typedef struct dmc {
 class Apu {
   private:
     // Used to play the generated audio to the user.
-    AudioDevice *audio_
+    AudioPlayer *audio_;
 
     // Used to communicate with a memory and cpu object.
     Memory *memory_;
@@ -154,7 +155,7 @@ class Apu {
 
   public:
     // Creates a new APU.
-    Apu(AudioDevice *audio, Memory *memory, DataWord *irq_line);
+    Apu(AudioPlayer *audio, Memory *memory, DataWord *irq_line);
 
     // Runs an APU cycle, updating the channels.
     void RunCycle(void);

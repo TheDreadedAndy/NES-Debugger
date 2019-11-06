@@ -1,22 +1,21 @@
-// The current idea is for ndb to be a complete reimplementation
-// of gdb for the NES. Using NesIGuess as its emulator.
-//
-// This will be the main file (at least that's the plan,
-// I may split it up more).
+/*
+ * TODO
+ */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <getopt.h>
-#include <time.h>
 #include "./ndb.h"
+
+#include <cstdio>
+#include <cstdlib>
+#include <cgetopt>
+#include <ctime>
+
 #include "./emulation/emutime.h"
 #include "./sdl/window.h"
 #include "./sdl/render.h"
 #include "./sdl/audio.h"
 #include "./sdl/input.h"
 #include "./util/util.h"
-#include "./cpu/2A03.h"
-#include "./cpu/regs.h"
+#include "./cpu/cpu.h"
 #include "./memory/memory.h"
 #include "./memory/header.h"
 #include "./ppu/ppu.h"
@@ -32,8 +31,8 @@
 bool ndb_running = true;
 
 /* Helper functions */
-static void start_emulation(char *rom, char *pal);
-static void run_emulation_cycle(void);
+static void StartEmulation(char *rom, char *pal);
+static void RunEmulationCycle(Cpu *cpu, Ppu *ppu, Apu *apu);
 
 /*
  * Loads in the users arguments and starts ndb.
@@ -112,7 +111,7 @@ int main(int argc, char *argv[]) {
  *
  * Assumes the file location is valid.
  */
-static void start_emulation(char *rom, char *pal) {
+static void StartEmulation(char *rom, char *pal) {
   // Open the rom. Prompt the user to select one if they did not already provide
   // one.
   FILE *rom_file = NULL;
@@ -147,7 +146,7 @@ static void start_emulation(char *rom, char *pal) {
  *
  * Assumes the emulation has been initialized.
  */
-static void run_emulation_cycle(void) {
+static void RunEmulationCycle(Cpu *cpu, Ppu *ppu, Apu *apu) {
   for (size_t i = 0; i < EMU_CYCLE_SIZE; i++) {
     // The PPU is clocked at 3x the rate of the CPU, the APU is clocked
     // at 1/2 the rate of the CPU.

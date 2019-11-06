@@ -566,7 +566,7 @@ void Apu::UpdateDmc(void) {
                                             && !dmc_irq_) {
       // Send an IRQ if dmc IRQ's are eneabled and the sample has ended.
       dmc_irq_ = true;
-      (*irq_line)++;
+      (*irq_line_)++;
     }
   } else if ((dmc_->bits_remaining == 0) && (dmc_->bytes_remaining == 0)) {
     dmc_->silent = true;
@@ -744,12 +744,10 @@ void Apu::Write(DoubleWord reg_addr, DataWord val) {
 /*
  * Write to the APU status register, reseting the channels and clearing
  * the DMC IRQ as necessary.
- *
- * Assumes the APU has been initialized.
  */
-static void apu_status_write(DataWord val) {
+void Apu::StatusWrite(DataWord val) {
   // Store the enable status of each channel.
-  channel_status = val;
+  channel_status_ = val;
 
   // Clear each channel whose bit was not set.
   if (!(val & FLAG_NOISE_ACTIVE)) { noise_->length = 0; }
@@ -767,9 +765,9 @@ static void apu_status_write(DataWord val) {
   }
 
   // Clear the DMC interrupt, if it is active.
-  if (dmc_irq) {
-    dmc_irq = false;
-    irq_line--;
+  if (dmc_irq_) {
+    dmc_irq_ = false;
+    (*irq_line_)--;
   }
 
   return;
@@ -778,19 +776,17 @@ static void apu_status_write(DataWord val) {
 /*
  * Reads from a memory mapped APU register.
  * All registers, except the status register, are write only and return 0.
- *
- * Assumes the APU has been initialized.
  */
-DataWord apu_read(DoubleWord reg_addr) {
+DataWord Apu::Read(DoubleWord reg_addr) {
   if (reg_addr == APU_STATUS_ADDR) {
     // Place the status of the APU in a word, and return it.
     DataWord status = 0;
-    if (dmc_irq) { status |= FLAG_DMC_IRQ; }
-    if (frame_irq) {
+    if (dmc_irq_) { status |= FLAG_DMC_IRQ; }
+    if (frame_irq_) {
       // Reading the status register clears the frame IRQ flag.
       status |= FLAG_FRAME_IRQ;
-      frame_irq = false;
-      irq_line--;
+      frame_irq_ = false;
+      (*irq_line_)--;
     }
     if (dmc_->bytes_remaining > 0) { status |= FLAG_DMC_ACTIVE; }
     if (noise_->length > 0) { status |= FLAG_NOISE_ACTIVE; }
@@ -807,17 +803,17 @@ DataWord apu_read(DoubleWord reg_addr) {
 /*
  * Frees the APU structures.
  */
-void apu_free(void) {
+Apu::~Apu(void) {
   // Free the channels of the APU.
-  free(pulse_a);
-  free(pulse_b);
-  free(triangle);
-  free(noise);
-  free(dmc);
+  delete pulse_a_;
+  delete pulse_b_;
+  delete triangle_;
+  delete noise_;
+  delete dmc_;
 
   // Free the mixing tables.
-  free(pulse_table);
-  free(tndmc_table);
+  delete pulse_table_;
+  delete tndmc_table_;
 
   return;
 }

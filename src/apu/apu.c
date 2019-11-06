@@ -98,181 +98,44 @@
 #define TNDMC_SIZE 32768U
 
 /*
- * Contains the data related to the operation of an APU pulse channel.
- */
-typedef struct pulse {
-  // Memory mapped registers.
-  dword_t timer;
-  word_t length;
-  word_t sweep;
-  bool sweep_reload;
-  word_t control;
-
-  // Internal registers.
-  word_t sweep_counter;
-  word_t pos;
-  dword_t clock;
-  word_t output;
-  word_t env_clock;
-  word_t env_volume;
-} pulse_t;
-
-/*
- * Contains the data related to the operation of the APU triangle channel.
- */
-typedef struct triangle {
-  // Memory mapped registers.
-  dword_t timer;
-  word_t length;
-  word_t control;
-  bool linear_reload;
-
-  // Internal registers.
-  dword_t clock;
-  word_t output;
-  word_t linear;
-  word_t pos;
-} triangle_t;
-
-/*
- * Contains the data related to the operation of the APU noise channel.
- */
-typedef struct noise {
-  // Memory mapped registers.
-  word_t period;
-  word_t length;
-  word_t control;
-
-  // Internal registers.
-  dword_t shift;
-  dword_t timer;
-  dword_t clock;
-  word_t env_clock;
-  word_t env_volume;
-  word_t output;
-} noise_t;
-
-/*
- * Contains the data related to the operation of the APU DMC channel.
- */
-typedef struct dmc {
-  // Memory mapped registers.
-  word_t control;
-  word_t rate;
-  word_t level;
-  dword_t addr;
-  dword_t length;
-
-  // Internal registers.
-  dword_t current_addr;
-  dword_t bytes_remaining;
-  word_t bits_remaining;
-  word_t sample_buffer;
-  word_t output;
-  bool silent;
-
-  // The DMC updates whenever this value is greater than the corresponding
-  // rate value.
-  size_t clock;
-} dmc_t;
-
-/*
  * The rate value in the DMC channel maps to a number of APU cycles to wait
  * between updates, which corresponds to a given frequency. These wait
  * times are stored in this array.
  */
-static size_t dmc_rates[] = { 214, 190, 170, 160, 143, 127, 113, 107,
-                              95, 80, 71, 64, 53, 42, 36, 27 };
+static const size_t dmc_rates[] = { 214, 190, 170, 160, 143, 127, 113, 107,
+                                    95, 80, 71, 64, 53, 42, 36, 27 };
 
 /*
  * The period value of the noise channel is determined using a lookup table
  * of APU cycle wait timers. This table is given here.
  */
-static dword_t noise_periods[] = { 2, 4, 8, 16, 32, 48, 64, 80, 101, 127, 190,
-                                  254, 381, 508, 1017, 2034 };
+static const DoubleWord noise_periods[] = { 2, 4, 8, 16, 32, 48, 64, 80, 101,
+                                            127, 190, 254, 381, 508, 1017,
+                                            2034 };
 
 /*
  * The pulse (square wave) channels have 4 duty cycle settings which change the
  * wave form output. Here these output settings are represented as bytes with
  * each 1 representing a cycle where the wave form is high.
  */
-static word_t pulse_waves[] = { 0x40U, 0x60U, 0x78U, 0x9FU };
+static const DataWord pulse_waves[] = { 0x40U, 0x60U, 0x78U, 0x9FU };
 
 /*
  * The triangle wave channel loops over a 32 step sequence, which is defined
  * here.
  */
-static word_t triangle_wave[] = { 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3,
-                                  2, 1, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
-                                  12, 13, 14, 15 };
+static const DataWord triangle_wave[] = { 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5,
+                                          4, 3, 2, 1, 0, 0, 1, 2, 3, 4, 5, 6, 7,
+                                          8, 9, 10, 11, 12, 13, 14, 15 };
 
 /*
  * The APU has a length lookup table, which it uses to translate the values
  * written to the channel length counters into actual cycle lengths.
  */
-static word_t length_table[] = { 10, 254, 20, 2, 40, 4, 80, 6, 160, 8, 60, 10,
-                                 14, 12, 26, 14, 12, 16, 24, 18, 48, 20, 96,
-                                 22, 192, 24, 72, 26, 16, 28, 32, 30 };
-
-/*
- * These tables are used to appropriately mix the output from the APU.
- *
- * The pulse table is indexed by the sum of the pulse output.
- * The triangle/noise/dmc table is indexed as a 3d array with the levels
- * of the channels as the respective indexes.
- */
-static float *pulse_table = NULL;
-static float *tndmc_table = NULL;
-
-/*
- * These global variables control the different channels of the APU.
- * They are accessed through MMIO, and otherwise unavailable outside
- * of this file.
- */
-static pulse_t *pulse_a = NULL;
-static pulse_t *pulse_b = NULL;
-static triangle_t *triangle = NULL;
-static noise_t *noise = NULL;
-static dmc_t *dmc = NULL;
-static word_t frame_control = 0;
-static word_t channel_status = 0;
-
-/*
- * Both the frame counter and the DMC unit can generate an IRQ.
- * These variables track if either is currently doing so.
- */
-static bool dmc_irq = false;
-static bool frame_irq = false;
-
-/*
- * The APU frame counter is clocked every 3729 clock cycles.
- * It can be placed in a 4 or 5 step mode, with each step performing some
- * defined action.
- */
-static size_t frame_clock = 0;
-static size_t frame_step = 0;
-
-// Most functions only update every other cycle. This flag tracks that.
-static bool cycle_even = false;
-
-/* Helper functions. */
-static void apu_init_pulse_table(void);
-static void apu_init_tndmc_table(void);
-static void apu_run_frame_step(void);
-static void apu_update_sweep(pulse_t *pulse);
-static dword_t apu_get_pulse_target(pulse_t *pulse);
-static void apu_update_pulse_envelope(pulse_t *pulse);
-static void apu_update_noise_envelope(void);
-static void apu_update_triangle_linear(void);
-static void apu_update_length(void);
-static void apu_inc_frame(void);
-static void apu_update_pulse(pulse_t *pulse);
-static void apu_update_triangle(void);
-static void apu_update_noise(void);
-static void apu_update_noise_shift(void);
-static void apu_update_dmc(void);
-static void apu_status_write(word_t val);
-static void apu_play_sample(void);
+static const DataWord length_table[] = { 10, 254, 20, 2, 40, 4, 80, 6, 160, 8,
+                                         60, 10, 14, 12, 26, 14, 12, 16, 24, 18,
+                                         48, 20, 96, 22, 192, 24, 72, 26, 16,
+                                         28, 32, 30 };
 
 /*
  * Initializes the APU structures.

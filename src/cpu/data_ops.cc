@@ -498,7 +498,7 @@ void Cpu::DataAddAddrlX(void) {
  */
 void Cpu::DataAddAddrlY(void) {
   MultiWord res;
-  res.dw = regs_->addr.w[WORD_LO] + regs_->x;
+  res.dw = regs_->addr.w[WORD_LO] + regs_->y;
   regs_->addr.w[WORD_LO] = res.w[WORD_LO];
   regs_->addr_carry = res.w[WORD_HI];
   return;

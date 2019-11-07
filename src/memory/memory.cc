@@ -93,7 +93,7 @@ uint32_t Memory::PaletteRead(DoubleWord addr) {
 void Memory::PaletteWrite(DoubleWord addr, DataWord val) {
   // Create the NES/xRGB pixel to be written.
   uint32_t pixel = (val << PALETTE_NES_PIXEL_SHIFT)
-                 | (ppu_->GetPalette())->Decode(val);
+                 | ((ppu_->GetPalette())->Decode(val));
 
   // Convert the address into an access to the palette data array.
   addr = (addr & PALETTE_BG_ACCESS_MASK) ? (addr & PALETTE_ADDR_MASK)
@@ -115,7 +115,7 @@ void Memory::PaletteUpdate(void) {
   for (size_t i = 0; i < PALETTE_DATA_SIZE; i++) {
     nes_pixel = palette_data_[i] >> PALETTE_NES_PIXEL_SHIFT;
     pixel = (nes_pixel << PALETTE_NES_PIXEL_SHIFT)
-          | (ppu_->GetPalette())->Decode(nes_pixel);
+          | ((ppu_->GetPalette())->Decode(nes_pixel));
     palette_data_[i] = pixel;
   }
   return;

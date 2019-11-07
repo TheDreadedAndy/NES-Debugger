@@ -6,7 +6,7 @@ BINS = $(addprefix build/,$(patsubst %.bin,%.o,$(wildcard bins/*.bin)))
 DIRS = $(sort $(dir $(OBJECTS) $(BINS)))
 CC = g++
 LIBS = $(shell sdl2-config --libs)
-override CFLAGS += -Wall -Wshadow -Wextra -Werror -pedantic -ggdb $(shell sdl2-config --cflags)
+override CFLAGS += -Wall -Wshadow -Wextra -Werror -pedantic -O3 $(shell sdl2-config --cflags)
 
 # Determine which OS is being compiled for.
 ifeq ($(OS),Windows_NT)

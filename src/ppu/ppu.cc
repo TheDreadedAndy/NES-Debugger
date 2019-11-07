@@ -922,7 +922,7 @@ void Ppu::Write(DoubleWord reg_addr, DataWord val) {
       MmioAddrWrite(val);
       break;
     case PPU_DATA_ACCESS:
-      memory_->VramWrite(val, vram_addr_);
+      memory_->VramWrite(vram_addr_, val);
       MmioVramAddrInc();
       break;
   }

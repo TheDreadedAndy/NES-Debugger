@@ -239,7 +239,7 @@ void Uxrom::VramWrite(DoubleWord addr, DataWord val) {
     // Name table is being accessed.
     DataWord table = (addr & NAMETABLE_SELECT_MASK) >> 10;
     nametable_[table][addr & NAMETABLE_ADDR_MASK] = val;
-  } else if (addr > PALETTE_OFFSET) {
+  } else if (addr >= PALETTE_OFFSET) {
     // Palette data is being accessed.
     PaletteWrite(addr, val);
   }

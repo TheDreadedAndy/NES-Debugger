@@ -812,8 +812,8 @@ Apu::~Apu(void) {
   delete dmc_;
 
   // Free the mixing tables.
-  delete pulse_table_;
-  delete tndmc_table_;
+  delete[] pulse_table_;
+  delete[] tndmc_table_;
 
   return;
 }

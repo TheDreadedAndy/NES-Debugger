@@ -336,7 +336,7 @@ void Cpu::DataAslA(void) {
 void Cpu::DataLsrMdr(void) {
   regs_->p.carry = regs_->mdr & 0x01U;
   regs_->mdr = (regs_->mdr >> 1U) & 0x7FU;
-  regs_->p.negative = regs_->mdr & STATUS_FLAG_N;
+  regs_->p.negative = false;
   regs_->p.zero = (regs_->mdr == 0);
   return;
 }
@@ -348,7 +348,7 @@ void Cpu::DataLsrMdr(void) {
 void Cpu::DataLsrA(void) {
   regs_->p.carry = regs_->a & 0x01U;
   regs_->a = (regs_->a >> 1U) & 0x7FU;
-  regs_->p.negative = regs_->a & STATUS_FLAG_N;
+  regs_->p.negative = false;
   regs_->p.zero = (regs_->a == 0);
   return;
 }

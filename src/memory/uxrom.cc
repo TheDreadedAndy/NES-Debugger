@@ -255,17 +255,17 @@ void Uxrom::VramWrite(DoubleWord addr, DataWord val) {
  */
 Uxrom::~Uxrom(void) {
   // Free the CPU memory arrays.
-  delete ram_;
-  delete bat_;
+  delete[] ram_;
+  delete[] bat_;
 
   // Free the VRAM data.
-  delete nametable_[0];
-  delete nametable_[3];
-  delete pattern_table_;
+  delete[] nametable_[0];
+  delete[] nametable_[3];
+  delete[] pattern_table_;
 
   // Frees each bank of CPU memory.
   for (size_t i = 0; i < (fixed_bank_ + 1U); i++) {
-    delete cart_[i];
+    delete[] cart_[i];
   }
 
   return;

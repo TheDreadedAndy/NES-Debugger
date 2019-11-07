@@ -42,7 +42,7 @@ HardwareRenderer::HardwareRenderer(SDL_Window *window, SDL_Renderer *renderer)
   renderer_ = renderer;
 
   // Allocate the rendering buffers.
-  pixel_buffer_ = new uint32_t[NES_WIDTH * NES_HEIGHT];
+  pixel_buffer_ = new uint32_t[NES_WIDTH * NES_HEIGHT]();
   frame_texture_ = SDL_CreateTexture(renderer_, SDL_PIXELFORMAT_RGB888,
                    SDL_TEXTUREACCESS_STREAMING, NES_WIDTH, NES_HEIGHT);
 

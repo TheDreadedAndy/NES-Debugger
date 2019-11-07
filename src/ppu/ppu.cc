@@ -10,7 +10,7 @@
 #include "../util/data.h"
 #include "../util/util.h"
 #include "../util/contracts.h"
-#include "../cpu/2A03.h"
+#include "../cpu/cpu.h"
 #include "../sdl/renderer.h"
 #include "../memory/memory.h"
 #include "./palette.h"
@@ -155,10 +155,10 @@ Ppu::Ppu(char *file, Memory *memory, Renderer *render, bool *nmi_line) {
   palette_ = new NesPalette(file);
 
   // Allocate the sprite renderering buffers.
-  primary_oam_ = new DataWord[PRIMARY_OAM_SIZE];
-  soam_buffer_[0] = new DataWord[SOAM_BUFFER_SIZE];
-  soam_buffer_[1] = new DataWord[SOAM_BUFFER_SIZE];
-  oam_buffer_ = new DataWord[OAM_BUFFER_SIZE];
+  primary_oam_ = new DataWord[PRIMARY_OAM_SIZE]();
+  soam_buffer_[0] = new DataWord[SOAM_BUFFER_SIZE]();
+  soam_buffer_[1] = new DataWord[SOAM_BUFFER_SIZE]();
+  oam_buffer_ = new DataWord[OAM_BUFFER_SIZE]();
 
   // Stores the given Memory and Renderer class for use in the emulation.
   memory_ = memory;
@@ -998,6 +998,13 @@ void Ppu::MmioVramAddrInc(void) {
   }
 
   return;
+}
+
+/*
+ * Exposes the palette to the caller.
+ */
+NesPalette *Ppu::GetPalette(void) {
+  return palette_;
 }
 
 /*

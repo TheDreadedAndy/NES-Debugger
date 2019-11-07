@@ -516,7 +516,7 @@ void Cpu::DataFixaAddrh(void) {
   if (regs_->addr_carry > 0) {
     regs_->addr.w[WORD_HI] += regs_->addr_carry;
     OperationCycle *op = state_->GetLastCycle();
-    state_->PushCycle(op->mem, &Nop, PC_NOP);
+    state_->PushCycle(op->mem, &Cpu::Nop, PC_NOP);
   }
   return;
 }
@@ -553,7 +553,7 @@ void Cpu::DataBranch(void) {
   DataWord flag = (regs_->inst >> 6U) & 0x03U;
   bool cond = regs_->inst & 0x20U;
   // Black magic that pulls the proper flag from the status reg.
-  DataWord status = StatusGetVector(&(regs_->p));
+  DataWord status = StatusGetVector(&(regs_->p), false);
   flag = (flag & 2U) ? ((status >> (flag & 1U)) & 1U)
                      : ((status >> ((~flag) & 0x07U)) & 1U);
   bool taken = ((static_cast<bool>(flag)) == cond);
@@ -572,12 +572,12 @@ void Cpu::DataBranch(void) {
   } else if (regs_->addr_carry) {
     // Case 2.
     regs_->pc.w[WORD_LO] = res.w[WORD_LO];
-    state_->AddCycle(&Nop, &DataFixPch, PC_NOP);
-    state_->AddCycle(&MemFetch, &Nop, PC_INC);
+    state_->AddCycle(&Cpu::Nop, &Cpu::DataFixPch, PC_NOP);
+    state_->AddCycle(&Cpu::MemFetch, &Cpu::Nop, PC_INC);
   } else {
     // Case 1.
     regs_->pc.w[WORD_LO] = res.w[WORD_LO];
-    state_->AddCycle(&MemFetch, &Nop, PC_INC);
+    state_->AddCycle(&Cpu::MemFetch, &Cpu::Nop, PC_INC);
   }
 
   return;

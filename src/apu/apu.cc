@@ -149,11 +149,11 @@ Apu::Apu(AudioPlayer *audio, Memory *memory, DataWord *irq_line) {
   irq_line_ = irq_line;
 
   // Allocate the channels of the APU.
-  pulse_a_ = new ApuPulse;
-  pulse_b_ = new ApuPulse;
-  triangle_ = new ApuTriangle;
-  noise_ = new ApuNoise;
-  dmc_ = new ApuDmc;
+  pulse_a_ = new ApuPulse();
+  pulse_b_ = new ApuPulse();
+  triangle_ = new ApuTriangle();
+  noise_ = new ApuNoise();
+  dmc_ = new ApuDmc();
 
   // Load in the mixing tables for the APU channels.
   InitPulseTable();

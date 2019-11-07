@@ -18,6 +18,9 @@
 #include "../util/util.h"
 #include "../util/data.h"
 #include "../io/controller.h"
+#include "../cpu/cpu.h"
+#include "../ppu/ppu.h"
+#include "../apu/apu.h"
 #include "./memory.h"
 #include "./header.h"
 
@@ -141,7 +144,7 @@ DataWord Uxrom::Read(DoubleWord addr) {
   } else if ((IO_OFFSET <= addr) && (addr < MAPPER_OFFSET)) {
     // Read from IO/APU MMIO.
     if ((addr == IO_JOY1_ADDR) || (addr == IO_JOY2_ADDR)) {
-      bus_ = ControllerRead(addr);
+      bus_ = controller_->Read(addr);
     } else {
       bus_ = apu_->Read(addr);
     }
@@ -181,7 +184,7 @@ void Uxrom::Write(DoubleWord addr, DataWord val) {
     if (addr == CPU_DMA_ADDR) {
       cpu_->StartDma(val);
     } else if (addr == IO_JOY1_ADDR) {
-      ControllerWrite(addr, val);
+      controller_->Write(addr, val);
     } else {
       apu_->Write(addr, val);
     }

@@ -110,6 +110,9 @@ class Ppu {
     // Runs the next emulated PPU cycle.
     void RunCycle(void);
 
+    // Used to give memory access to the palette decoder.
+    NesPalette *GetPalette(void);
+
     // Reads from a memory mapped PPU register.
     DataWord Read(DoubleWord reg_addr);
 

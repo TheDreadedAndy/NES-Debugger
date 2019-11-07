@@ -57,7 +57,7 @@ AudioPlayer *AudioPlayer::Create(void) {
  */
 AudioPlayer::AudioPlayer(SDL_AudioDeviceID device) {
   // Prepare the audio buffer.
-  audio_buffer_ = new float[BUFFER_SIZE];
+  audio_buffer_ = new float[BUFFER_SIZE]();
 
   // Initialize the filters.
   last_normal_sample_ = 0;

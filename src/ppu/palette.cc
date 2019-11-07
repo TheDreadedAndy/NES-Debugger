@@ -50,7 +50,7 @@ NesPalette::NesPalette(char *file) {
   }
 
   // Load the palette file into the decoded palette array.
-  decoded_palette_ = new uint32_t[PALETTE_SIZE * PALETTE_DIMS];
+  decoded_palette_ = new uint32_t[PALETTE_SIZE * PALETTE_DIMS]();
   uint32_t red, green, blue;
   if (pal_file != NULL) {
     // Load the file the user provided.

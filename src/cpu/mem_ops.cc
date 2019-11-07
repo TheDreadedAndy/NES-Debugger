@@ -232,14 +232,14 @@ void Cpu::MemBrk(void) {
   if (nmi_edge_) {
     nmi_edge_ = false;
     irq_ready_ = false;
-    state_->AddCycle(&MemNmiPcl, &DataSei, PC_NOP);
-    state_->AddCycle(&MemNmiPch, &Nop, PC_NOP);
-    state_->AddCycle(&MemFetch, &Nop, PC_INC);
+    state_->AddCycle(&Cpu::MemNmiPcl, &Cpu::DataSei, PC_NOP);
+    state_->AddCycle(&Cpu::MemNmiPch, &Cpu::Nop, PC_NOP);
+    state_->AddCycle(&Cpu::MemFetch, &Cpu::Nop, PC_INC);
   } else {
     irq_ready_ = false;
-    state_->AddCycle(&MemIrqPcl, &DataSei, PC_NOP);
-    state_->AddCycle(&MemIrqPch, &Nop, PC_NOP);
-    state_->AddCycle(&MemFetch, &Nop, PC_INC);
+    state_->AddCycle(&Cpu::MemIrqPcl, &Cpu::DataSei, PC_NOP);
+    state_->AddCycle(&Cpu::MemIrqPch, &Cpu::Nop, PC_NOP);
+    state_->AddCycle(&Cpu::MemFetch, &Cpu::Nop, PC_INC);
   }
 
   return;
@@ -255,13 +255,13 @@ void Cpu::MemIrq(void) {
   // Allows an nmi to hijack an irq interrupt.
   if (nmi_edge_) {
     nmi_edge_ = false;
-    state_->AddCycle(&MemNmiPcl, &DataSei, PC_NOP);
-    state_->AddCycle(&MemNmiPch, &Nop, PC_NOP);
-    state_->AddCycle(&MemFetch, &Nop, PC_INC);
+    state_->AddCycle(&Cpu::MemNmiPcl, &Cpu::DataSei, PC_NOP);
+    state_->AddCycle(&Cpu::MemNmiPch, &Cpu::Nop, PC_NOP);
+    state_->AddCycle(&Cpu::MemFetch, &Cpu::Nop, PC_INC);
   } else {
-    state_->AddCycle(&MemIrqPcl, &DataSei, PC_NOP);
-    state_->AddCycle(&MemIrqPch, &Nop, PC_NOP);
-    state_->AddCycle(&MemFetch, &Nop, PC_INC);
+    state_->AddCycle(&Cpu::MemIrqPcl, &Cpu::DataSei, PC_NOP);
+    state_->AddCycle(&Cpu::MemIrqPch, &Cpu::Nop, PC_NOP);
+    state_->AddCycle(&Cpu::MemFetch, &Cpu::Nop, PC_INC);
   }
 
   return;

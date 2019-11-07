@@ -6,13 +6,14 @@
 
 #include <cstdio>
 #include <cstdlib>
-#include <cgetopt>
 #include <ctime>
+
+#include <getopt.h>
 
 #include "./emulation/emutime.h"
 #include "./sdl/window.h"
-#include "./sdl/render.h"
-#include "./sdl/audio.h"
+#include "./sdl/renderer.h"
+#include "./sdl/audio_player.h"
 #include "./sdl/input.h"
 #include "./util/util.h"
 #include "./cpu/cpu.h"
@@ -31,7 +32,6 @@
 bool ndb_running = true;
 
 /* Helper functions */
-static void StartEmulation(char *rom, char *pal);
 static void RunEmulationCycle(Cpu *cpu, Ppu *ppu, Apu *apu);
 
 /*
@@ -41,13 +41,12 @@ int main(int argc, char *argv[]) {
 
   // Global variables needed for getopt.
   extern char *optarg;
-  extern int optind, opterr, optopt;
 
   // Long option array, used to parse input.
   struct option long_opts[] = {
-    { .name="surface", .has_arg=0, .flag=NULL, .val='s' },
-    { .name="file", .has_arg=1, .flag=NULL, .val='f' },
-    { .name="palette", .has_arg=1, .flag=NULL, .val='p' }
+    { "surface", 0, NULL, 's' },
+    { "file", 1, NULL, 'f' },
+    { "palette", 1, NULL, 'p' }
   };
 
   // Parses the users command line input.
@@ -65,7 +64,7 @@ int main(int argc, char *argv[]) {
         pal_file = optarg;
         break;
       case 's':
-        rendering_type = RENDER_SURFACE;
+        rendering_type = RENDER_SOFTWARE;
         break;
       default:
         printf("usage: ndb -f <FILE> -p <PALETTE FILE>\n");
@@ -83,7 +82,7 @@ int main(int argc, char *argv[]) {
   if (rom_file != NULL) {
     rom = fopen(rom_file, "rb");
   } else {
-    open_file(&rom);
+    OpenFile(&rom);
   }
 
   // Verify that the users file was opened correctly.
@@ -94,11 +93,13 @@ int main(int argc, char *argv[]) {
 
   // Use the rom file to create the memory object.
   Memory *memory = Memory::Create(rom);
+  memory->AddController(window->GetInput());
 
   // Use the memory object to create the NES CPU, PPU, and APU.
   Cpu *cpu = new Cpu(memory);
-  Ppu *ppu = new Ppu(pal_file, memory, window->renderer_, &(Cpu->nmi_line_));
-  Apu *apu = new Apu(memory, &(Cpu->irq_line_));
+  Ppu *ppu = new Ppu(pal_file, memory, window->GetRenderer(),
+                                       &(cpu->nmi_line_));
+  Apu *apu = new Apu(window->GetAudioPlayer(), memory, &(cpu->irq_line_));
 
   // Close the rom file.
   fclose(rom);
@@ -109,10 +110,10 @@ int main(int argc, char *argv[]) {
     EmutimeSyncFrameRate(NES_FRAME_RATE);
 
     // Update the frame rate display.
-    EmutimeUpdateFrameCounter(NES_FRAME_RATE);
+    EmutimeUpdateFrameCounter(NES_FRAME_RATE, window);
 
     // Process any events on the SDL queue.
-    window_->ProcessEvents();
+    window->ProcessEvents();
 
     // Execute the next frame of emulation.
     RunEmulationCycle(cpu, ppu, apu);
@@ -137,11 +138,11 @@ static void RunEmulationCycle(Cpu *cpu, Ppu *ppu, Apu *apu) {
   for (size_t i = 0; i < EMU_CYCLE_SIZE; i++) {
     // The PPU is clocked at 3x the rate of the CPU, the APU is clocked
     // at 1/2 the rate of the CPU.
-    ppu_->RunCycle();
-    ppu_->RunCycle();
-    ppu_->RunCycle();
-    cpu_->RunCycle();
-    apu_->RunCycle();
+    ppu->RunCycle();
+    ppu->RunCycle();
+    ppu->RunCycle();
+    cpu->RunCycle();
+    apu->RunCycle();
   }
   return;
 }

@@ -17,7 +17,7 @@
 #include "../util/data.h"
 #include "../ppu/ppu.h"
 #include "../ppu/palette.h"
-#include "../cpu/2A03.h"
+#include "../cpu/cpu.h"
 #include "../io/controller.h"
 #include "../apu/apu.h"
 #include "./header.h"
@@ -70,7 +70,7 @@ Memory *Memory::Create(FILE *rom_file) {
  */
 Memory::Memory(RomHeader *header) {
   header_ = header;
-  palette_data_ = new uint32_t[PALETTE_DATA_SIZE];
+  palette_data_ = new uint32_t[PALETTE_DATA_SIZE]();
   return;
 }
 
@@ -92,7 +92,8 @@ uint32_t Memory::PaletteRead(DoubleWord addr) {
  */
 void Memory::PaletteWrite(DoubleWord addr, DataWord val) {
   // Create the NES/xRGB pixel to be written.
-  uint32_t pixel = (val << PALETTE_NES_PIXEL_SHIFT) | palette_decode(val);
+  uint32_t pixel = (val << PALETTE_NES_PIXEL_SHIFT)
+                 | (ppu_->GetPalette())->Decode(val);
 
   // Convert the address into an access to the palette data array.
   addr = (addr & PALETTE_BG_ACCESS_MASK) ? (addr & PALETTE_ADDR_MASK)
@@ -113,7 +114,8 @@ void Memory::PaletteUpdate(void) {
   uint32_t pixel;
   for (size_t i = 0; i < PALETTE_DATA_SIZE; i++) {
     nes_pixel = palette_data_[i] >> PALETTE_NES_PIXEL_SHIFT;
-    pixel = (nes_pixel << PALETTE_NES_PIXEL_SHIFT) | palette_decode(nes_pixel);
+    pixel = (nes_pixel << PALETTE_NES_PIXEL_SHIFT)
+          | (ppu_->GetPalette())->Decode(nes_pixel);
     palette_data_[i] = pixel;
   }
   return;
@@ -133,10 +135,27 @@ void Memory::Connect(Cpu *cpu, Ppu *ppu, Apu *apu) {
 }
 
 /*
+ * Uses the given input to create a controller object for this memory object.
+ */
+void Memory::AddController(Input *input) {
+  // Remove the connected controller, if it exists.
+  if (controller_ != NULL)  {
+    delete controller_;
+  }
+
+  // Create the new controller.
+  controller_ = new Controller(input);
+
+  return;
+}
+
+
+/*
  * Frees the header and palatte data array associated with this memory class.
  */
 Memory::~Memory(void) {
   delete header_;
   delete[] palette_data_;
+  if (controller_ != NULL) { delete controller_; }
   return;
 }

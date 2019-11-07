@@ -49,8 +49,8 @@
 Cpu::Cpu(Memory *memory) {
   // Init all cpu structures.
   memory_ = memory;
-  state_ = new CpuState;
-  regs_ = new CpuRegFile;
+  state_ = new CpuState();
+  regs_ = new CpuRegFile();
 
   // Setup the cpu register file.
   // On startup, IRQ's are disabled and the high byte of the stack pointer

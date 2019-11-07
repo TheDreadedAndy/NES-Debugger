@@ -34,9 +34,9 @@
  * Creates the state queue for the given CpuState with size STATE_MAX_OPS.
  */
 CpuState::CpuState(void) {
-  state_ = new StateQueue;
-  state_->queue = new OperationCycle[STATE_MAX_OPS];
-  last_op_ = new OperationCycle;
+  state_ = new StateQueue();
+  state_->queue = new OperationCycle[STATE_MAX_OPS]();
+  last_op_ = new OperationCycle();
   return;
 }
 

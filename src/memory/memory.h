@@ -5,6 +5,8 @@
 #include <cstdint>
 
 #include "../util/data.h"
+#include "../sdl/input.h"
+#include "../io/controller.h"
 #include "./header.h"
 
 // Memory addressing constants.
@@ -88,6 +90,9 @@ class Memory {
     Ppu *ppu_;
     Apu *apu_;
 
+    // The controller connected to this memory object.
+    Controller *controller_;
+
     // Stores the rom header and allocates the palette data array.
     Memory(RomHeader *header);
 
@@ -105,12 +110,16 @@ class Memory {
     void PaletteUpdate();
 
     // Gives the memory access to its associated Ppu/Cpu classes.
-    // Must be called before any other function.
+    // Must be called before using r/w functions.
     void Connect(Cpu *cpu, Ppu *ppu, Apu *apu);
+
+    // Uses the given input class to create and connect a controller
+    // to the memory object. Must be called before using r/w functions.
+    void AddController(Input *input);
 
     // Creates a derived memory object for the mapper of the given
     // rom file. Returns NULL on failure.
-    Memory *Create(FILE *rom_file);
+    static Memory *Create(FILE *rom_file);
 
     // Frees the rom header and palette data array.
     virtual ~Memory(void);

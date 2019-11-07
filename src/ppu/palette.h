@@ -2,6 +2,7 @@
 #define _NES_PALETTE
 
 #include <cstdint>
+#include <cstdio>
 
 #include "../util/data.h"
 

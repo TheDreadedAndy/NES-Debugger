@@ -91,7 +91,7 @@ class Memory {
     Apu *apu_;
 
     // The controller connected to this memory object.
-    Controller *controller_;
+    Controller *controller_ = NULL;
 
     // Stores the rom header and allocates the palette data array.
     Memory(RomHeader *header);

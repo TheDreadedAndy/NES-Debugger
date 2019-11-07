@@ -12,10 +12,6 @@
  */
 class HardwareRenderer : public Renderer {
   private:
-    // Used to scale the output to the window.
-    SDL_Rect frame_rect_;
-    SDL_Rect window_rect_;
-
     // Holds the next frame of pixel data to be streamed to the texture.
     uint32_t *pixel_buffer_;
 

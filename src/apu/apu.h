@@ -111,28 +111,28 @@ class Apu {
 
     // Used to control the channels of the APU. Set through MMIO
     // in the emulation.
-    DataWord frame_control_;
-    DataWord channel_status_;
+    DataWord frame_control_ = 0;
+    DataWord channel_status_ = 0;
 
     // Tracks if the DMC or the frame counter are currently generating
     // an IRQ.
-    bool dmc_irq_;
-    bool frame_irq_;
+    bool dmc_irq_ = false;
+    bool frame_irq_ = false;
 
     // Tracks the current frame step of the APU. The step size can be
     // controlled by the emulation.
-    size_t frame_clock_;
-    size_t frame_step_;
+    size_t frame_clock_ = 0;
+    size_t frame_step_ = 0;
 
     // Most functions of the APU are only clocked on even cycles.
-    bool cycle_even_;
+    bool cycle_even_ = false;
 
     // Used to quickly obtain the correct output of the APU.
     float *pulse_table_;
     float *tndmc_table_;
 
     // Tracks when the next sample should be sent to the audio device buffer.
-    float sample_clock_;
+    float sample_clock_ = 0;
 
     /* Helper functions */
     void InitPulseTable(void);

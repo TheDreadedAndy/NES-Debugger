@@ -101,6 +101,9 @@ int main(int argc, char *argv[]) {
                                        &(cpu->nmi_line_));
   Apu *apu = new Apu(window->GetAudioPlayer(), memory, &(cpu->irq_line_));
 
+  // Connect the CPU, PPU, and APU to memory.
+  memory->Connect(cpu, ppu, apu);
+
   // Close the rom file.
   fclose(rom);
 

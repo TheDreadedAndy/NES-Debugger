@@ -16,7 +16,7 @@ class AudioPlayer {
     // Sample are added to a buffer, which is queued to the device when
     // it becomes full.
     float *audio_buffer_;
-    size_t buffer_slot_;
+    size_t buffer_slot_ = 0;
 
     // Audio samples are sent to this device, which is picked
     // during construction.
@@ -24,10 +24,10 @@ class AudioPlayer {
 
     // Sound output is run through two high pass filters and a low pass
     // filter, which are managed using these variables.
-    float last_normal_sample_;
-    float last_hpf1_sample_;
-    float last_hpf2_sample_;
-    float last_lpf_sample_;
+    float last_normal_sample_ = 0;
+    float last_hpf1_sample_ = 0;
+    float last_hpf2_sample_ = 0;
+    float last_lpf_sample_ = 0;
 
     // Allocates the audio buffer and initializes the audio filters.
     AudioPlayer(SDL_AudioDeviceID device);

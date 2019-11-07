@@ -21,24 +21,24 @@
 class Ppu {
   private:
     // Internal PPU registers.
-    DoubleWord vram_addr_;
-    DoubleWord temp_vram_addr_;
-    bool write_toggle_;
-    DataWord fine_x_;
+    DoubleWord vram_addr_ = 0;
+    DoubleWord temp_vram_addr_ = 0;
+    bool write_toggle_ = false;
+    DataWord fine_x_ = 0;
 
     // Memory mapped PPU registers.
-    DataWord bus_;
-    DataWord vram_buf_;
-    DataWord ctrl_;
-    DataWord mask_;
-    DataWord status_;
-    DataWord oam_addr_;
+    DataWord bus_ = 0;
+    DataWord vram_buf_ = 0;
+    DataWord ctrl_ = 0;
+    DataWord mask_ = 0;
+    DataWord status_ = 0;
+    DataWord oam_addr_ = 0;
 
     // Working memory for the PPU.
-    DataWord oam_mask_;
+    DataWord oam_mask_ = 0;
     DataWord *primary_oam_;
-    DataWord soam_eval_buf_;
-    DataWord soam_render_buf_;
+    DataWord soam_eval_buf_ = 1;
+    DataWord soam_render_buf_ = 0;
     DataWord *soam_buffer_[NUM_SOAM_BUFFERS];
     DataWord *oam_buffer_;
 
@@ -52,13 +52,13 @@ class Ppu {
     DataWord next_palette_[PPU_BIT_PLANES];
 
     // MDR and write toggle, used for 2-cycle r/w system.
-    DataWord mdr_;
-    bool mdr_write_;
+    DataWord mdr_ = 0;
+    bool mdr_write_ = false;
 
     // Tracks the current scanline/cycle the PPU emulation is on.
-    size_t current_scanline_;
-    size_t current_cycle_;
-    bool frame_odd_;
+    size_t current_scanline_ = 261;
+    size_t current_cycle_ = 0;
+    bool frame_odd_ = false;
 
     // Holds the palette to be used to convert NES colors to RGB colors.
     NesPalette *palette_;

@@ -59,12 +59,6 @@ AudioPlayer::AudioPlayer(SDL_AudioDeviceID device) {
   // Prepare the audio buffer.
   audio_buffer_ = new float[BUFFER_SIZE]();
 
-  // Initialize the filters.
-  last_normal_sample_ = 0;
-  last_hpf1_sample_ = 0;
-  last_hpf2_sample_ = 0;
-  last_lpf_sample_ = 0;
-
   // Store and unpause the device.
   audio_device_ = device;
   SDL_PauseAudioDevice(audio_device_, 0);

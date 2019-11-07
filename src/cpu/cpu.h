@@ -42,20 +42,20 @@ typedef struct {
 class Cpu {
   private:
     // Used to edge detect the NMI signal.
-    bool nmi_prev_;
+    bool nmi_prev_ = false;
 
     // Interrupt bools, which can be set inside of CPU operations.
-    bool nmi_edge_;
-    bool irq_level_;
+    bool nmi_edge_ = false;
+    bool irq_level_ = false;
     // Some instructions need to poll on one cycle and then interrupt later.
     // This variable is used to facilitate that.
-    bool irq_ready_;
+    bool irq_ready_ = false;
 
     // Used for DMA transfers to PPU OAM.
-    bool cycle_even_;
-    DataWord dma_mdr_;
-    size_t dma_cycles_remaining_;
-    MultiWord dma_addr_;
+    bool cycle_even_ = false;
+    DataWord dma_mdr_ = 0;
+    size_t dma_cycles_remaining_ = 0;
+    MultiWord dma_addr_ = { 0 };
 
     // Holds the associated memory object, which is used to access
     // memory during the emulation.
@@ -191,8 +191,8 @@ class Cpu {
 
   public:
     // Interrupt lines, which can be set by the PPU/APU.
-    DataWord irq_line_;
-    bool nmi_line_;
+    DataWord irq_line_ = 0;
+    bool nmi_line_ = false;
 
     // Creates a new CPU object.
     Cpu(Memory *memory);

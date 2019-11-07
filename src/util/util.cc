@@ -50,11 +50,11 @@ DataWord *RandNew(size_t size) {
  */
 size_t GetFileSize(FILE *file) {
   // Save the current position.
-  size_t pos = (size_t) ftell(file);
+  size_t pos = static_cast<size_t>(ftell(file));
 
   // Seek the end and get the file size.
   fseek(file, 0, SEEK_END);
-  size_t file_size = (size_t) ftell(file);
+  size_t file_size = static_cast<size_t>(ftell(file));
 
   // Reset the position and return.
   fseek(file, pos, SEEK_SET);

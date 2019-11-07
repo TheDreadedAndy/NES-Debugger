@@ -358,10 +358,11 @@ void Cpu::DataLsrA(void) {
  * sets the N and Z flags.
  */
 void Cpu::DataRolMdr(void) {
-  regs_->p.carry = (regs_->mdr >> 7U) & 0x01U;
+  bool carry = (regs_->mdr >> 7U) & 0x01U;
   regs_->mdr = ((regs_->mdr << 1U) & 0xFEU) | regs_->p.carry;
   regs_->p.negative = regs_->mdr & STATUS_FLAG_N;
   regs_->p.zero = (regs_->mdr == 0);
+  regs_->p.carry = carry;
   return;
 }
 
@@ -370,10 +371,11 @@ void Cpu::DataRolMdr(void) {
  * the N and Z flags.
  */
 void Cpu::DataRolA(void) {
-  regs_->p.carry = (regs_->a >> 7U) & 0x01U;
+  bool carry = (regs_->a >> 7U) & 0x01U;
   regs_->a = ((regs_->a << 1U) & 0xFEU) | regs_->p.carry;
   regs_->p.negative = regs_->a & STATUS_FLAG_N;
   regs_->p.zero = (regs_->a == 0);
+  regs_->p.carry = carry;
   return;
 }
 
@@ -382,10 +384,11 @@ void Cpu::DataRolA(void) {
  * sets the N and Z flags.
  */
 void Cpu::DataRorMdr(void) {
-  regs_->p.carry = regs_->mdr & 0x01U;
+  bool carry = regs_->mdr & 0x01U;
   regs_->mdr = ((regs_->mdr >> 1U) & 0x7FU) | (regs_->p.carry << 7U);
   regs_->p.negative = regs_->mdr & STATUS_FLAG_N;
   regs_->p.zero = (regs_->mdr == 0);
+  regs_->p.carry = carry;
   return;
 }
 
@@ -394,10 +397,11 @@ void Cpu::DataRorMdr(void) {
  * sets the N and Z flags.
  */
 void Cpu::DataRorA(void) {
-  regs_->p.carry = regs_->a & 0x01U;
+  bool carry = regs_->a & 0x01U;
   regs_->a = ((regs_->a >> 1U) & 0x7FU) | (regs_->p.carry << 7U);
   regs_->p.negative = regs_->a & STATUS_FLAG_N;
   regs_->p.zero = (regs_->a == 0);
+  regs_->p.carry = carry;
   return;
 }
 

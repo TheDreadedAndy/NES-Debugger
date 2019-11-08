@@ -94,9 +94,6 @@ void HardwareRenderer::Frame(void) {
   // Update the window.
   SDL_RenderPresent(renderer_);
 
-  // Signal that a frame was drawn.
-  frame_output_ = true;
-
   return;
 }
 

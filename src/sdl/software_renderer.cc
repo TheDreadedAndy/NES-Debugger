@@ -83,9 +83,6 @@ void SoftwareRenderer::Frame(void) {
   // Draw the frame to the window.
   SDL_UpdateWindowSurface(window_);
 
-  // Signal that a frame was drawn.
-  frame_output_ = true;
-
   return;
 }
 

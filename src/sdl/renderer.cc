@@ -36,12 +36,6 @@ Renderer *Renderer::Create(SDL_Window *window, RenderType type) {
  */
 Renderer::Renderer(SDL_Window *window) {
   window_ = window;
-  frame_output_ = false;
-  window_size_valid_ = false;
-  frame_rect_.x = NES_WIDTH_OFFSET;
-  frame_rect_.y = NES_HEIGHT_OFFSET;
-  frame_rect_.w = NES_WIDTH;
-  frame_rect_.h = NES_TRUE_HEIGHT;
   return;
 }
 
@@ -72,16 +66,6 @@ void Renderer::GetWindowRect(void) {
   }
 
   return;
-}
-
-/*
- * Returns the current value of frame_output_, sets frame_output to false.
- * Used to track frame timing in the emulation.
- */
-bool Renderer::HasDrawn(void) {
-  bool frame = frame_output_;
-  frame_output_ = false;
-  return frame;
 }
 
 /*

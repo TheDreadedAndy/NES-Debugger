@@ -31,18 +31,15 @@ typedef enum { RENDER_SOFTWARE, RENDER_HARDWARE } RenderType;
 class Renderer {
   protected:
     // Used to scale the output to the window.
-    SDL_Rect frame_rect_;
+    const SDL_Rect frame_rect_ = { NES_WIDTH_OFFSET, NES_HEIGHT_OFFSET,
+                                   NES_WIDTH, NES_TRUE_HEIGHT };
     SDL_Rect window_rect_;
 
     // Holds a pointer to the current SDL window.
     SDL_Window *window_;
 
-    // Set when a frame is drawn. Reset when HasDrawn() is called.
-    // Used to track the frame rate and time the emulator.
-    bool frame_output_;
-
     // Set by the event manager when the size of the window changes.
-    bool window_size_valid_;
+    bool window_size_valid_ = false;
 
     // Determines the dimensions of the window rect for correct scaling
     // of the NES picture.
@@ -60,9 +57,6 @@ class Renderer {
 
     // Renders any pixel changes to the main window.
     virtual void Frame(void) = 0;
-
-    // Returns if the frame has been drawn since the last call to this function.
-    bool HasDrawn(void);
 
     // Signals that the window surface must be obtained again.
     void InvalidateWindowSurface(void);

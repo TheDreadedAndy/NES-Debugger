@@ -46,39 +46,19 @@
 #define BUFFER_MAX 256
 
 /*
- * These strings represent configuration options which can be used to change
- * the input map.
- */
-static const char *kButtonNames[] = { "BUTTON_A", "BUTTON_B", "BUTTON_SELECT",
-                               "BUTTON_START", "PAD_UP", "PAD_DOWN",
-                               "PAD_LEFT", "PAD_RIGHT" };
-
-/*
- * The default mapping for the NES controller.
- */
-static SDL_Keycode kDefaultButtonMap[] = { SDLK_x, SDLK_z, SDLK_BACKSPACE,
-                                           SDLK_RETURN, SDLK_UP, SDLK_DOWN,
-                                           SDLK_LEFT, SDLK_RIGHT };
-
-/*
- * The name of the default configuration file.
- */
-static const char *kDefaultConfig = "ndb.cfg";
-
-/*
  * Loads the input mapping, allowing for key presses and releases to be used
  * for emulation.
  */
 Input::Input(char *file) {
   // Load in the default button mapping.
   for (int i = 0; i < NUM_BUTTONS; i++) {
-    button_map_[i] = kDefaultButtonMap[i];
+    button_map_[i] = kDefaultButtonMap_[i];
   }
 
   // Load the default file if none was provided.
   FILE *config;
   if (file == NULL) {
-    config = fopen(kDefaultConfig, "a+");
+    config = fopen(kDefaultConfig_, "a+");
   } else {
     config = fopen(file, "a+");
   }
@@ -106,7 +86,7 @@ void Input::CreateConfig(FILE *config) {
 
   // Write the default mapping for each button.
   for (int i = 0; i < NUM_BUTTONS; i++) {
-    fwrite(kButtonNames[i], 1, strlen(kButtonNames[i]), config);
+    fwrite(kButtonNames_[i], 1, strlen(kButtonNames_[i]), config);
     fwrite("=", 1, 1, config);
     fwrite(SDL_GetKeyName(button_map_[i]), 1,
            strlen(SDL_GetKeyName(button_map_[i])), config);
@@ -196,7 +176,7 @@ void Input::SetMap(char *cfg_name, char *key_name) {
 
   // Get the map index of the specified config string, if it exists.
   size_t button = 0;
-  while (strcmp(cfg_name, kButtonNames[button])) {
+  while (strcmp(cfg_name, kButtonNames_[button])) {
     button++;
     // If the config string is invalid, so we return.
     if (button >= NUM_BUTTONS) { return; }

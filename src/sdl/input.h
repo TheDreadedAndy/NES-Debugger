@@ -15,6 +15,20 @@
  */
 class Input {
   private:
+    // These strings represent configuration options which can be used to change
+    // the input map.
+    const char *kButtonNames_[8] = { "BUTTON_A", "BUTTON_B", "BUTTON_SELECT",
+                                    "BUTTON_START", "PAD_UP", "PAD_DOWN",
+                                    "PAD_LEFT", "PAD_RIGHT" };
+
+    // The default mapping for the NES controller.
+    const SDL_Keycode kDefaultButtonMap_[8] = { SDLK_x, SDLK_z, SDLK_BACKSPACE,
+                                                SDLK_RETURN, SDLK_UP, SDLK_DOWN,
+                                                SDLK_LEFT, SDLK_RIGHT };
+
+    // The name of the default configuration file.
+    const char *kDefaultConfig_ = "ndb.cfg";
+
     // Holds the current button mapping for the controller.
     SDL_Keycode button_map_[NUM_BUTTONS];
 

@@ -75,11 +75,6 @@ Input::Input(char *file) {
     button_map_[i] = kDefaultButtonMap[i];
   }
 
-  // Setup the button press variables.
-  input_status_ = 0;
-  dpad_priority_up_ = false;
-  dpad_priority_left_ = false;
-
   // Load the default file if none was provided.
   FILE *config;
   if (file == NULL) {

@@ -1,5 +1,11 @@
 /*
- * TODO
+ * Implements a renderer class using SDL's texture and hardware rendering
+ * systems. This implementation is faster than software rendering
+ * on systems with decent OpenGL support.
+ *
+ * While a hardware renderer can be created directly, it is intended that
+ * all renderers are created through a call to Renderer::Create(), with
+ * the rendering system selected through a RenderType enum.
  */
 
 #include "./hardware_renderer.h"

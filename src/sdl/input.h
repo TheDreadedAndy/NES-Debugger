@@ -19,12 +19,12 @@ class Input {
     SDL_Keycode button_map_[NUM_BUTTONS];
 
     // Holds the current pressed/released state for each button.
-    DataWord input_status_;
+    DataWord input_status_ = 0;
 
     // Used to prevent the play from pressing opposing dpad directions
     // at the same time.
-    bool dpad_priority_up_;
-    bool dpad_priority_left_;
+    bool dpad_priority_up_ = false;
+    bool dpad_priority_left_ = false;
 
     // Helper functions.
     void CreateConfig(FILE *config);

@@ -1,5 +1,18 @@
 /*
- * TODO
+ * This file provides several memory and file utilities.
+ *
+ * RandNew() creates an array of DataWords with the requested size, then
+ * randomizes the contents of this array. This function is used mainly in
+ * memory emulation, as serveral games require memory to be in an undefined
+ * on power up.
+ *
+ * GetFileSize() returns the file size of the given file. It is mainly used to
+ * verify the file size of the given NES file.
+ *
+ * OpenFile() opens the proper open file dialogue for the target OS, and fills
+ * the given file pointer with an open file that was selected by the user.
+ * It returns NULL on failure. It is called by the emulation when the user
+ * fails to specify a rom file in the terminal.
  */
 
 #include "./util.h"

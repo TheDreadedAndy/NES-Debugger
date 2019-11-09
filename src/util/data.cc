@@ -1,5 +1,13 @@
 /*
- * TODO
+ * This file and its associated header define the main data sizes used by
+ * the NES. In the NES, a word is a byte, and a double word is two bytes.
+ * Multiwords are used to aid in the emulation of double word registers
+ * that were two word size registers in the original implementation.
+ *
+ * In addition to these data type definitions, this file provides
+ * some basic data utilities. ReverseWord() can be used to bit-wise
+ * reverse a word. MsbWord() can be used to isolate the MSB of a given
+ * word.
  */
 
 #include "./data.h"

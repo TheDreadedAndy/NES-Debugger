@@ -5,7 +5,9 @@ Here's a semi-complete list of things that still need to be changed:
 
 Next up:
   - NES 2.0 parsing needs to be written.
-  - Attribute table bug in Mega Man
+  - APU mixing should be optimized.
+  - NROM and SxROM need to be ported to C++.
+  - Error checking needs to be added to main.
 
 Small issues:
   - UxROM PRG-ROM offset calculation currently assumes there is not trainer.

@@ -1,5 +1,21 @@
 /*
- * TODO
+ * This file provides an interface between the NES's APU emulation
+ * and the SDL audio playback system. Adding this layer both keeps
+ * the APU emulation code base cleaner and allows the audio backend
+ * to be modified without rewriting the emulation (so long as the
+ * interface is preserved).
+ *
+ * Samples are queued one at a time, with the audio interface applying
+ * the NES's low/high pass filters in real time. When the sample buffer
+ * is filled, the filtered samples are queued to the audio device and
+ * played back to the user. The use of a buffer also allows for the audio
+ * samples to played back with correct timing regardless of how fast the
+ * emulation is running; however, it also adds a slight delay to playback
+ * (about 21 ms).
+ *
+ * While more than one audio player object can be created at one time,
+ * this will cause SDL to use more than one audio device and is, thus,
+ * not an intended use of this class.
  */
 
 #include "./audio_player.h"

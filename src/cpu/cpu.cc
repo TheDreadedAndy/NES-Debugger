@@ -87,8 +87,6 @@ void Cpu::RunCycle(void) {
 
   // Fetch and run the next micro instructions for the cycle.
   OperationCycle *next_op = state_->NextCycle();
-  //(this->*(next_op->mem))();
-  //(this->*(next_op->data))();
   std::invoke(next_op->mem, this);
   std::invoke(next_op->data, this);
   if (next_op->inc_pc) { regs_->pc.dw++; }

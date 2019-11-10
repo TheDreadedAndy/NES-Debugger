@@ -78,9 +78,10 @@ void EmutimeUpdateFrameCounter(long tic_rate, Window *window) {
     // Update the frame rate display.
     EmutimeGet(&current_time);
     EmutimeDiff(&current_time, &last_time, &diff);
-    float secs_passed = ((float) diff.tv_sec) + (((float) diff.tv_nsec)
-                                              / ((float) NSECS_PER_SEC));
-    window->DisplayFps(((float) frames_counted) / secs_passed);
+    float secs_passed = (static_cast<float>(diff.tv_sec))
+                      + ((static_cast<float>(diff.tv_nsec))
+                      / (static_cast<float>(NSECS_PER_SEC)));
+    window->DisplayFps((static_cast<float>(frames_counted)) / secs_passed);
     frames_counted = 0;
 
     // Update the last called time.

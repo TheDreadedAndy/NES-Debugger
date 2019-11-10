@@ -81,7 +81,7 @@ Uxrom::Uxrom(FILE *rom_file, RomHeader *header) : Memory(header) {
 void Uxrom::LoadPrg(FILE *rom_file) {
   // Calculate the number of prg banks used by the rom, then load
   // the rom into memory.
-  size_t num_banks = (size_t) (header_->prg_rom_size / BANK_SIZE);
+  size_t num_banks = static_cast<size_t>(header_->prg_rom_size / BANK_SIZE);
   fseek(rom_file, HEADER_SIZE, SEEK_SET);
   for (size_t i = 0; i < num_banks; i++) {
     cart_[i] = new DataWord[BANK_SIZE];

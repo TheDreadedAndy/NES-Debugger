@@ -1,5 +1,18 @@
 /*
- * TODO
+ * The file contains the Ppu class and all of its member functions. The
+ * Ppu class is used to emulation the NES's PPU, which rendered tiles and
+ * sprites to the screen.
+ *
+ * The CPU emulation can communicate with this class thorugh memory, which
+ * properly maps the PPU's MMIO addresses to the MMIO member functions of
+ * the Ppu class.
+ *
+ * The NES PPU has many strange and counter-intuitive bugs, and so great
+ * care should be taken when editing this file to ensure compatibility.
+ * This is especially important when editing code related to sprite layering.
+ *
+ * More information on the specific opperations of the PPU is available
+ * on nesdev.com.
  */
 
 #include "./ppu.h"

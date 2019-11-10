@@ -27,8 +27,8 @@ class NesPalette {
 
     // Holds the color emphasis and grayscale value, which reflect
     // the settings in PPUMASK.
-    DataWord color_tint_;
-    bool grayscale_colors_;
+    DataWord color_tint_ = 0;
+    bool grayscale_colors_ = false;
 
     // Stores the decoded paletter, where each index holds its
     // corresponding color.

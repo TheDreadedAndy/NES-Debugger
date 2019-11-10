@@ -647,7 +647,7 @@ void Apu::Write(DoubleWord reg_addr, DataWord val) {
         pulse->length = length_table[(val & LENGTH_MASK) >> LENGTH_SHIFT];
       }
       pulse->timer = (pulse->timer & TIMER_LOW_MASK)
-                   | ((((DoubleWord) val) & TIMER_HIGH_MASK)
+                   | (((static_cast<DoubleWord>(val)) & TIMER_HIGH_MASK)
                    << TIMER_HIGH_SHIFT);
 
       // Reset the sequencer position and envelope.
@@ -669,7 +669,7 @@ void Apu::Write(DoubleWord reg_addr, DataWord val) {
         triangle_->length = length_table[(val & LENGTH_MASK) >> LENGTH_SHIFT];
       }
       triangle_->timer = (triangle_->timer & TIMER_LOW_MASK)
-                       | ((((DoubleWord) val) & TIMER_HIGH_MASK)
+                       | (((static_cast<DoubleWord>(val)) & TIMER_HIGH_MASK)
                        << TIMER_HIGH_SHIFT);
 
       // Set the linear counter reload flag, which can be cleared by the
@@ -705,12 +705,14 @@ void Apu::Write(DoubleWord reg_addr, DataWord val) {
       break;
     case DMC_ADDRESS_ADDR:
       // Update the base sample address of the DMC channel.
-      dmc_->addr = (((DoubleWord) val) << DMC_ADDR_SHIFT) | DMC_ADDR_BASE;
+      dmc_->addr = ((static_cast<DoubleWord>(val)) << DMC_ADDR_SHIFT)
+                 | DMC_ADDR_BASE;
       dmc_->current_addr = dmc_->addr;
       break;
     case DMC_LENGTH_ADDR:
       // Update the sample length of the DMC channel.
-      dmc_->length = (((DoubleWord) val) << DMC_LENGTH_SHIFT) | DMC_LENGTH_BASE;
+      dmc_->length = ((static_cast<DoubleWord>(val)) << DMC_LENGTH_SHIFT)
+                   | DMC_LENGTH_BASE;
       dmc_->bytes_remaining = dmc_->length;
       break;
     case APU_STATUS_ADDR:

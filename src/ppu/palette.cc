@@ -1,5 +1,21 @@
 /*
- * TODO
+ * The NesPalette class provides a way for the PPU/Memory to easily
+ * convert NES pixels to RGB colors. Each PPU instance has its own
+ * associated NesPalette, and each NesPalette has 8 color palettes.
+ * These 8 palettes represent the different color tint modes supported
+ * by the NES. The PPU emulation can change the palette in use
+ * through calls to UpdateMask().
+ *
+ * Additionally, the NesPalette is used by memory to decode NES pixels
+ * into RGB colors that can be passed to the renderer by the PPU. The system
+ * is as follows: The PPU writes an NES pixel to memory, memory takes the pixel
+ * and uses the palette associated with its PPU to convert the pixel to RGB.
+ * This RGB pixel can then be read back by the PPU during rendering, when it
+ * is drawing pixels to the screen. The PPU then sends the pixel to the
+ * renderer, which displays it.
+ *
+ * Note that the user can load in a custom NES palette. However, if the palette
+ * is invalid, or none is provided, a default will be used.
  */
 
 #include "./palette.h"

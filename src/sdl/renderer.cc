@@ -1,5 +1,18 @@
 /*
- * TODO
+ * The renderer abstract class define an interface which can be used
+ * by the PPU emulation to draw pixels to the main window. It abstracts
+ * window resizing, scaling, and the use of SDL away from the emulation.
+ * This allows for code that is clean and clear, and enables the rendering
+ * method to be changed without changing the PPU emulation itself.
+ *
+ * Note that the SDL event manager, defined in the file sdl/window.cc, must
+ * signal the renderer object whenever the window size changes, or else
+ * scaling will not be updated properly.
+ *
+ * There are currently two renderer implementations: software and hardware.
+ * The software renderer uses SDL surfaces and is faster on hardware with
+ * poor OpenGL support. The hardware renderer uses SDL renderers/textures, and
+ * is faster on hardware which supports OpenGL well.
  */
 
 #include "./renderer.h"

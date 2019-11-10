@@ -1,5 +1,11 @@
 /*
- * TODO
+ * This is a software renderering implementation of the abstract renderer
+ * class. It is implemented using and SDL surface to buffer the next frame
+ * to. This surface is blitted to the screen whenever it is filled, and the
+ * display is then updated.
+ *
+ * This implementation of rendering is faster on hardware with poor OpenGL
+ * support.
  */
 
 #include "./software_renderer.h"
@@ -78,7 +84,7 @@ void SoftwareRenderer::Frame(void) {
   }
 
   // Copy the render surface to the window surface.
-  SDL_BlitScaled(render_surface_, &frame_rect_, window_surface_, &window_rect_);
+  SDL_BlitScaled(render_surface_, &kFrameRect_, window_surface_, &window_rect_);
 
   // Draw the frame to the window.
   SDL_UpdateWindowSurface(window_);

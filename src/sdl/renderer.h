@@ -31,7 +31,7 @@ typedef enum { RENDER_SOFTWARE, RENDER_HARDWARE } RenderType;
 class Renderer {
   protected:
     // Used to scale the output to the window.
-    const SDL_Rect frame_rect_ = { NES_WIDTH_OFFSET, NES_HEIGHT_OFFSET,
+    const SDL_Rect kFrameRect_ = { NES_WIDTH_OFFSET, NES_HEIGHT_OFFSET,
                                    NES_WIDTH, NES_TRUE_HEIGHT };
     SDL_Rect window_rect_;
 

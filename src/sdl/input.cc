@@ -1,10 +1,16 @@
 /*
- * This file holds function to interact with SDL and collect input from the
- * user. It then provides this input to the emulator in a form independent
- * of SDL.
+ * This file provides an interface for the emulator to use to
+ * communicate with SDL, allowing for controller emulation
+ * that is independent of the input method/implementation.
  *
- * Additionally, this file creates/loads a configuration file which can be
- * changed to remap the NES controller buttons.
+ * Configuration files can be specified when creating an input object,
+ * and allow the user to rebind the keys which correspond to each
+ * button on the NES controller.
+ *
+ * The input class provides a method for the controller to poll for input.
+ * When the poll function is called, the input object returns a DataWord
+ * corresponding to the currently pressed buttons. Note that impossible
+ * inputs are masked out of this word (Ex. down + up at the same time).
  */
 
 #include "./input.h"

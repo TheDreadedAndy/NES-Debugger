@@ -95,7 +95,7 @@ void HardwareRenderer::Frame(void) {
   SDL_UnlockTexture(frame_texture_);
 
   // Copy the render surface to the window surface.
-  SDL_RenderCopy(renderer_, frame_texture_, &frame_rect_, &window_rect_);
+  SDL_RenderCopy(renderer_, frame_texture_, &kFrameRect_, &window_rect_);
 
   // Update the window.
   SDL_RenderPresent(renderer_);

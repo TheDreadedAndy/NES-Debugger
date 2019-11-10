@@ -1,17 +1,21 @@
 /*
- * TODO: Update this.
+ * This file contains the master SDL class, called Window. Any interactions
+ * with SDL classes should be done through the window class, and only one
+ * window class should exist at a given time. The main purpose of this class
+ * is to allow the emulation code to be independent from the renderering,
+ * audio, and input code. The window class collects all the interfaces related
+ * to SDL and manages them.
  *
- * This file is used to initialize all SDL systems used by the emulator.
- * It is required that window_init be called before using any functions
- * in render.c, audio.c, and input.c. As such, the window should
- * be created before the emulation has started and closed after the emulation
- * has ended. If the initialization of SDL fails, the emulation should be
- * aborted.
+ * The window class provides methods to gain access to its current renderer,
+ * audio player, and input objects. These methods allow these objects to be
+ * passed through to the pieces of the emulation which require them.
  *
- * Direct calls to the SDL library should not be used outside of this file
- * and the three aforementioned files. Seperating calls in this way will
- * allow for the emulator to be easily switched away from SDL, should the
- * need be.
+ * Note that the window class also manages the SDL event queue. The queue is
+ * processed whenever the ProcessEvents() method is called. This method should
+ * be called at least once per frame, as it is responsible for sending the
+ * signals to the input object which cause it to update the input state.
+ * ProcessEvents() additionally handles events related to the main SDL window,
+ * such as closing and resizing the window.
  */
 
 #include "./window.h"
@@ -109,8 +113,6 @@ Window::Window(SDL_Window *window, Renderer *renderer,
 
 /*
  * Processes all events on the SDL event queue.
- *
- * Assumes that SDL has been initialized.
  */
 void Window::ProcessEvents(void) {
   // Loop over all events on the SDL event queue.
@@ -139,7 +141,6 @@ void Window::ProcessEvents(void) {
  * Processes the window event stored within the given event.
  *
  * Assumes that the event holds a window event.
- * Assumes that SDL has been initialized.
  */
 void Window::ProcessWindowEvent(SDL_Event *event) {
   // Determine which window event is being thrown.
@@ -161,8 +162,6 @@ void Window::ProcessWindowEvent(SDL_Event *event) {
 
 /*
  * Displays the current fps of the emulation in the window title.
- *
- * Assumes that SDL has been initialized.
  */
 void Window::DisplayFps(double fps) {
   char buf[MAX_TITLE_SIZE];
@@ -193,9 +192,8 @@ Input *Window::GetInput(void) {
 }
 
 /*
- * Closes the SDL window.
- *
- * Assumes the window and render surface have been initialized.
+ * Closes the SDL window and deletes its related objects.
+ * Quits from SDL.
  */
 Window::~Window(void) {
   // Free all the interface objects.

@@ -1,5 +1,5 @@
 /*
- * Translates the controller byte from input.c into the format expected
+ * Translates the controller byte from input.cc into the format expected
  * to be produced by an NES. Currently only supports a standard controller.
  */
 

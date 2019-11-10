@@ -1,19 +1,20 @@
 /*
- * This file contains the interpreter for the emulation of the NES's 2A03 6502
- * CPU.
+ * This file contains the interpreter for the emulation of the NES's 6502
+ * CPU. The interpreter is emulated one cycle at a time by calling the
+ * function RunCycle() on a cpu object.
  *
- * Instructions are run using a state queue, found in state.c, which is filled
- * by the fetch phase of an instruction. The queue contains micro instructions
- * for data and memory operations, which are executed in pairs of memory and
- * data each cycle.
+ * Instructions are run using a state queue, found in cpu_state.cc, which is
+ * filled by the fetch phase of an instruction. The queue contains micro
+ * instructions for data and memory operations, which are executed in pairs
+ * of memory and data each cycle.
  *
  * The microinstructions are an abstraction, the real cpu used a cycle counter
- * and an RLC to determine how the datapath should be controlled. It seemed
- * silly to reimplement that in code, as going that low level wouldn't be
- * helpful to accuracy.
+ * and a "Random Logic Controller" to determine how the datapath should be
+ * controlled. It seemed silly to reimplement that in code, as going that low
+ * level wouldn't be helpful to accuracy.
  *
- * The data and memory micro instructions can be found in microdata.c and
- * micromem.c, respectively.
+ * The data and memory micro instructions can be found in data_ops.cc and
+ * mem_ops.cc, respectively.
  *
  * Interrupts are polled for at the end of each cycle, and checked during the
  * last micro instruction of an instruction. Interrupts are generated using
@@ -23,7 +24,7 @@
  * which is started through a memory access to $4014.
  *
  * References to the APU, PPU, and IO are not found in this file, as they
- * are handled by MMIO and, thus, part of memory.c.
+ * are handled by MMIO and, thus, part of the memory implementation.
  */
 
 #include "./cpu.h"

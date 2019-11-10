@@ -1,9 +1,14 @@
 /*
- * This file is used for timing the emulation and SDL polling
- * in the main loop. Times are obtained using clock_gettime, and
- * compared using the functions in this file.
+ * This file contains functions used to lock the frame rate of the emulator.
+ * The original frame rate of the NES was 60 FPS, and so the emulation must
+ * be prevented from running faster than this to ensure the games are playable.
  *
- * This file uses posix standard functions and is, thus, not portable.
+ * In addition to providing a way to limit the emulation speed, this file
+ * also provides a function to display the current emulated frame rate
+ * to the user.
+ *
+ * Both of these functions are called in each iteration of the main program
+ * loop.
  */
 
 #include "./emutime.h"

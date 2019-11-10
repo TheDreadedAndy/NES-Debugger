@@ -1,9 +1,16 @@
 /*
- * NES memory implementation.
+ * This file contains the abstract memory class, which is used to abstract
+ * the memory mappings of each game cartridge away from the CPU.
  *
- * Abstracts away memory mapping from the 2A03.
+ * Each mapper must define a way to read/write to both vram and cpu memory.
+ * Palette access are handled within the Memory class, and need not be
+ * implemented by the mappers; the mapper can simple call the memory
+ * class's functions when it receives a read/write to palette data.
  *
- * TODO
+ * There are about 300 different memory mappers in the iNes/NES 2.0 header
+ * standard. As of right now, not all of these are implemented. Each
+ * mapper represents a different set of memory asics that were used in
+ * original NES cartridges.
  */
 
 #include "./memory.h"

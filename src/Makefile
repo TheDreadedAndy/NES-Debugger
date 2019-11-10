@@ -45,4 +45,4 @@ $(DIRS):
 # Removes built files.
 clean:
 	-rm -f $(OBJECTS) $(BINS) $(addprefix build/,$(MAINS))
-#	-rm -f $(patsubst %.o,%,$(MAINS))
+	-rm -f $(patsubst %.o,%,$(MAINS))

@@ -91,7 +91,6 @@ void Uxrom::LoadPrg(FILE *rom_file) {
   }
 
   // Setup the default banks and max banks.
-  current_bank_ = 0;
   fixed_bank_ = num_banks - 1;
   bank_mask_ = (num_banks > MAX_UNROM_BANKS)
              ? UOROM_BANK_MASK : UNROM_BANK_MASK;

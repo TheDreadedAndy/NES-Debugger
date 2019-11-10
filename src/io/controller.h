@@ -21,7 +21,7 @@ class Controller {
     DataWord joy2_shift_;
 
     // Standard controllers are probed whenever the strobe bit is set.
-    DataWord joy_strobe_;
+    DataWord joy_strobe_ = 0;
 
     // Holds the input object associated with this controller.
     Input *input_;

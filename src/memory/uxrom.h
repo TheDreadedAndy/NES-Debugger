@@ -21,7 +21,7 @@ class Uxrom : public Memory {
   private:
     // Used to emulate open bus behavior. Stores the last value read
     // from system memory.
-    DataWord bus_;
+    DataWord bus_ = 0;
 
     // NES system ram.
     DataWord *ram_;
@@ -29,7 +29,7 @@ class Uxrom : public Memory {
     // Cart memory.
     DataWord *bat_;
     DataWord *cart_[UXROM_MAX_BANKS];
-    DataWord current_bank_;
+    DataWord current_bank_ = 0;
     // Should always be fixed to the final bank used.
     DataWord fixed_bank_;
     DataWord bank_mask_;

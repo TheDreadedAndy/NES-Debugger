@@ -9,6 +9,9 @@
  *
  * Each micro op structure contains the information necessary for the processor
  * to execute all the necessary operations of that cycle.
+ *
+ * The cpu state queue may never be empty in between cpu cycle emulations,
+ * though it may be empty just before a fetch is called.
  */
 
 #include "./cpu_state.h"

@@ -1,5 +1,27 @@
 /*
- * TODO
+ * This file contains the emulation for the NES's APU.
+ * Note that although the APU is clocked at the same rate as the CPU,
+ * internally most channels run at half the rate of the CPU.
+ *
+ * The APU contains two pulse channels, a noise channel driven by a
+ * linear feedback shift register, a triangle wave channel, and
+ * a delta modulation channel. These channels are mixed non-linearly.
+ * This mixing is currently emulated using a large lookup table, but
+ * this is subject to change.
+ *
+ * Note that the only difference between the pulse channels is how
+ * their sweep frequencies are subtracted, with one using ones complement
+ * and the other using twos complement. Additionally, note
+ * that the triangle channel is clocked at the rate of the CPU.
+ *
+ * The DMC channel can provide the CPU with an IRQ interrupt whenever
+ * it finishes a sample. The frame counter can also provide an IRQ.
+ * Multiple IRQ's can be issued at the same time, so long as they
+ * are from different sources.
+ *
+ * Finally, it should be noted that the orignal NES has several filters
+ * attatched to its audio output. These filters are recreated in the
+ * SDL audio interface, and are not found in this file.
  */
 
 #include "./apu.h"

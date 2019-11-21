@@ -1,30 +1,8 @@
 /*
- * This file contains functtions which implement micro operations for the 6502.
- * These micro ops are an abstraction and do not exist within the original
- * processor.
- *
- * These operations are called from the 2A03 emulation using the state queue.
- * These operations assume that the regfile has been initialized.
- *
- * Whenever a data oppertion is performed, there is a good chance that the
- * cpu status will need to be updated. The cpu status is represented by
- * a register with 7 flags, which are layed out in the following way:
- * Bit:  7 6 5 4 3 2 1 0
- * flag: N V B B D I Z C
- *       | | | | | | | |
- *       | | | | | | | -> Carry out for unsigned arithmetic.
- *       | | | | | | ---> Zero flag, set when result was zero.
- *       | | | | | -----> IRQ Block flag, prevents IRQ's from being triggered.
- *       | | | | -------> BCD Flag, useless in the NES.
- *       | | -----------> The "B" flag, used to determine where an interrupt
- *       | |              originated.
- *       | -------------> Signed overflow flag.
- *       ---------------> Negative flag, equal to the MSB of the result.
- *
- * The hex values in the code that follows are used to mask in or out these
- * flags. Note that the only memory operation (found in micromem.c) that
- * modifies the processor state is mem_pull_a (since PLA sets the N and Z
- * flags).
+ * This file contains all of the data micro instructions for the 6502 CPU.
+ * These instructions are an abstraction for emulation purposes, and did
+ * not exist within the original design. Note that these functions should
+ * only be called from the CPU state queue.
  */
 
 #include "./cpu.h"

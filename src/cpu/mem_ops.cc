@@ -1,12 +1,9 @@
 /*
  * This file contains the memory micro instructions for the 2A03, which
  * are an abstraction that simplfies emulating the cpu's action on each cycle.
- *
- * These functions are not called directly, rather they are added to the state
- * queue by cpu_fetch and then called from the queue each cycle.
- *
- * These functions assume that the memory, registers, and state have been
- * initialized.
+ * These functions are not called directly (and never should be), rather they
+ * are added to the state queue by Cpu::Fetch() and then called from the queue
+ * each cycle.
  */
 
 #include "./cpu.h"
@@ -21,8 +18,6 @@
 /*
  * Fetches the next instruction and adds its cycles to the state queue.
  * Handles interrupts and hijacking.
- *
- * Assumes all the cpu structures have been initialized.
  */
 void Cpu::MemFetch(void) {
   Fetch(state_->GetLastCycle());

@@ -1,7 +1,12 @@
 /*
- * Whenever a data oppertion is performed, there is a good chance that the
- * cpu status will need to be updated. The cpu status is represented by
- * a register with 7 flags, which are layed out in the following way:
+ * This file provides a way to represent the status flags of the 6502 CPU
+ * in emulation as a set of boolean values, rather than the register
+ * it was in the original implementation. The functions StatusGetVector()
+ * and StatusSetVector() can be used to convert between the structural
+ * representation and the original register representation as necessary
+ * for emulation.
+ *
+ * The original implementation was layed out as follows:
  * Bit:  7 6 5 4 3 2 1 0
  * flag: N V B B D I Z C
  *       | | | | | | | |
@@ -13,9 +18,6 @@
  *       | |              originated.
  *       | -------------> Signed overflow flag.
  *       ---------------> Negative flag, equal to the MSB of the result.
- *
- * This file provides a way to convert between the values in the status
- * structure and the original register implementation of CPU status.
  */
 
 #include "./cpu_status.h"

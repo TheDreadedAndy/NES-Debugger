@@ -14,9 +14,7 @@
 #include "../util/data.h"
 
 // Constants used to size and access memory.
-#define MAX_ROM_BANKS 32U
 #define ROM_BANK_SIZE 0x4000U
-#define MAX_RAM_BANKS 4U
 #define RAM_BANK_SIZE 0x2000U
 #define PRG_RAM_OFFSET 0x6000U
 #define PRG_ROM_A_OFFSET 0x8000U
@@ -26,7 +24,6 @@
 
 // Constants used to control accesses to memory.
 #define FLAG_CONTROL_RESET 0x80U
-#define SHIFT_BASE 0x10U
 #define CONTROL_RESET_MASK 0x0CU
 #define CONTROL_UPDATE_OFFSET 0x8000U
 #define CHR_A_UPDATE_OFFSET 0xA000U
@@ -47,9 +44,7 @@
 #define FLAG_PRG_RAM_DISABLE 0x10U
 
 // Constants used to size and access VRAM.
-#define MAX_CHR_BANKS 32U
 #define CHR_BANK_SIZE 0x1000U
-#define MAX_SCREENS 4U
 #define SCREEN_SIZE 0x400U
 #define NAMETABLE_ACCESS_BIT 0x2000U
 #define NAMETABLE_SELECT_MASK 0x0C00U
@@ -57,53 +52,6 @@
 #define NAMETABLE_ADDR_MASK 0x03FFU
 #define PATTERN_TABLE_HIGH_ACCESS_BIT 0x1000U
 #define PATTERN_TABLE_MASK 0x0FFFU
-
-// Nes virtual memory data structure for sxrom (mapper 1).
-typedef struct sxrom {
-  // Cart memory.
-  word_t *prg_rom[MAX_ROM_BANKS];
-  word_t *prg_ram[MAX_RAM_BANKS];
-  word_t num_prg_ram_banks;
-  word_t num_prg_rom_banks;
-
-  // PPU memory.
-  word_t *pattern_table[MAX_CHR_BANKS];
-  word_t num_chr_banks;
-  bool is_chr_ram;
-  word_t *nametable_bank_a;
-  word_t *nametable_bank_b;
-  word_t *nametable[MAX_SCREENS];
-
-  // Controlling registers.
-  word_t shift_reg;
-  word_t control_reg;
-  word_t chr_a_reg;
-  word_t chr_b_reg;
-  word_t prg_reg;
-
-  // Bank selection registers.
-  word_t chr_bank_a;
-  word_t chr_bank_b;
-  word_t prg_rom_bank_a;
-  word_t prg_rom_bank_b;
-  word_t prg_ram_bank;
-
-  // Bank access masks.
-  word_t chr_bank_mask;
-  word_t prg_ram_bank_mask;
-  word_t prg_ram_bank_shift;
-  word_t prg_rom_high_mask;
-} sxrom_t;
-
-/* Helper functions */
-static void sxrom_load_prg_ram(memory_t *M);
-static void sxrom_load_prg_rom(FILE *rom_file, memory_t *M);
-static void sxrom_load_chr(FILE *rom_file, memory_t *M);
-static word_t sxrom_create_mask(word_t items);
-static void sxrom_update_registers(word_t val, dword_t addr, sxrom_t *M);
-static void sxrom_update_control(word_t update, sxrom_t *M);
-static void sxrom_update_prg_rom_banks(sxrom_t *M);
-static void sxrom_update_chr_banks(sxrom_t *M);
 
 /*
  * Uses the header within the provided memory structure to create

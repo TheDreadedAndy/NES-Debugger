@@ -1,7 +1,13 @@
 /*
  * Implementation of INES Mapper 1 (SxROM).
  *
- * TODO
+ * This mapper is interfaced using a serial connection to several controlling
+ * registers. The original INES standard does not define how large each section
+ * of memory should be, and so this implementation makes an educated guess
+ * for roms using that standard.
+ *
+ * SxROM features control over nametable mirroring, bank switched CHR memory,
+ * bank switched PRG-ROM, and bank switched PRG-RAM.
  */
 
 #include "./sxrom.h"
@@ -12,6 +18,10 @@
 
 #include "../util/util.h"
 #include "../util/data.h"
+#include "../cpu/cpu.h"
+#include "../ppu/ppu.h"
+#include "../apu/apu.h"
+#include "../io/controller.h"
 #include "./memory.h"
 #include "./header.h"
 
@@ -105,7 +115,11 @@ void Sxrom::LoadPrgRom(FILE *rom_file) {
   }
 
   // Determine if the requested PRG-ROM size needs a fifth selection bit.
-  if (num_prg_rom_banks_ > 16) { prg_rom_high_mask_ = 0x10; }
+  if (num_prg_rom_banks_ > 16) {
+    prg_rom_high_mask_ = 0x10;
+  } else {
+    prg_rom_high_mask_ = 0;
+  }
 
   // Setup the default bank mode.
   prg_rom_bank_b_ = num_prg_rom_banks_ - 1;
@@ -230,7 +244,7 @@ void Sxrom::LoadPrgRam(void) {
  * Assumes that the connect function has been called on this object
  * with valid Cpu/Ppu/Apu objects.
  */
-DataWord Sxrom::Read(dword_t addr) {
+DataWord Sxrom::Read(DoubleWord addr) {
   // Determine which part of memory is being accessed, read the value,
   // and place it on the bus.
   if (addr < PPU_OFFSET) {
@@ -247,8 +261,8 @@ DataWord Sxrom::Read(dword_t addr) {
       bus_ = apu_->Read(addr);
     }
   } else if ((PRG_RAM_OFFSET <= addr) && (addr < PRG_ROM_A_OFFSET)
-                                      && (M->num_prg_ram_banks > 0)
-                                      && !(M->prg_reg & FLAG_PRG_RAM_DISABLE)) {
+                                      && (num_prg_ram_banks_ > 0)
+                                      && !(prg_reg_ & FLAG_PRG_RAM_DISABLE)) {
     // Read from PRG-RAM.
     bus_ = prg_ram_[prg_ram_bank_][addr & PRG_RAM_MASK];
   } else if ((PRG_ROM_A_OFFSET <= addr) && (addr < PRG_ROM_B_OFFSET)) {
@@ -290,8 +304,8 @@ void Sxrom::Write(DoubleWord addr, DataWord val) {
       apu_->Write(addr, val);
     }
   } else if ((PRG_RAM_OFFSET <= addr) && (addr < PRG_ROM_A_OFFSET)
-                                      && (M->num_prg_ram_banks > 0)
-                                      && !(M->prg_reg & FLAG_PRG_RAM_DISABLE)) {
+                                      && (num_prg_ram_banks_ > 0)
+                                      && !(prg_reg_ & FLAG_PRG_RAM_DISABLE)) {
     // Write to cartridge RAM.
     prg_ram_[prg_ram_bank_][addr & PRG_RAM_MASK] = val;
   } else if (addr >= PRG_ROM_A_OFFSET) {
@@ -324,7 +338,7 @@ void Sxrom::UpdateRegisters(DoubleWord addr, DataWord val) {
   }
 
   // Otherwise, we reset the shift register and apply the requested update.
-  DataWord update = ((M->shift_reg >> 1U) & 0xFU) | ((val & 1U) << 4U);
+  DataWord update = ((shift_reg_ >> 1U) & 0xFU) | ((val & 1U) << 4U);
   shift_reg_ = SHIFT_BASE;
   if ((CONTROL_UPDATE_OFFSET <= addr) && (addr < CHR_A_UPDATE_OFFSET)) {
     // Update the control register.
@@ -399,7 +413,7 @@ void Sxrom::UpdateControl(DataWord update) {
  */
 void Sxrom::UpdatePrgRomBanks(void) {
   // Caculate the current PRG-ROM bank selection.
-  DataWord prg_bank = (chr_a_reg_ & M->prg_rom_high_mask)
+  DataWord prg_bank = (chr_a_reg_ & prg_rom_high_mask_)
                     | (prg_reg_ & PRG_ROM_BANK_LOW_MASK);
 
   // Update the PRG-ROM bank selection using the method specified in the control
@@ -444,78 +458,72 @@ void Sxrom::UpdateChrBanks(void) {
 
 /*
  * Reads a word from VRAM using the bank selection registers.
- *
- * Assumes the provided pointer is non-null.
- * Assumes the provided pointer is of type sxrom_t and is valid.
  */
-word_t sxrom_vram_read(dword_t addr, void *map) {
-  // Cast back from the generic structure.
-  sxrom_t *M = (sxrom_t*) map;
+DataWord Sxrom::VramRead(DoubleWord addr) {
+  // Mask out any extra bits.
+  addr &= VRAM_BUS_MASK;
 
   // Determine which part of VRAM is being accessed.
-  if (addr & NAMETABLE_ACCESS_BIT) {
-    // Nametable is being accessed.
-    word_t table = (addr & NAMETABLE_SELECT_MASK) >> NAMETABLE_SELECT_SHIFT;
-    return M->nametable[table][addr & NAMETABLE_ADDR_MASK];
-  } else if (addr & PATTERN_TABLE_HIGH_ACCESS_BIT) {
+  if ((addr < NAMETABLE_OFFSET) && (addr & PATTERN_TABLE_HIGH_ACCESS_BIT)) {
     // CHR1 is being accessed.
-    return M->pattern_table[M->chr_bank_b][addr & PATTERN_TABLE_MASK];
-  } else {
+    return pattern_table_[chr_bank_b_][addr & PATTERN_TABLE_MASK];
+  } else if (addr < NAMETABLE_OFFSET) {
     // CHR0 is being accessed.
-    return M->pattern_table[M->chr_bank_a][addr & PATTERN_TABLE_MASK];
+    return pattern_table_[chr_bank_a_][addr & PATTERN_TABLE_MASK];
+  } else if (addr < PALETTE_OFFSET) {
+    // Nametable is being accessed.
+    DataWord table = (addr & NAMETABLE_SELECT_MASK) >> NAMETABLE_SELECT_SHIFT;
+    return nametable_[table][addr & NAMETABLE_ADDR_MASK];
+  } else {
+    // Convert the address into an access to the palette data array.
+    addr = (addr & PALETTE_BG_ACCESS_MASK) ? (addr & PALETTE_ADDR_MASK)
+                                           : (addr & PALETTE_BG_MASK);
+    return palette_data_[addr] >> PALETTE_NES_PIXEL_SHIFT;
   }
 }
 
 /*
  * Writes a word to VRAM at the requested memory location, if possible.
  * Uses the bank selection registers to address VRAM.
- *
- * Assumes the provided pointer is non-null.
- * Assumes the provided pointer is of type sxrom_t and is valid.
  */
-void sxrom_vram_write(word_t val, dword_t addr, void *map) {
-  // Cast back from the generic structure.
-  sxrom_t *M = (sxrom_t*) map;
-
+void Sxrom::VramWrite(DoubleWord addr, DataWord val) {
   // Determine which part of VRAM is being accessed.
-  if (addr & NAMETABLE_ACCESS_BIT) {
-    // Nametable is being accessed.
-    word_t table = (addr & NAMETABLE_SELECT_MASK) >> NAMETABLE_SELECT_SHIFT;
-    M->nametable[table][addr & NAMETABLE_ADDR_MASK] = val;
-  } else if ((addr & PATTERN_TABLE_HIGH_ACCESS_BIT) && M->is_chr_ram) {
+  if ((addr < NAMETABLE_OFFSET) && is_chr_ram_
+     && (addr & PATTERN_TABLE_HIGH_ACCESS_BIT)) {
     // CHR1 is being accessed.
-    M->pattern_table[M->chr_bank_b][addr & PATTERN_TABLE_MASK] = val;
-  } else if (M->is_chr_ram) {
+    pattern_table_[chr_bank_b_][addr & PATTERN_TABLE_MASK] = val;
+  } else if ((addr < NAMETABLE_OFFSET) && is_chr_ram_) {
     // CHR0 is being accessed.
-    M->pattern_table[M->chr_bank_a][addr & PATTERN_TABLE_MASK] = val;
+    pattern_table_[chr_bank_a_][addr & PATTERN_TABLE_MASK] = val;
+  } else if ((NAMETABLE_OFFSET <= addr) && (addr < PALETTE_OFFSET)) {
+    // Nametable is being accessed.
+    DataWord table = (addr & NAMETABLE_SELECT_MASK) >> NAMETABLE_SELECT_SHIFT;
+    nametable_[table][addr & NAMETABLE_ADDR_MASK] = val;
+  } else if (addr >= PALETTE_OFFSET) {
+    // Palette data is being accessed.
+    PaletteWrite(addr, val);
   }
 
   return;
 }
 
 /*
- * Frees the provided SxROM structure.
- *
- * Assumes the provided pointer is non-null.
- * Assumes the provided pointer is of type sxrom_t and is valid.
+ * Deletes the calling Sxrom object.
  */
-void sxrom_free(void *map) {
-  // Cast back from the generic structure.
-  sxrom_t *M = (sxrom_t*) map;
+Sxrom::~Sxrom(void) {
+  // Free the CPU memory array.
+  delete[] ram_;
 
   // Free the cartridge rom and ram.
-  for (size_t i = 0; i < M->num_prg_rom_banks; i++) { free(M->prg_rom[i]); }
-  for (size_t i = 0; i < M->num_prg_ram_banks; i++) { free(M->prg_ram[i]); }
+  for (size_t i = 0; i < num_prg_rom_banks_; i++) { delete[] prg_rom_[i]; }
+  for (size_t i = 0; i < num_prg_ram_banks_; i++) { delete[] prg_ram_[i]; }
 
   // Free the nametables.
-  free(M->nametable_bank_a);
-  free(M->nametable_bank_b);
+  delete[] nametable_bank_a_;
+  delete[] nametable_bank_b_;
 
   // Free the CHR data.
-  for (size_t i = 0; i < M->num_chr_banks; i++) { free(M->pattern_table[i]); }
-
-  // Free the structure itself.
-  free(M);
+  for (size_t i = 0; i < num_chr_banks_; i++) { delete[] pattern_table_[i]; }
 
   return;
 }

@@ -101,7 +101,7 @@ RomHeader *DecodeHeader(FILE *rom_file) {
   }
 
   // Allocate the header structure and determine the header type.
-  RomHeader *header = new RomHeader;
+  RomHeader *header = new RomHeader();
   header->header_type = GetHeaderType(file_header, rom_size);
 
   // Decode the header according to its type.

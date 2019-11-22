@@ -247,10 +247,9 @@ void Uxrom::VramWrite(DoubleWord addr, DataWord val) {
 }
 
 /*
- * Takes in a uxrom memory structure and frees it.
+ * Deletes the calling Uxrom object.
  *
  * Assumes that the fixed bank is the final allocated bank.
- * Assumes the input pointer is a uxrom memory structure and is non-null.
  */
 Uxrom::~Uxrom(void) {
   // Free the CPU memory arrays.

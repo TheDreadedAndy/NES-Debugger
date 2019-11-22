@@ -29,7 +29,7 @@
 #include "../apu/apu.h"
 #include "./header.h"
 //#include "./nrom.h"
-//#include "./sxrom.h"
+#include "./sxrom.h"
 #include "./uxrom.h"
 
 // Size of NES palette data.
@@ -54,10 +54,10 @@ Memory *Memory::Create(FILE *rom_file) {
   switch(header->mapper) {
     /*case NROM_MAPPER:
       mem = new Nrom(rom_file, header);
-      break;
+      break;*/
     case SXROM_MAPPER:
       mem = new Sxrom(rom_file, header);
-      break;*/
+      break;
     case UXROM_MAPPER:
       mem = new Uxrom(rom_file, header);
       break;

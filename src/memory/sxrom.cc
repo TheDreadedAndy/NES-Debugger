@@ -181,157 +181,176 @@ DataWord Sxrom::CreateMask(DataWord items) {
  * If a NES2.0 header is specified, and the requested amount of PRG-RAM
  * conflicts with the CHR bank mask, this function aborts.
  *
- * Assumes the memory structure and its mapper field are non-null.
- * Assumes the header provided by the memory structure is valid.
- * Assumes CHR data has been initialized for the given SxROM structure.
+ * Assumes the calling object was provided a valid header during initialization.
+ * Assumes CHR data has been initialized for the calling object.
  */
-static void sxrom_load_prg_ram(memory_t *M) {
-  // Cast back from the generic structure.
-  sxrom_t *map = (sxrom_t*) M->map;
-
+void Sxrom::LoadPrgRam(void) {
   // Determine if the rom supplied a valid PRG-RAM size.
-  if (M->header->header_type != NES2) {
+  if (header_->header_type != NES2) {
     // Determine the max amount of ram that can be given to the rom from
     // the number of CHR banks used.
-    if (map->chr_bank_mask <= 0x03U) {
-      map->num_prg_ram_banks = MAX_RAM_BANKS;
-    } else if (map->chr_bank_mask <= 0x07U) {
-      map->num_prg_ram_banks = MAX_RAM_BANKS / 2U;
+    if (chr_bank_mask_ <= 0x03U) {
+      num_prg_ram_banks_ = MAX_RAM_BANKS;
+    } else if (chr_bank_mask_ <= 0x07U) {
+      num_prg_ram_banks_ = MAX_RAM_BANKS / 2U;
     } else {
-      map->num_prg_ram_banks = 1U;
+      num_prg_ram_banks_ = 1U;
     }
   } else {
     // The mapper is NES 2.0, so we can use the specified PRG-RAM size.
-    map->num_prg_ram_banks = M->header->prg_ram_size / RAM_BANK_SIZE;
+    num_prg_ram_banks_ = header_->prg_ram_size / RAM_BANK_SIZE;
   }
 
   // Create the bank mask/shift from the number of banks.
   // The bank mask will use bits 3/2 of the chr registers, depending on space.
-  map->prg_ram_bank_mask = sxrom_create_mask(map->num_prg_ram_banks);
-  map->prg_ram_bank_shift = (map->num_prg_ram_banks > 2U) ? 2U : 3U;
-  map->prg_ram_bank_mask <<= map->prg_ram_bank_shift;
+  prg_ram_bank_mask_ = CreateMask(num_prg_ram_banks_);
+  prg_ram_bank_shift_ = (num_prg_ram_banks_ > 2U) ? 2U : 3U;
+  prg_ram_bank_mask_ <<= prg_ram_bank_shift_;
 
   // Check for a conflict with CHR bank selection mask.
-  if (map->prg_ram_bank_mask & map->chr_bank_mask) {
+  if (prg_ram_bank_mask_ & chr_bank_mask_) {
     fprintf(stderr, "Error: the requested amount of PRG-RAM cannot be"
                     " addressed with the given CHR size.\n");
     abort();
   }
 
   // Allocate the PRG-RAM banks.
-  for (size_t i = 0; i < map->num_prg_ram_banks; i++) {
-    map->prg_ram[i] = rand_alloc(RAM_BANK_SIZE * sizeof(word_t));
+  for (size_t i = 0; i < num_prg_ram_banks_; i++) {
+    prg_ram_[i] = RandNew(RAM_BANK_SIZE);
   }
 
   return;
 }
 
 /*
- * Reads the word at the specified address from memory using the profided mapper
- * structure.
+ * Reads the word at the specified address from memory, accounting
+ * for MMIO and bank switching. If the address leads to an open bus,
+ * the last value read is returned.
  *
- * Assumes the provided pointer is non-null and points to a valid sxrom
- * structure.
+ * Assumes that the connect function has been called on this object
+ * with valid Cpu/Ppu/Apu objects.
  */
-word_t sxrom_read(dword_t addr, void *map) {
-  // Cast back from generic pointer to the memory structure.
-  sxrom_t *M = (sxrom_t*) map;
-
+DataWord Sxrom::Read(dword_t addr) {
   // Determine which part of memory is being accessed, read the value,
   // and place it on the bus.
-  if ((PRG_RAM_OFFSET <= addr) && (addr < PRG_ROM_A_OFFSET)
-                               && (M->num_prg_ram_banks > 0)
-                               && !(M->prg_reg & FLAG_PRG_RAM_DISABLE)) {
+  if (addr < PPU_OFFSET) {
+    // Read from RAM.
+    bus_ = ram_[addr & RAM_MASK];
+  } else if ((PPU_OFFSET <= addr) && (addr < IO_OFFSET)) {
+    // Access PPU MMIO.
+    bus_ = ppu_->Read(addr);
+  } else if ((IO_OFFSET <= addr) && (addr < MAPPER_OFFSET)) {
+    // Read from IO/APU MMIO.
+    if ((addr == IO_JOY1_ADDR) || (addr == IO_JOY2_ADDR)) {
+      bus_ = controller_->Read(addr);
+    } else {
+      bus_ = apu_->Read(addr);
+    }
+  } else if ((PRG_RAM_OFFSET <= addr) && (addr < PRG_ROM_A_OFFSET)
+                                      && (M->num_prg_ram_banks > 0)
+                                      && !(M->prg_reg & FLAG_PRG_RAM_DISABLE)) {
     // Read from PRG-RAM.
-    return M->prg_ram[M->prg_ram_bank][addr & PRG_RAM_MASK];
+    bus_ = prg_ram_[prg_ram_bank_][addr & PRG_RAM_MASK];
   } else if ((PRG_ROM_A_OFFSET <= addr) && (addr < PRG_ROM_B_OFFSET)) {
     // Read from the low half of PRG-ROM.
-    return M->prg_rom[M->prg_rom_bank_a][addr & PRG_ROM_MASK];
+    bus_ = prg_rom_[prg_rom_bank_a_][addr & PRG_ROM_MASK];
   } else if (addr >= PRG_ROM_B_OFFSET) {
     // Read from the high half of PRG-ROM.
-    return M->prg_rom[M->prg_rom_bank_b][addr & PRG_ROM_MASK];
+    bus_ = prg_rom_[prg_rom_bank_b_][addr & PRG_ROM_MASK];
   }
 
-  return memory_bus;
+  return bus_;
 }
 
 /*
  * Attempts to write the given value to requested address, updating
  * the controlling registers if PRG-ROM was written to.
  *
- * Assumes the provided pointer is non-null and points to a valid sxrom
- * structure.
+ * Assumes that Connect has been called on the calling object with valid
+ * Cpu/Ppu/Apu objects.
  */
-void sxrom_write(word_t val, dword_t addr, void *map) {
-  // Cast back from generic pointer to the memory structure.
-  sxrom_t *M = (sxrom_t*) map;
+void Sxrom::Write(DoubleWord addr, DataWord val) {
+  // Place the value on the bus.
+  bus_ = val;
 
-  // Load the bus with the requested value, and attempt to write that value to
-  // memory.
-  if ((PRG_RAM_OFFSET <= addr) && (addr < PRG_ROM_A_OFFSET)
-                               && (M->num_prg_ram_banks > 0)
-                               && !(M->prg_reg & FLAG_PRG_RAM_DISABLE)) {
-    M->prg_ram[M->prg_ram_bank][addr & PRG_RAM_MASK] = val;
+  // Attempt to write the value to memory.
+  if (addr < PPU_OFFSET) {
+    // Write to NES RAM.
+    ram_[addr & RAM_MASK] = val;
+  } else if ((PPU_OFFSET <= addr) && (addr < IO_OFFSET)) {
+    // Write to PPU MMIO.
+    ppu_->Write(addr, val);
+  } else if ((IO_OFFSET <= addr) && (addr < MAPPER_OFFSET)) {
+    // Write to the general MMIO space.
+    if (addr == CPU_DMA_ADDR) {
+      cpu_->StartDma(val);
+    } else if (addr == IO_JOY1_ADDR) {
+      controller_->Write(addr, val);
+    } else {
+      apu_->Write(addr, val);
+    }
+  } else if ((PRG_RAM_OFFSET <= addr) && (addr < PRG_ROM_A_OFFSET)
+                                      && (M->num_prg_ram_banks > 0)
+                                      && !(M->prg_reg & FLAG_PRG_RAM_DISABLE)) {
+    // Write to cartridge RAM.
+    prg_ram_[prg_ram_bank_][addr & PRG_RAM_MASK] = val;
   } else if (addr >= PRG_ROM_A_OFFSET) {
-    sxrom_update_registers(val, addr, M);
+    // Write to the controlling registers for SxROM.
+    UpdateRegisters(addr, val);
   }
 
   return;
 }
 
 /*
- * Updates the controlling registers for the provided sxrom structure
- * using the given address and values.
- *
- * Assumes the provided sxrom structure is non-null and valid.
+ * Updates the controlling registers for the calling object using the
+ * given address and values.
  */
-static void sxrom_update_registers(word_t val, dword_t addr, sxrom_t *M) {
+void Sxrom::UpdateRegisters(DoubleWord addr, DataWord val) {
   // Check if this update requested to reset the shift register and PRG-ROM
   // bank selection.
   if (val & FLAG_CONTROL_RESET) {
-    M->shift_reg = SHIFT_BASE;
-    M->control_reg = M->control_reg | CONTROL_RESET_MASK;
+    shift_reg_ = SHIFT_BASE;
+    control_reg_ = control_reg_ | CONTROL_RESET_MASK;
     return;
   }
 
   // If this update does not fill the shift register, we simply apply it
   // and return.
-  if ((M->shift_reg & 1) != 1) {
+  if ((shift_reg_ & 1) != 1) {
     // Shift the LSB of the value into the MSB of the 5-bit shift register.
-    M->shift_reg = ((M->shift_reg >> 1U) & 0xFU) | ((val & 1U) << 4U);
+    shift_reg_ = ((shift_reg_ >> 1U) & 0xFU) | ((val & 1U) << 4U);
     return;
   }
 
   // Otherwise, we reset the shift register and apply the requested update.
-  word_t update = ((M->shift_reg >> 1U) & 0xFU) | ((val & 1U) << 4U);
-  M->shift_reg = SHIFT_BASE;
+  DataWord update = ((M->shift_reg >> 1U) & 0xFU) | ((val & 1U) << 4U);
+  shift_reg_ = SHIFT_BASE;
   if ((CONTROL_UPDATE_OFFSET <= addr) && (addr < CHR_A_UPDATE_OFFSET)) {
     // Update the control register.
-    sxrom_update_control(update, M);
+    UpdateControl(update);
   } else if ((CHR_A_UPDATE_OFFSET <= addr) && (addr < CHR_B_UPDATE_OFFSET)) {
     // Update the CHR0 register and copy the PRG selections to CHR1.
-    M->chr_a_reg = update;
-    M->chr_b_reg = (M->chr_b_reg & M->chr_bank_mask) | (M->chr_a_reg
-                 & (M->prg_ram_bank_mask | M->prg_rom_high_mask));
+    chr_a_reg_ = update;
+    chr_b_reg_ = (chr_b_reg_ & chr_bank_mask_) | (chr_a_reg_
+               & (prg_ram_bank_mask_ | prg_rom_high_mask_));
 
     // Update the bank selections.
-    sxrom_update_chr_banks(M);
-    M->prg_ram_bank = (M->chr_a_reg & M->prg_ram_bank_mask)
-                    >> M->prg_ram_bank_shift;
+    UpdateChrBanks();
+    prg_ram_bank_ = (chr_a_reg_ & prg_ram_bank_mask_) >> prg_ram_bank_shift_;
   } else if ((CHR_B_UPDATE_OFFSET <= addr) && (addr < PRG_UPDATE_OFFSET)) {
     // Update the CHR1 register and copy the PRG selections to CHR0.
-    M->chr_b_reg = update;
-    M->chr_a_reg = (M->chr_a_reg & M->chr_bank_mask) | (M->chr_b_reg
-                 & (M->prg_ram_bank_mask | M->prg_rom_high_mask));
+    chr_b_reg_ = update;
+    chr_a_reg_ = (chr_a_reg_ & chr_bank_mask_) | (chr_b_reg_
+               & (prg_ram_bank_mask_ | prg_rom_high_mask_));
 
     // Update the bank selections.
-    sxrom_update_chr_banks(M);
-    M->prg_ram_bank = (M->chr_b_reg & M->prg_ram_bank_mask)
-                    >> M->prg_ram_bank_shift;
+    UpdateChrBanks();
+    prg_ram_bank_ = (chr_b_reg_ & prg_ram_bank_mask_) >> prg_ram_bank_shift_;
   } else if (addr >= PRG_UPDATE_OFFSET) {
     // Update the PRG register.
-    M->prg_reg = update;
-    sxrom_update_prg_rom_banks(M);
+    prg_reg_ = update;
+    UpdatePrgRomBanks();
   }
 
   return;
@@ -340,68 +359,64 @@ static void sxrom_update_registers(word_t val, dword_t addr, sxrom_t *M) {
 /*
  * Updates the nametable, program rom, and chr addressing mode using the given
  * 5-bit control register update value.
- *
- * Assumes the provided sxrom structure is non-null and valid.
  */
-static void sxrom_update_control(word_t update, sxrom_t *M) {
+void Sxrom::UpdateControl(DataWord update) {
   // Update the control register.
-  M->control_reg = update;
+  control_reg_ = update;
 
   // Update the nametable mirroring using the low two bits in the 5-bit update.
   switch(update & NAMETABLE_CONTROL_MASK) {
     case NAMETABLE_MIRROR_LOW:
-      for (int i = 0; i < 4; i++) { M->nametable[i] = M->nametable_bank_a; }
+      for (int i = 0; i < 4; i++) { nametable_[i] = nametable_bank_a_; }
       break;
     case NAMETABLE_MIRROR_HIGH:
-      for (int i = 0; i < 4; i++) { M->nametable[i] = M->nametable_bank_b; }
+      for (int i = 0; i < 4; i++) { nametable_[i] = nametable_bank_b_; }
       break;
     case NAMETABLE_MIRROR_VERT:
-      M->nametable[0] = M->nametable_bank_a;
-      M->nametable[1] = M->nametable_bank_b;
-      M->nametable[2] = M->nametable_bank_a;
-      M->nametable[3] = M->nametable_bank_b;
+      nametable_[0] = nametable_bank_a_;
+      nametable_[1] = nametable_bank_b_;
+      nametable_[2] = nametable_bank_a_;
+      nametable_[3] = nametable_bank_b_;
       break;
     case NAMETABLE_MIRROR_HORI:
-      M->nametable[0] = M->nametable_bank_a;
-      M->nametable[1] = M->nametable_bank_a;
-      M->nametable[2] = M->nametable_bank_b;
-      M->nametable[3] = M->nametable_bank_b;
+      nametable_[0] = nametable_bank_a_;
+      nametable_[1] = nametable_bank_a_;
+      nametable_[2] = nametable_bank_b_;
+      nametable_[3] = nametable_bank_b_;
       break;
   }
 
   // Update the CHR/PRG bank selections.
-  sxrom_update_chr_banks(M);
-  sxrom_update_prg_rom_banks(M);
+  UpdateChrBanks();
+  UpdatePrgRomBanks();
 
   return;
 }
 
 /*
- * Updates the current bank selections using the regsiters in the provided
- * SxROM memory structure.
- *
- * Assumes the provided memory structure is non-null and valid.
+ * Updates the current bank selections using the regsiters in the
+ * calling object.
  */
-static void sxrom_update_prg_rom_banks(sxrom_t *M) {
+void Sxrom::UpdatePrgRomBanks(void) {
   // Caculate the current PRG-ROM bank selection.
-  word_t prg_bank = (M->chr_a_reg & M->prg_rom_high_mask)
-                  | (M->prg_reg & PRG_ROM_BANK_LOW_MASK);
+  DataWord prg_bank = (chr_a_reg_ & M->prg_rom_high_mask)
+                    | (prg_reg_ & PRG_ROM_BANK_LOW_MASK);
 
   // Update the PRG-ROM bank selection using the method specified in the control
   // register and the current value of the PRG-ROM bank selection registers.
-  switch(M->control_reg & PRG_ROM_CONTROL_MASK) {
+  switch(control_reg_ & PRG_ROM_CONTROL_MASK) {
     case PRG_ROM_MODE_32K:
     case PRG_ROM_MODE_32K_ALT:
-      M->prg_rom_bank_a = prg_bank & (~1U);
-      M->prg_rom_bank_b = prg_bank | 1U;
+      prg_rom_bank_a_ = prg_bank & (~1U);
+      prg_rom_bank_b_ = prg_bank | 1U;
       break;
     case PRG_ROM_MODE_FIX_LOW:
-      M->prg_rom_bank_a = 0;
-      M->prg_rom_bank_b = prg_bank;
+      prg_rom_bank_a_ = 0;
+      prg_rom_bank_b_ = prg_bank;
       break;
     case PRG_ROM_MODE_FIX_HIGH:
-      M->prg_rom_bank_a = prg_bank;
-      M->prg_rom_bank_b = M->num_prg_rom_banks - 1U;
+      prg_rom_bank_a_ = prg_bank;
+      prg_rom_bank_b_ = num_prg_rom_banks_ - 1U;
       break;
   }
 
@@ -411,19 +426,17 @@ static void sxrom_update_prg_rom_banks(sxrom_t *M) {
 /*
  * Reloads the CHR bank selections from the CHR registers using the currently
  * selected bank switching mode in the control register.
- *
- * Assumes the provided SxROM structure is non-null and valid.
  */
-static void sxrom_update_chr_banks(sxrom_t *M) {
+void Sxrom::UpdateChrBanks(void) {
   // Update the CHR bank selection using the high bit of the control register.
-  if (M->control_reg & FLAG_CHR_MODE) {
+  if (control_reg_ & FLAG_CHR_MODE) {
     // 4KB bank mode.
-    M->chr_bank_a = M->chr_a_reg & M->chr_bank_mask;
-    M->chr_bank_b = M->chr_b_reg & M->chr_bank_mask;
+    chr_bank_a_ = chr_a_reg_ & chr_bank_mask_;
+    chr_bank_b_ = chr_b_reg_ & chr_bank_mask_;
   } else {
     // 8KB bank mode.
-    M->chr_bank_a = M->chr_a_reg & M->chr_bank_mask & (~1U);
-    M->chr_bank_b = M->chr_bank_a | 1U;
+    chr_bank_a_ = chr_a_reg_ & chr_bank_mask_ & (~1U);
+    chr_bank_b_ = chr_bank_a_ | 1U;
   }
 
   return;

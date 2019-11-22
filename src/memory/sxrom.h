@@ -3,9 +3,10 @@
 
 #include <cstdlib>
 #include <cstdint>
+
+#include "../util/data.h"
 #include "./memory.h"
 #include "./header.h"
-#include "../util/data.h"
 
 // The defined mapper number that this memory system belongs to.
 #define SXROM_MAPPER 1

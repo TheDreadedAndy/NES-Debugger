@@ -4,14 +4,16 @@
  * TODO
  */
 
-#include <stdlib.h>
-#include <stdint.h>
-#include <stdio.h>
+#include "./sxrom.h"
+
+#include <cstdlib>
+#include <cstdint>
+#include <cstdio>
+
 #include "../util/util.h"
+#include "../util/data.h"
 #include "./memory.h"
 #include "./header.h"
-#include "./sxrom.h"
-#include "../util/data.h"
 
 // Constants used to size and access memory.
 #define ROM_BANK_SIZE 0x4000U
@@ -54,124 +56,101 @@
 #define PATTERN_TABLE_MASK 0x0FFFU
 
 /*
- * Uses the header within the provided memory structure to create
- * an sxrom mapper structure and load the game data into the mapper.
- * The mapper structure and its functions are then stored within
- * the provided memory structure.
+ * Uses the provided rom file and header to initialize and create an
+ * Sxrom class.
  *
- * Assumes the provided memory structure and rom file are non-null and valid.
+ * Assumes the provided rom file and header are valid.
  */
-void sxrom_new(FILE *rom_file, memory_t *M) {
-  // Allocate memory structure and set up its data.
-  sxrom_t *map = xcalloc(1, sizeof(sxrom_t));
-  M->map = (void*) map;
-  M->read = &sxrom_read;
-  M->write = &sxrom_write;
-  M->vram_read = &sxrom_vram_read;
-  M->vram_write = &sxrom_vram_write;
-  M->free = &sxrom_free;
+Sxrom::Sxrom(FILE *rom_file, RomHeader *header) : Memory(header) {
+  // Setup the NES ram space.
+  ram_ = RandNew(RAM_SIZE);
 
   // Load the rom data into memory.
-  sxrom_load_prg_rom(rom_file, M);
-  sxrom_load_chr(rom_file, M);
+  LoadPrgRom(rom_file);
+  LoadChr(rom_file);
 
   // Set up the cart ram space.
-  sxrom_load_prg_ram(M);
+  LoadPrgRam();
 
   // Setup the nametable in vram. The header mirroring bit is ignored in
   // this mapper, so we set the mirrored banks to a default value for now.
-  map->nametable_bank_a = rand_alloc(sizeof(word_t) * SCREEN_SIZE);
-  map->nametable_bank_b = rand_alloc(sizeof(word_t) * SCREEN_SIZE);
-  map->nametable[0] = map->nametable_bank_a;
-  map->nametable[1] = map->nametable_bank_a;
-  map->nametable[2] = map->nametable_bank_a;
-  map->nametable[3] = map->nametable_bank_a;
-
-  // Reset the shift register.
-  map->shift_reg = SHIFT_BASE;
+  nametable_bank_a_ = RandNew(SCREEN_SIZE);
+  nametable_bank_b_ = RandNew(SCREEN_SIZE);
+  nametable_[0] = nametable_bank_a_;
+  nametable_[1] = nametable_bank_a_;
+  nametable_[2] = nametable_bank_a_;
+  nametable_[3] = nametable_bank_a_;
 
   return;
 }
 
 /*
- * Loads the given rom file into the sxrom memory structure.
+ * Loads the given rom file into the sxrom memory object.
  * Note that while this implementation assumes the banks will boot in mode 3,
  * with the upper half of rom fixed to the last bank and the lower half on bank
  * 0, this is not specified in original hardware.
  *
  * Assumes the provided rom_file is valid.
- * Assumes the provided memory structure and its mapper field are non-null.
- * Assumes the mapper field points to an sxrom mapper structure.
+ * Assumes the object was initialized with a valid header structure.
  */
-static void sxrom_load_prg_rom(FILE *rom_file, memory_t *M) {
-  // Cast back from the generic structure.
-  sxrom_t *map = (sxrom_t*) M->map;
-
+void Sxrom::LoadPrgRom(FILE *rom_file) {
   // Get the number of PRG-ROM banks, then load the rom into memory.
-  map->num_prg_rom_banks = M->header->prg_rom_size / ROM_BANK_SIZE;
+  num_prg_rom_banks_ = header_->prg_rom_size / ROM_BANK_SIZE;
   fseek(rom_file, HEADER_SIZE, SEEK_SET);
-  for (size_t i = 0; i < map->num_prg_rom_banks; i++) {
-    map->prg_rom[i] = xmalloc(ROM_BANK_SIZE * sizeof(word_t));
+  for (size_t i = 0; i < num_prg_rom_banks_; i++) {
+    prg_rom_[i] = new DataWord[ROM_BANK_SIZE];
     for (size_t j = 0; j < ROM_BANK_SIZE; j++) {
-      map->prg_rom[i][j] = fgetc(rom_file);
+      prg_rom_[i][j] = fgetc(rom_file);
     }
   }
 
   // Determine if the requested PRG-ROM size needs a fifth selection bit.
-  if (map->num_prg_rom_banks > 16) {
-    map->prg_rom_high_mask = 0x10;
-  }
+  if (num_prg_rom_banks_ > 16) { prg_rom_high_mask_ = 0x10; }
 
   // Setup the default bank mode.
-  map->prg_rom_bank_a = 0;
-  map->prg_rom_bank_b = map->num_prg_rom_banks - 1;
+  prg_rom_bank_b_ = num_prg_rom_banks_ - 1;
 
   return;
 }
 
 /*
- * Determine if the given rom is using CHR-ROM or CHR-RAM, then creates
+ * Determines if the given rom is using CHR-ROM or CHR-RAM, then creates
  * the necessary banks. Loads in the CHR data if the board is using CHR-ROM.
  * Creates a mask for accessing the CHR control register.
  *
  * This function aborts if the created mask conflicts with the PRG-ROM mask.
  *
  * Assumes the provided rom file is valid.
- * Assumes the provided memory structure and its mapper field are non-null.
- * Assumes the mapper field points to a sxrom structure.
- * Assumes that the provided sxrom structure has had its PRG-ROM initialized.
+ * Assumes that the calling object has had its PRG-ROM initialized.
  */
-static void sxrom_load_chr(FILE *rom_file, memory_t *M) {
-  // Cast the mapper back from the generic structure.
-  sxrom_t *map = (sxrom_t*) M->map;
-
+void Sxrom::LoadChr(FILE *rom_file) {
   // Check if the rom is using CHR-RAM, and allocate it if so.
-  if (M->header->chr_ram_size > 0) {
-    map->is_chr_ram = true;
-    map->num_chr_banks = M->header->chr_ram_size / CHR_BANK_SIZE;
-    for (size_t i = 0; i < map->num_chr_banks; i++) {
-      map->pattern_table[i] = rand_alloc(sizeof(word_t) * CHR_BANK_SIZE);
+  if (header_->chr_ram_size > 0) {
+    is_chr_ram_ = true;
+    num_chr_banks_ = header_->chr_ram_size / CHR_BANK_SIZE;
+    for (size_t i = 0; i < num_chr_banks_; i++) {
+      pattern_table_[i] = RandNew(CHR_BANK_SIZE);
     }
   } else {
     // Otherwise, the rom is using CHR-ROM and we must load it into the mapper.
-    map->is_chr_ram = false;
-    map->num_chr_banks = M->header->chr_rom_size / CHR_BANK_SIZE;
-    fseek(rom_file, HEADER_SIZE + M->header->prg_rom_size, SEEK_SET);
-    for (size_t i = 0; i < map->num_chr_banks; i++) {
-      map->pattern_table[i] = xmalloc(sizeof(word_t) * CHR_BANK_SIZE);
+    is_chr_ram_ = false;
+    num_chr_banks_ = header_->chr_rom_size / CHR_BANK_SIZE;
+    fseek(rom_file, HEADER_SIZE + header_->prg_rom_size, SEEK_SET);
+    for (size_t i = 0; i < num_chr_banks_; i++) {
+      pattern_table_[i] = new DataWord[CHR_BANK_SIZE];
       for (size_t j = 0; j < CHR_BANK_SIZE; j++) {
-        map->pattern_table[i][j] = fgetc(rom_file);
+        pattern_table_[i][j] = fgetc(rom_file);
       }
     }
   }
 
   // Calculate the mask to be used to select the CHR banks in the CHR control
   // register.
-  map->chr_bank_mask = sxrom_create_mask(map->num_chr_banks);
+  chr_bank_mask_ = CreateMask(num_chr_banks_);
 
   // Check if the requested rom size conflicts with the requested number of
   // CHR banks.
-  if (map->chr_bank_mask & map->prg_rom_high_mask) {
+  if (chr_bank_mask_ & prg_rom_high_mask_) {
     fprintf(stderr, "Error: The requested amount of PRG-ROM cannot be "
                     "addressed with the given CHR size.\n");
     abort();
@@ -181,10 +160,10 @@ static void sxrom_load_chr(FILE *rom_file, memory_t *M) {
 }
 
 /*
- * Creates a bitmask that can select the provided number of elements.
+ * Creates an 8-bit bitmask that can select the provided number of elements.
  */
-static word_t sxrom_create_mask(word_t items) {
-  word_t msb = msb_word(items);
+DataWord Sxrom::CreateMask(DataWord items) {
+  DataWord msb = MsbWord(items);
   if ((msb != 0) && (msb == items)) {
     return msb - 1U;
   } else if (msb != 0) {

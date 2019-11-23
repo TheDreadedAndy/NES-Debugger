@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=NES Debugger
+Comment=NES emulator and debugger
+Exec=ndb
+Icon=ndb

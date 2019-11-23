@@ -39,8 +39,28 @@ $(patsubst %.o,%,$(MAINS)): $(OBJECTS) $(BINS)
 $(DIRS):
 	mkdir -p $@
 
-# Prevent issues with clean.
+# Prevent issues with make commands.
+.PHONY: install
+.PHONY: uninstall
 .PHONY: clean
+
+# Install to program to local directories.
+install:
+ifneq (,$(wildcard ./ndb))
+ifeq ($(UNAME),Linux)
+	-cp ./ndb /usr/local/bin/
+	-cp ./resources/ndb.desktop /usr/local/share/applications/
+	-cp ./resources/ndb.png /usr/local/share/pixmaps/
+endif
+endif
+
+# Remove the program from local directories.
+uninstall:
+ifeq ($(UNAME),Linux)
+	-rm /usr/local/bin/ndb
+	-rm /usr/local/share/applications/ndb.desktop
+	-rm /usr/local/share/pixmaps/ndb.png
+endif
 
 # Removes built files.
 clean:

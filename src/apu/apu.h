@@ -127,16 +127,10 @@ class Apu {
     // Most functions of the APU are only clocked on even cycles.
     bool cycle_even_ = false;
 
-    // Used to quickly obtain the correct output of the APU.
-    float *pulse_table_;
-    float *tndmc_table_;
-
     // Tracks when the next sample should be sent to the audio device buffer.
     float sample_clock_ = 0;
 
     /* Helper functions */
-    void InitPulseTable(void);
-    void InitTndmcTable(void);
     void RunFrameStep(void);
     void UpdateSweep(ApuPulse *pulse);
     DoubleWord GetPulseTarget(ApuPulse *pulse);

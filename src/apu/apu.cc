@@ -6,8 +6,8 @@
  * The APU contains two pulse channels, a noise channel driven by a
  * linear feedback shift register, a triangle wave channel, and
  * a delta modulation channel. These channels are mixed non-linearly.
- * This mixing is currently emulated using a large lookup table, but
- * this is subject to change.
+ * This mixing is currently emulated using a 2nd and a 3rd order taylor
+ * series approximation.
  *
  * Note that the only difference between the pulse channels is how
  * their sweep frequencies are subtracted, with one using ones complement
@@ -113,11 +113,20 @@
 #define DMC_CURRENT_ADDR_BASE 0x8000U
 #define DMC_LEVEL_MAX 127U
 
-// These constants are used to size the APU mixing tables.
-#define PULSE_TABLE_SIZE 31U
-#define TRIANGLE_DIM_SHIFT 11U
-#define NOISE_DIM_SHIFT 7U
-#define TNDMC_SIZE 32768U
+// These constants are used to calculate the taylor series approximation
+// of the APU output.
+#define PULSE_TAYLOR_CENTER 15.0f
+#define PULSE_TAYLOR_TERM0 0.149377f
+#define PULSE_TAYLOR_TERM1 0.00840697f
+#define PULSE_TAYLOR_TERM2 (-0.000087318f)
+#define TND_TRIANGLE_COEF 0.000121551f
+#define TND_NOISE_COEF 0.0000816927f
+#define TND_DMC_COEF 0.0000441735f
+#define TND_TAYLOR_CENTER 0.00432935f
+#define TND_TAYLOR_TERM0 0.482776f
+#define TND_TAYLOR_TERM1 77.821f
+#define TND_TAYLOR_TERM2 (-5430.9f)
+#define TND_TAYLOR_TERM3 379005.0f
 
 /*
  * The rate value in the DMC channel maps to a number of APU cycles to wait
@@ -177,54 +186,8 @@ Apu::Apu(AudioPlayer *audio, Memory *memory, DataWord *irq_line) {
   noise_ = new ApuNoise();
   dmc_ = new ApuDmc();
 
-  // Load in the mixing tables for the APU channels.
-  InitPulseTable();
-  InitTndmcTable();
-
   // On power-up, the noise shifter is seeded with the value 1.
   noise_->shift = 1;
-  return;
-}
-
-/*
- * Loads the pulse mixing table from the binary into memory.
- */
-void Apu::InitPulseTable(void) {
-  // Get the address of the pulse table.
-  extern const DataWord _binary_bins_pulse_table_bin_start[];
-
-  // Convert the bytes of the table to floats and load them into memory.
-  pulse_table_ = new float[PULSE_TABLE_SIZE];
-  union { float f; uint32_t u; } temp;
-  for (size_t i = 0; i < PULSE_TABLE_SIZE; i++) {
-    temp.u = (_binary_bins_pulse_table_bin_start[(4 * i) + 0])
-           | (_binary_bins_pulse_table_bin_start[(4 * i) + 1] << 8)
-           | (_binary_bins_pulse_table_bin_start[(4 * i) + 2] << 16)
-           | (_binary_bins_pulse_table_bin_start[(4 * i) + 3] << 24);
-    pulse_table_[i] = temp.f;
-  }
-
-  return;
-}
-
-/*
- * Loads the triangle/noise/dmc table from the binary into memory.
- */
-void Apu::InitTndmcTable(void) {
-  // Get the address of the tndmc table.
-  extern const DataWord _binary_bins_tndmc_table_bin_start[];
-
-  // Convert the bytes of the table to floats and load them into memory.
-  tndmc_table_ = new float[TNDMC_SIZE];
-  union { float f; uint32_t u; } temp;
-  for (size_t i = 0; i < TNDMC_SIZE; i++) {
-    temp.u = (_binary_bins_tndmc_table_bin_start[(4 * i) + 0])
-           | (_binary_bins_tndmc_table_bin_start[(4 * i) + 1] << 8)
-           | (_binary_bins_tndmc_table_bin_start[(4 * i) + 2] << 16)
-           | (_binary_bins_tndmc_table_bin_start[(4 * i) + 3] << 24);
-    tndmc_table_[i] = temp.f;
-  }
-
   return;
 }
 
@@ -595,7 +558,8 @@ void Apu::UpdateDmc(void) {
   }
 
   // Use the sample buffer to update the dmc level.
-  dmc_->bits_remaining = (dmc_->bits_remaining > 0) ? dmc_->bits_remaining - 1 : 7;
+  dmc_->bits_remaining = (dmc_->bits_remaining > 0)
+                       ? dmc_->bits_remaining - 1 : 7;
   if (!(dmc_->silent)) {
     if ((dmc_->sample_buffer & 1) && (dmc_->level <= (DMC_LEVEL_MAX - 2))) {
       dmc_->level += 2;
@@ -618,14 +582,24 @@ void Apu::PlaySample(void) {
     return;
   }
 
-  // Pull the output of the APU from the mixing tables.
-  float pulse_output = pulse_table_[pulse_a_->output + pulse_b_->output];
-  float tndmc_output = tndmc_table_[(triangle_->output << TRIANGLE_DIM_SHIFT)
-                     | (noise_->output << NOISE_DIM_SHIFT) | dmc_->level];
-  float output = pulse_output + tndmc_output;
+  // Use a taylor series to approximate the output of the pulse waves.
+  float xp = static_cast<float>(pulse_a_->output + pulse_b_->output)
+           - PULSE_TAYLOR_CENTER;
+  float pulse_output = PULSE_TAYLOR_TERM0 + (PULSE_TAYLOR_TERM1 * xp)
+                     + (PULSE_TAYLOR_TERM2 * xp * xp);
+
+  // Use a taylor series to approximate the output of the triangle, noise
+  // and DMC waves.
+  float xtnd = (TND_TRIANGLE_COEF * static_cast<float>(triangle_->output))
+             + (TND_NOISE_COEF * static_cast<float>(noise_->output))
+             + (TND_DMC_COEF * static_cast<float>(dmc_->level))
+             - TND_TAYLOR_CENTER;
+  float tnd_output = TND_TAYLOR_TERM0 + (TND_TAYLOR_TERM1 * xtnd)
+                   + (TND_TAYLOR_TERM2 * xtnd * xtnd)
+                   + (TND_TAYLOR_TERM3 * xtnd * xtnd * xtnd);
 
   // Add the output to the sample buffer.
-  audio_->AddSample(output);
+  audio_->AddSample(tnd_output + pulse_output);
 
   // Reset the sample clock.
   sample_clock_ -= 36.2869375;
@@ -834,10 +808,6 @@ Apu::~Apu(void) {
   delete triangle_;
   delete noise_;
   delete dmc_;
-
-  // Free the mixing tables.
-  delete[] pulse_table_;
-  delete[] tndmc_table_;
 
   return;
 }

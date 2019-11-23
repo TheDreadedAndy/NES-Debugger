@@ -49,7 +49,6 @@ class Uxrom : public Memory {
     void Write(DoubleWord addr, DataWord val);
     DataWord VramRead(DoubleWord addr);
     void VramWrite(DoubleWord addr, DataWord val);
-    void Connect(Cpu *cpu, Ppu *ppu, Apu *apu);
 
     Uxrom(FILE *rom_file, RomHeader *header);
     ~Uxrom(void);

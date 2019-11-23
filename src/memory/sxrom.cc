@@ -58,7 +58,6 @@
 // Constants used to size and access VRAM.
 #define CHR_BANK_SIZE 0x1000U
 #define SCREEN_SIZE 0x400U
-#define NAMETABLE_ACCESS_BIT 0x2000U
 #define NAMETABLE_SELECT_MASK 0x0C00U
 #define NAMETABLE_SELECT_SHIFT 10U
 #define NAMETABLE_ADDR_MASK 0x03FFU
@@ -204,9 +203,9 @@ void Sxrom::LoadPrgRam(void) {
     // Determine the max amount of ram that can be given to the rom from
     // the number of CHR banks used.
     if (chr_bank_mask_ <= 0x03U) {
-      num_prg_ram_banks_ = MAX_RAM_BANKS;
+      num_prg_ram_banks_ = SXROM_MAX_RAM_BANKS;
     } else if (chr_bank_mask_ <= 0x07U) {
-      num_prg_ram_banks_ = MAX_RAM_BANKS / 2U;
+      num_prg_ram_banks_ = SXROM_MAX_RAM_BANKS / 2U;
     } else {
       num_prg_ram_banks_ = 1U;
     }
@@ -243,6 +242,8 @@ void Sxrom::LoadPrgRam(void) {
  *
  * Assumes that the connect function has been called on this object
  * with valid Cpu/Ppu/Apu objects.
+ * Assumes that AddController has been called by the calling object on
+ * a valid Input object.
  */
 DataWord Sxrom::Read(DoubleWord addr) {
   // Determine which part of memory is being accessed, read the value,
@@ -282,6 +283,8 @@ DataWord Sxrom::Read(DoubleWord addr) {
  *
  * Assumes that Connect has been called on the calling object with valid
  * Cpu/Ppu/Apu objects.
+ * Assumes that AddController has been called by the calling object on
+ * a valid Input object.
  */
 void Sxrom::Write(DoubleWord addr, DataWord val) {
   // Place the value on the bus.
@@ -324,7 +327,7 @@ void Sxrom::UpdateRegisters(DoubleWord addr, DataWord val) {
   // Check if this update requested to reset the shift register and PRG-ROM
   // bank selection.
   if (val & FLAG_CONTROL_RESET) {
-    shift_reg_ = SHIFT_BASE;
+    shift_reg_ = SXROM_SHIFT_BASE;
     control_reg_ = control_reg_ | CONTROL_RESET_MASK;
     return;
   }
@@ -339,7 +342,7 @@ void Sxrom::UpdateRegisters(DoubleWord addr, DataWord val) {
 
   // Otherwise, we reset the shift register and apply the requested update.
   DataWord update = ((shift_reg_ >> 1U) & 0xFU) | ((val & 1U) << 4U);
-  shift_reg_ = SHIFT_BASE;
+  shift_reg_ = SXROM_SHIFT_BASE;
   if ((CONTROL_UPDATE_OFFSET <= addr) && (addr < CHR_A_UPDATE_OFFSET)) {
     // Update the control register.
     UpdateControl(update);

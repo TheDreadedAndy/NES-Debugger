@@ -28,7 +28,7 @@
 #include "../io/controller.h"
 #include "../apu/apu.h"
 #include "./header.h"
-//#include "./nrom.h"
+#include "./nrom.h"
 #include "./sxrom.h"
 #include "./uxrom.h"
 
@@ -52,9 +52,9 @@ Memory *Memory::Create(FILE *rom_file) {
   // Use the decoded header to decide which memory structure should be created.
   Memory *mem = NULL;
   switch(header->mapper) {
-    /*case NROM_MAPPER:
+    case NROM_MAPPER:
       mem = new Nrom(rom_file, header);
-      break;*/
+      break;
     case SXROM_MAPPER:
       mem = new Sxrom(rom_file, header);
       break;

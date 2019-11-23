@@ -1,58 +1,56 @@
 /*
- * Implementation of INES Mapper 2 (UxROM).
+ * Implementation of INES Mapper 0 (NROM).
  *
- * The third quarter of addressable NES memory is mapped to a switchable
- * bank, which can be changed by writing to that section of memory.
- * The last quarter of memory is always mapped to the final bank.
+ * This is the most basic NES mapper, with no bank switching.
  *
- * This implementation can address up to 256KB of cart memory.
+ * This implementation supports up to 32KB of program data, 8KB of ram,
+ * and 8KB of CHR data.
  */
 
-#include "./uxrom.h"
+#include "./nrom.h"
 
-#include <new>
 #include <cstdlib>
 #include <cstdint>
 #include <cstdio>
+#include <new>
 
 #include "../util/util.h"
 #include "../util/data.h"
-#include "../io/controller.h"
 #include "../cpu/cpu.h"
 #include "../ppu/ppu.h"
 #include "../apu/apu.h"
+#include "../io/controller.h"
 #include "./memory.h"
 #include "./header.h"
 
 // Constants used to size and access memory.
 #define BANK_SIZE 0x4000U
 #define BANK_OFFSET 0x8000U
+#define BANK_OPT_OFFSET 0xC000U
 #define BANK_ADDR_MASK 0x3FFFU
-#define UOROM_BANK_MASK 0x0FU
-#define UNROM_BANK_MASK 0x07U
-#define MAX_UNROM_BANKS 8
-#define FIXED_BANK_OFFSET 0xC000U
 #define BAT_SIZE 0x2000U
 #define BAT_OFFSET 0x6000U
+#define BAT_MASK 0x1FFFU
 
 // Constants used to size and access VRAM.
-#define CHR_RAM_SIZE 0x2000U
 #define PATTERN_TABLE_SIZE 0x2000U
+#define NAMETABLE_SIZE 0x0400U
+#define NAMETABLE_SELECT_MASK 0x0C00U
+#define NAMETABLE_ADDR_MASK 0x03FFU
 #define PATTERN_TABLE_MASK 0x1FFFU
 
 /*
- * Uses the provided rom file and header to initialize the Uxrom class.
+ * Uses the provided header and rom file to create an Nrom object.
  *
- * Assumes the provided rom file is non-null and points to a valid NES rom.
- * Assumes the provided header was created from the rom and is valid.
+ * Assumes the provided ROM file is non-null and points to a valid NES ROM.
+ * Assumes the provided header is valid and was created using said ROM.
  */
-Uxrom::Uxrom(FILE *rom_file, RomHeader *header) : Memory(header) {
-  // Setup the ram space.
+Nrom::Nrom(FILE *rom_file, RomHeader *header) : Memory(header) {
+  // Setup cart and NES RAM.
   ram_ = RandNew(RAM_SIZE);
   bat_ = RandNew(BAT_SIZE);
 
   // Load the rom data into memory.
-  header_ = header;
   LoadPrg(rom_file);
   LoadChr(rom_file);
 
@@ -73,15 +71,23 @@ Uxrom::Uxrom(FILE *rom_file, RomHeader *header) : Memory(header) {
 }
 
 /*
- * Loads the program rom data into the calling Uxrom class during contruction.
+ * Loads the PRG-ROM section of a ROM into the mapped memory system.
  *
- * Assumes the provided rom file is non-null and points to a valid NES rom.
- * Assumes the header field of the class is valid and matches the rom.
+ * Assumes the provided ROM file is non-null and valid.
+ * Assumes the calling object was provided with a valid ROM header.
  */
-void Uxrom::LoadPrg(FILE *rom_file) {
-  // Calculate the number of prg banks used by the rom, then load
-  // the rom into memory.
+void Nrom::LoadPrg(FILE *rom_file) {
+  // Calculate the number of PRG-ROM banks used by the ROM.
   size_t num_banks = static_cast<size_t>(header_->prg_rom_size / BANK_SIZE);
+
+  // Throw an error if the rom file requested an invalid amount of space.
+  if (num_banks > 2) {
+    fprintf(stderr, "Error: The ROM file requested an invalid amount of "
+                    "program memory for this mapper.\n");
+    abort();
+  }
+
+  // Load the PRG-ROM into the Nrom object.
   fseek(rom_file, HEADER_SIZE, SEEK_SET);
   for (size_t i = 0; i < num_banks; i++) {
     cart_[i] = new DataWord[BANK_SIZE];
@@ -90,25 +96,25 @@ void Uxrom::LoadPrg(FILE *rom_file) {
     }
   }
 
-  // Setup the default banks and max banks.
-  fixed_bank_ = num_banks - 1;
-  bank_mask_ = (num_banks > MAX_UNROM_BANKS)
-             ? UOROM_BANK_MASK : UNROM_BANK_MASK;
+  // If the cart contains only 16KB of PRG-ROM, we mirror it into
+  // the second bank.
+  if (num_banks < 2) { cart_[1] = cart_[0]; }
 
   return;
 }
 
 /*
- * Loads the CHR ROM data into the calling Uxrom class during construction.
+ * Loads the CHR section of a ROM into the mapped memory system.
  *
- * Assumes the provided rom file is non-null and points to a valid NES rom.
- * Assumes the header field of the class is valid and matches the rom.
+ * Assumes the provided ROM file is valid.
+ * Assumes the calling object was provided with a valid header for the
+ * given ROM.
  */
-void Uxrom::LoadChr(FILE *rom_file) {
+void Nrom::LoadChr(FILE *rom_file) {
   // Check if the rom is using chr-ram, and allocate it if so.
   if (header_->chr_ram_size > 0) {
     is_chr_ram_ = true;
-    pattern_table_ = RandNew(CHR_RAM_SIZE);
+    pattern_table_ = RandNew(header_->chr_ram_size);
     return;
   }
 
@@ -125,19 +131,18 @@ void Uxrom::LoadChr(FILE *rom_file) {
 }
 
 /*
- * Reads a value from the given address, accounting for MMIO and bank
- * switching. If the address given leads to an open bus, the last value
- * that was placed on the bus is returned instead.
+ * Reads a value from the given address, accounting for MMIO and
+ * open bus behavior.
  *
- * Assumes that Connect has been called on valid Cpu/Ppu/Apu classes for this
- * memory class.
+ * Assumes that Connect has been called by the calling object on valid
+ * Cpu/Ppu/Apu objects.
  * Assumes that AddController has been called by the calling object on
  * a valid Input object.
  */
-DataWord Uxrom::Read(DoubleWord addr) {
-  // Detect where in memory we need to access and place the value on the bus.
+DataWord Nrom::Read(DoubleWord addr) {
+  // Detect where in memory we need to access and do so.
   if (addr < PPU_OFFSET) {
-    // Read from RAM.
+    // Read from system RAM.
     bus_ = ram_[addr & RAM_MASK];
   } else if ((PPU_OFFSET <= addr) && (addr < IO_OFFSET)) {
     // Access PPU MMIO.
@@ -150,26 +155,28 @@ DataWord Uxrom::Read(DoubleWord addr) {
       bus_ = apu_->Read(addr);
     }
   } else if ((BAT_OFFSET <= addr) && (addr < BANK_OFFSET)) {
-    // Read from the roms WRAM/Battery.
+    // Read from the carts working RAM.
     bus_ = bat_[addr & BAT_MASK];
-  } else if ((BANK_OFFSET <= addr) && (addr < FIXED_BANK_OFFSET)) {
-    // Read from the switchable bank.
-    bus_ = cart_[current_bank_][addr & BANK_ADDR_MASK];
-  } else if (addr >= FIXED_BANK_OFFSET) {
-    // Read from the fixed bank.
-    bus_ = cart_[fixed_bank_][addr & BANK_ADDR_MASK];
+  } else if ((BANK_OFFSET <= addr) && (addr < BANK_OPT_OFFSET)) {
+    // Read from the low bank.
+    bus_ = cart_[0][addr & BANK_ADDR_MASK];
+  } else if (addr >= BANK_OPT_OFFSET) {
+    // Read from the high bank.
+    bus_ = cart_[1][addr & BANK_ADDR_MASK];
   }
 
   return bus_;
 }
 
 /*
- * Writes a value to the given address, accounting for MMIO.
+ * Attempts to write the given value to the given address, accounting for MMIO.
  *
- * Assumes that Connect has been called on valid Cpu/Ppu/Apu classes for this
- * memory class.
+ * Assumes that Connect has been called by the calling object on valid
+ * Cpu/Ppu/Apu objects.
+ * Assumes that AddController has been called by the calling object on
+ * a valid Input object.
  */
-void Uxrom::Write(DoubleWord addr, DataWord val) {
+void Nrom::Write(DoubleWord addr, DataWord val) {
   // Put the value being written on the bus.
   bus_ = val;
 
@@ -192,19 +199,15 @@ void Uxrom::Write(DoubleWord addr, DataWord val) {
   } else if ((BAT_OFFSET <= addr) && (addr < BANK_OFFSET)) {
     // Write to the WRAM/Battery of the cart.
     bat_[addr & BAT_MASK] = val;
-  } else if (addr >= BANK_OFFSET) {
-    // Writing to the cart area uses the low bits to select a bank.
-    current_bank_ = val & bank_mask_;
   }
 
   return;
 }
 
 /*
- * Reads the value at the given address from vram, accounting
- * for mirroring.
+ * Reads the value at the given address in VRAM.
  */
-DataWord Uxrom::VramRead(DoubleWord addr) {
+DataWord Nrom::VramRead(DoubleWord addr) {
   // Mask out any extra bits.
   addr &= VRAM_BUS_MASK;
 
@@ -225,11 +228,11 @@ DataWord Uxrom::VramRead(DoubleWord addr) {
 }
 
 /*
- * Writes the given value to vram, accounting for mirroring.
- * Update the palette data array if a value is written to the palette.
+ * Attempts to write the given value to VRAM.
  * Does nothing if the program attempts to write to CHR-ROM.
+ * Updates the palette data array if the palette is written to.
  */
-void Uxrom::VramWrite(DoubleWord addr, DataWord val) {
+void Nrom::VramWrite(DoubleWord addr, DataWord val) {
   // Masks out any extra bits.
   addr &= VRAM_BUS_MASK;
 
@@ -249,24 +252,21 @@ void Uxrom::VramWrite(DoubleWord addr, DataWord val) {
 }
 
 /*
- * Deletes the calling Uxrom object.
- *
- * Assumes that the fixed bank is the final allocated bank.
+ * Deletes the calling Nrom object.
  */
-Uxrom::~Uxrom(void) {
-  // Free the CPU memory arrays.
+Nrom::~Nrom(void) {
+  // Delete the NES system memory.
   delete[] ram_;
-  delete[] bat_;
 
-  // Free the VRAM data.
+  // Delete the cart's memory.
+  delete[] bat_;
+  delete[] cart_[0];
+  if (cart_[0] != cart_[1]) { delete[] cart_[1]; }
+
+  // Delete the PPU's ram space.
+  delete[] pattern_table_;
   delete[] nametable_[0];
   delete[] nametable_[3];
-  delete[] pattern_table_;
-
-  // Frees each bank of CPU memory.
-  for (size_t i = 0; i < (fixed_bank_ + 1U); i++) {
-    delete[] cart_[i];
-  }
 
   return;
 }

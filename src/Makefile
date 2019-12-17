@@ -48,6 +48,8 @@ $(DIRS):
 install:
 ifneq (,$(wildcard ./ndb))
 ifeq ($(UNAME),Linux)
+	-mkdir -p /usr/local/share/applications
+	-mkdir -p /usr/local/share/pixmaps
 	-cp ./ndb /usr/local/bin/
 	-cp ./resources/ndb.desktop /usr/local/share/applications/
 	-cp ./resources/ndb.png /usr/local/share/pixmaps/

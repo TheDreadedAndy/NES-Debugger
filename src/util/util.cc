@@ -21,9 +21,9 @@
 #include <cstdio>
 #include <cstdlib>
 #include <ctime>
-#ifdef _NES_OSWIN
 #include <cstring>
 
+#ifdef _NES_OSWIN
 #include <windows.h>
 #endif
 
@@ -113,4 +113,12 @@ void OpenFile(FILE **file) {
   // Open the provided file.
   *file = fopen(user_file_name, "rb");
   return;
+}
+
+/*
+ * Uses strcmp to compare the given strings. Returns true if they are equal
+ * and non-null
+ */
+bool StrEq(char *str1, char *str2) {
+  return (string1 != NULL) && (string2 != NULL) && (strcmp(str1, str2) == 0);
 }

@@ -1,47 +1,35 @@
 #ifndef _NES_CONFIG
 #define _NES_CONFIG
 
-// The number of buttons currently mappable within the emulation.
-#define NUM_MAPS 8
+#include <cstdint>
 
-// Enumeration used to index into the button mapping and string array.
-typedef enum { BUTTON_A, BUTTON_B, BUTTON_START, BUTTON_SELECT, BUTTON_UP,
-               BUTTON_DOWN, BUTTON_LEFT, BUTTON_RIGHT } ButtonName;
-
-// Enumerations used to configure video
-typedef enum { RENDER_SOFTWARE, RENDER_HARDWARE } RendererType;
-typedef enum { VIDEO_RGB, VIDEO_NTSC } VideoType;
-
-// Enumerations to configure input.
-typedef enum { HEADER_DEFINED, NES_CONTROLLER } ControllerType;
+const char *kRendererTypeKey_ = "renderer_type"
+const char *kVideoTypeKey_ = "video_type"
+const char *kPaletteFileKey_ = "palette_file"
+const char *kControllerTypeKey_ = "controller_type"
 
 /*
  * Maintains the current configuration for the emulation.
  * Configuration can be read from/written to a file in a pre-defined
- * location.
  */
 class Config {
   private:
-    // Video setting keys, for use with the config file.
-    const char *kRendererTypeKey_ = "renderer_type"
-    const char *kVideoTypeKey_ = "video_type"
-    const char *kPaletteFileKey_ = "palette_file"
+    // The configuration is stored as a dictionary of strings.
+    typedef struct {
+      char *key;
+      char *val;
+      DictElem *next;
+    } DictElem;
 
-    // Input setting keys, for use with the config file.
-    const char *kButtonMapKeys_[NUM_MAPS] = { "button_a", "button_b",
-                "button_start", "button_select", "button_up", "button_down",
-                "button_left", "button_right" };
-    const char *kControllerTypeKey_ = "controller_type"
+    // The size of the dictionary is defined in the implementation.
+    DictElem **dict_ = NULL;
 
-    // Variables used to hold the current video settings.
-    RendererType renderer_type_ = RENDER_SOFTWARE;
-    VideoType video_type_ = VIDEO_RGB;
-    char *palette_file_ = NULL;
+    // Scans a key/value from a line in the configuration file.
+    bool ScanKey(char *buf, size_t buf_size, FILE *config);
+    bool ScanVal(char *buf, size_t buf_size, FILE *config);
 
-    // Variables used to hold the current input settings.
-    SDL_Keycode button_map_[NUM_MAPS] = { SDLK_x, SDLK_z, SDLK_RETURN,
-                SDLK_BACKSPACE, SDLK_UP, SDLK_DOWN, SDLK_LEFT, SDLK_RIGHT };
-    ControllerType controller_type_ = HEADER_DEFINED;
+    // Hashes the given string.
+    size_t Hash(char *string);
 
   public:
     // Creates a config structure by loading from the given file
@@ -54,19 +42,12 @@ class Config {
     // Writes any changes back to the config file.
     void Save(void);
 
-    // Functions used to get each field in the configuration.
-    RendererType GetRendererType(void);
-    VideoType GetVideoType(void);
-    char *GetPaletteFile(void);
-    SDL_Keycode GetButtonMap(ButtonName button);
-    ControllerType GetControllerType(void);
+    // Gets a field from the loaded configuration file.
+    // If the field does not exist, the specified default value is returned.
+    char *Get(char *key, char *default_value = NULL);
 
-    // Functions used to set each field in the configuration.
-    void SetRendererType(RendererType renderer_type);
-    void SetVideoType(VideoType video_type);
-    void SetPaletteFile(char *palette_file);
-    void SetButtonMap(ButtonName button, SDL_Keycode map);
-    void SetControllerType(ControllerType controller);
+    // Sets a field in the loaded configuration.
+    void Set(char *key, char *val);
 
     // Writes the config file, then deletes the config object.
     ~Config(void);

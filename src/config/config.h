@@ -3,10 +3,13 @@
 
 #include <cstdint>
 
-const char *kRendererTypeKey_ = "renderer_type"
-const char *kVideoTypeKey_ = "video_type"
-const char *kPaletteFileKey_ = "palette_file"
-const char *kControllerTypeKey_ = "controller_type"
+/* Keys for video configuration */
+const char *kRendererTypeKey = "renderer_type"
+const char *kVideoTypeKey = "video_type"
+const char *kPaletteFileKey = "palette_file"
+
+/* Keys for controller configuration */
+const char *kControllerTypeKey = "controller_type"
 
 /*
  * Maintains the current configuration for the emulation.
@@ -14,6 +17,12 @@ const char *kControllerTypeKey_ = "controller_type"
  */
 class Config {
   private:
+    // The name of the config file, and its full subfolder path from
+    // the users home/documents folder.
+    const char *kConfName_ = "ndb.conf";
+    const char *kLinuxSubFolder = "/.config/ndb/ndb.conf";
+    const char *kWinSubFolder = "/ndb/ndb.conf";
+
     // The configuration is stored as a dictionary of strings.
     typedef struct {
       char *key;
@@ -23,6 +32,10 @@ class Config {
 
     // The size of the dictionary is defined in the implementation.
     DictElem **dict_ = NULL;
+
+    // The default location for the configuration file.
+    // This value is OS dependent.
+    char *default_config_;
 
     // Determines the default configuration location should be.
     // The implementation of this function is OS dependent.

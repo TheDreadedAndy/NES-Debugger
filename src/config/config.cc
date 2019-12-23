@@ -10,6 +10,10 @@
 #include <cstdio>
 #include <cstring>
 
+#ifdef _NES_OSWIN
+#include <windows.h>
+#endif
+
 #include "../util/util.h"
 
 // The size of the configuration dictionary.
@@ -27,6 +31,9 @@ Config::Config(char *config_file) {
   // Creates an empty dictionary to hold the configuration.
   dict_ = new DictElem[DICT_SIZE]();
 
+  // Holds the default configuration file location.
+  default_config_ = GetDefaultFile();
+
   // Loads the given configuration file into the dictionary.
   Load(config_file);
 
@@ -37,13 +44,54 @@ Config::Config(char *config_file) {
  * Gets the default configuration files location for the users OS.
  * On Windows, this will be C:/Users/USER/My Documents/ndb/ndb.conf.
  * On Linux, this will be /home/USER/.config/ndb/ndb.conf
+ *
+ * This function always returns some valid string, though the path
+ * may be inaccessible.
+ *
+ * The returned string must be deleted after use.
  */
 char *GetDefaultFile(void) {
-  return NULL;
+#if defined(_NES_OSWIN)
+  // Attempts to retrieve the location of the users documents folder.
+  char path[MAX_PATH + 1];
+  memset(path, 0, MAX_PATH);
+  HRESULT res = SHGetFolderPath(NULL, CSIDL_MYDOCUMENTS, -1,
+                                SHGFP_TYPE_CURRENT, path);
+
+  // If the users documents folder could no be obtained, we return the name
+  // of the conf file instead.
+  if (res != S_OK) {
+    fprintf(stderr, "Error: Failed to find default config folder\n");
+    return StrCpy(kConfName_);
+  }
+
+  // Otherwise, append the subfolder path to the users folder.
+  size_t path_len = strlen(path);
+  size_t sub_len = sizeof(kWinSubPath_) - 1;
+  char *conf = new char[path_len + sub_len + 1];
+  for (size_t i = 0; i < path_len; i++) { conf[i] = path[i]; }
+  for (size_t i = 0; i < sub_len; i++) { conf[path_len + i] = kWinSubPath_[i]; }
+  conf[path_len + sub_len] = '\0';
+  return conf;
+#elif defined(_NES_OSLIN)
+  // Gets the users home folder and appends the subfolder path to it.
+  char *path = getenv("HOME");
+  size_t path_len = strlen(path);
+  size_t sub_len = sizeof(kLinuxSubPath_) - 1;
+  for (size_t i = 0; i < path_len; i++) { conf[i] = kLinuxSubPath_[i]; }
+  for (size_t i = 0; i < sub_len; i++) {
+    conf[path_len + i] = kLinuxSubPath_[i];
+  }
+  conf[path_len + sub_len] = '\0';
+  return conf;
+#else
+  // If no OS is defined, we return the conf file name instead.
+  return StrCpy(kConfName_);
+#endif
 }
 
 /*
- * Loads the keys and values from teh given configuration file into the
+ * Loads the keys and values from the given configuration file into the
  * dictionary for the calling object.
  *
  * If the configuration file is null, a default is loaded.
@@ -61,7 +109,7 @@ void Config::Load(char *config_file) {
 
   // If no file is given, or it cannot be opened, attempts to open a default.
   if (config_file == NULL) {
-    config = fopen(GetDefaultFile(), "a+");
+    config = fopen(default_config_, "a+");
     if (config == NULL) {
       fprintf(stderr, "Error: Failed to open the default config file\n");
       return;
@@ -171,7 +219,7 @@ void Config::Save(char *config_file) {
   // If the given config file was NULL, or if it could not be opened,
   // a default is used.
   if (config_file == NULL) {
-    config = fopen(GetDefaultFile(), "a+");
+    config = fopen(default_config_, "a+");
     if (config == NULL) {
       fprintf(stderr, "Error: Failed to open the default config file\n");
       return;
@@ -323,8 +371,9 @@ Config::~Config(void) {
     }
   }
 
-  // Delete the dict itself.
+  // Delete the dict itself and the default folder path string.
   delete[] dict_;
+  delete[] default_config_;
 
   return;
 }

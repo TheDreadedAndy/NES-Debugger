@@ -122,3 +122,15 @@ void OpenFile(FILE **file) {
 bool StrEq(char *str1, char *str2) {
   return (string1 != NULL) && (string2 != NULL) && (strcmp(str1, str2) == 0);
 }
+
+/*
+ * Copies the given string into a newly allocated string.
+ *
+ * Assumes the given string is non-null.
+ */
+char *StrCpy(char *str) {
+  size_t len = strlen(str);
+  char *copy = new char[len + 1];
+  for (size_t i = 0; i <= len; i++) { copy[i] = str[i]; }
+  return;
+}

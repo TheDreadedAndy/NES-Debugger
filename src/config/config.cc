@@ -8,6 +8,7 @@
 #include <cstdlib>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 
 #include "../util/util.h"
 
@@ -24,12 +25,21 @@
  */
 Config::Config(char *config_file) {
   // Creates an empty dictionary to hold the configuration.
-  dict_ = new DictElem[DICT_SIZE];
+  dict_ = new DictElem[DICT_SIZE]();
 
   // Loads the given configuration file into the dictionary.
   Load(config_file);
 
   return;
+}
+
+/*
+ * Gets the default configuration files location for the users OS.
+ * On Windows, this will be C:/Users/USER/My Documents/ndb/ndb.conf.
+ * On Linux, this will be /home/USER/.config/ndb/ndb.conf
+ */
+char *GetDefaultFile(void) {
+  return NULL;
 }
 
 /*
@@ -41,10 +51,21 @@ Config::Config(char *config_file) {
 void Config::Load(char *config_file) {
   // Attempts to open the given configuration file.
   FILE *config;
-  if (config_file == NULL) {
-    config = fopen(kDefaultConfig_, "a+");
-  } else {
+  if (config_file != NULL) {
     config = fopen(config_file, "a+");
+    if (config == NULL) {
+      config_file = NULL;
+      fprintf(stderr, "Error: Failed to open the given config file\n");
+    }
+  }
+
+  // If no file is given, or it cannot be opened, attempts to open a default.
+  if (config_file == NULL) {
+    config = fopen(GetDefaultFile(), "a+");
+    if (config == NULL) {
+      fprintf(stderr, "Error: Failed to open the default config file\n");
+      return;
+    }
   }
 
   // Scans each line of the file for a valid configuration setting.
@@ -134,36 +155,176 @@ bool Config::ScanVal(char *buf, size_t buf_size, FILE *config) {
 }
 
 /*
- * TODO
+ * Writes the current configuration to the given file.
  */
-void Config::Save(void) {
+void Config::Save(char *config_file) {
+  // Attempts to open the given configuration file.
+  FILE *config;
+  if (config_file != NULL) {
+    config = fopen(config_file, "a+");
+    if (config == NULL) {
+      config_file = NULL;
+      fprintf(stderr, "Error: Failed to open the specified config file\n");
+    }
+  }
+
+  // If the given config file was NULL, or if it could not be opened,
+  // a default is used.
+  if (config_file == NULL) {
+    config = fopen(GetDefaultFile(), "a+");
+    if (config == NULL) {
+      fprintf(stderr, "Error: Failed to open the default config file\n");
+      return;
+    }
+  }
+
+  // Writes each element to the opened config file.
+  for (size_t i = 0; i < DICT_SIZE; i++) {
+    DictElem *elem = dict_[i];
+    while (elem != NULL) {
+      WriteElem(elem, config);
+      elem = elem->next;
+    }
+  }
+
   return;
 }
 
 /*
- * TODO
+ * Writes an element from the dictionary to the given file.
+ *
+ * Assumes the given file is open and non-null.
+ * Assumes the given element is non-null and valid.
  */
-char *Get(char *key, char *default_value = NULL) {
+void Config::WriteElem(DictElem *elem, FILE *file) {
+  fwrite(elem->key, 1, strlen(elem->key), config);
+  fwrite("=", 1, 1, config);
+  fwrite(elem->val, 1, strlen(elem->val), config);
+  fwrite("\n", 1, 1, config);
+  return;
+}
+
+/*
+ * Attempts to get the value assigned to the given key in the configuration
+ * dictionary. If the key is not in the dictionary, the given default value
+ * is assigned set and returned. If no default is given, NULL is returned
+ * and no value is set.
+ *
+ * Assumes the given key is non-null and non-empty.
+ *
+ * The returned value must not be deleted.
+ */
+char Config::*Get(char *key, char *default_value = NULL) {
+  // Get the index of the key, and check if it's in the list.
+  size_t index = Hash(key);
+  DictElem *elem = dict_[index];
+  DictElem *last_elem = NULL;
+  while (elem != NULL) {
+    if (StrEq(elem->key, key)) { return elem->val; }
+    last_elem = elem;
+    elem = elem->next;
+  }
+
+  // If the key was not in the dictionary, and a default was provided,
+  // the default is added to the list and then returned.
+  if (default_value != NULL) {
+    // Checks if this element is the start of a new list.
+    if (last_elem == NULL) {
+      dict_[index] = new DictElem();
+      elem = dict_[index];
+    } else {
+      // Otherwise, the element is added to the end of the list.
+      last_elem->next = new DictElem();
+      elem = last_elem->next;
+    }
+
+    // Creates copies of the key and value for the element, then returns
+    // the value.
+    elem->key = StrCpy(key);
+    elem->val = StrCpy(default_value);
+    return elem->val;
+  }
+
+  // Otherwise, NULL is returned as no value could be found.
   return NULL;
 }
 
 /*
- * TODO
+ * Adds the given value to the configuration dictionary under the given key.
+ * Copies of the given key and value are used in the dictionary.
+ *
+ * Assumes the given key and value are non-null and valid.
  */
-size_t Hash(char *string) {
-  return 0;
-}
+void Config::Set(char *key, char *val) {
+  // If the key is already in the configuration dictionary, the value
+  // is updated.
+  size_t index = Hash(key);
+  DictElem *elem = dict_[index];
+  DictElem *last_elem = NULL;
+  while (elem != NULL) {
+    if (StrEq(elem->key, key)) {
+      delete[] elem->val;
+      elem->val = StrCpy(val);
+      return;
+    }
+    last_elem = elem;
+    elem = elem->next;
+  }
 
-/*
- * TODO
- */
-void Set(char *key, char *val) {
+  // If the key is not already in the dictionary, then a new element is
+  // created for it and its value is set.
+  if (last_elem == NULL) {
+    dict_[index] = new DictElem();
+    elem = dict_[index];
+  } else {
+    last_elem->next = new DictElem();
+    elem = last_elem->next;
+  }
+  elem->key = StrCpy(key);
+  elem->val = StrCpy(val);
+
   return;
 }
 
 /*
- * TODO
+ * Hashes the given string.
+ *
+ * Assumes the given string is non-null.
+ */
+size_t Config::Hash(char *string) {
+  // Start with prime numbers for a better distrobution.
+  const size_t prime_start = 31U
+  size_t hash = 3U;
+
+  // Use the prime numbers and the values of the characters in the string
+  // to create a hash for the string.
+  size_t i = 0;
+  while (string[i] != '\0') {
+    hash = hash * prime_start + string[i];
+    i++;
+  }
+  return hash % DICT_SIZE;
+}
+
+/*
+ * Deletes the dictionary and all of its elements.
  */
 Config::~Config(void) {
+  // Delete each list of elements.
+  for (int i = 0; i < DICT_SIZE; i++) {
+    DictElem *elem = dict_[i];
+    DictElem *next_elem;
+    while (elem != NULL) {
+      next_elem = elem->next;
+      delete[] elem->key;
+      delete[] elem->val;
+      delete elem;
+      elem = next_elem;
+    }
+  }
+
+  // Delete the dict itself.
+  delete[] dict_;
+
   return;
 }

@@ -24,9 +24,16 @@ class Config {
     // The size of the dictionary is defined in the implementation.
     DictElem **dict_ = NULL;
 
+    // Determines the default configuration location should be.
+    // The implementation of this function is OS dependent.
+    char *GetDefaultFile(void);
+
     // Scans a key/value from a line in the configuration file.
     bool ScanKey(char *buf, size_t buf_size, FILE *config);
     bool ScanVal(char *buf, size_t buf_size, FILE *config);
+
+    // Writes an element of the config dictionary to the given file.
+    void WriteElem(DictElem *elem, FILE *file);
 
     // Hashes the given string.
     size_t Hash(char *string);
@@ -40,7 +47,7 @@ class Config {
     void Load(char *config_file);
 
     // Writes any changes back to the config file.
-    void Save(void);
+    void Save(char *config_file);
 
     // Gets a field from the loaded configuration file.
     // If the field does not exist, the specified default value is returned.

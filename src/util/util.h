@@ -18,6 +18,9 @@ size_t GetFileSize(FILE *file);
 void OpenFile(FILE **file);
 
 // Compares two null-terminated strings and returns true if they are equal.
-bool StrEq(char *string1, char *string2);
+bool StrEq(char *str1, char *str2);
+
+// Copies a null terminated string into a newly allocated string.
+char *StrCpy(char *str);
 
 #endif

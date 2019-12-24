@@ -3,6 +3,7 @@
 
 #include <SDL2/SDL.h>
 
+#include "../config/config.h"
 #include "./renderer.h"
 #include "./audio_player.h"
 #include "./input.h"
@@ -30,7 +31,7 @@ class Window {
 
   public:
     // Attempts to create a Window object. Returns NULL on failure.
-    static Window *Create(char *input_cfg, RenderType rendering_type);
+    static Window *Create(Config *config);
 
     // Processes all relevent events on the SDL event queue.
     void ProcessEvents(void);

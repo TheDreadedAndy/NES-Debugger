@@ -27,9 +27,9 @@
  * Creates a new configuration object by allocating a dictionary and
  * using the given configuration file to set values in it.
  */
-Config::Config(char *config_file) {
+Config::Config(const char *config_file) {
   // Creates an empty dictionary to hold the configuration.
-  dict_ = new DictElem[DICT_SIZE]();
+  dict_ = new DictElem*[DICT_SIZE]();
 
   // Holds the default configuration file location.
   default_config_ = GetDefaultFile();
@@ -50,7 +50,7 @@ Config::Config(char *config_file) {
  *
  * The returned string must be deleted after use.
  */
-char *GetDefaultFile(void) {
+char *Config::GetDefaultFile(void) {
 #if defined(_NES_OSWIN)
   // Attempts to retrieve the location of the users documents folder.
   char path[MAX_PATH + 1];
@@ -67,26 +67,32 @@ char *GetDefaultFile(void) {
 
   // Otherwise, append the subfolder path to the users folder.
   size_t path_len = strlen(path);
-  size_t sub_len = sizeof(kWinSubPath_) - 1;
+  size_t sub_len = sizeof(kWinSubFolder_) - 1;
   char *conf = new char[path_len + sub_len + 1];
   for (size_t i = 0; i < path_len; i++) { conf[i] = path[i]; }
-  for (size_t i = 0; i < sub_len; i++) { conf[path_len + i] = kWinSubPath_[i]; }
+  for (size_t i = 0; i < sub_len; i++) {
+    conf[path_len + i] = kWinSubFolder_[i];
+  }
   conf[path_len + sub_len] = '\0';
   return conf;
+
 #elif defined(_NES_OSLIN)
   // Gets the users home folder and appends the subfolder path to it.
   char *path = getenv("HOME");
   size_t path_len = strlen(path);
-  size_t sub_len = sizeof(kLinuxSubPath_) - 1;
-  for (size_t i = 0; i < path_len; i++) { conf[i] = kLinuxSubPath_[i]; }
+  size_t sub_len = sizeof(kLinuxSubFolder_) - 1;
+  char *conf = new char[path_len + sub_len + 1];
+  for (size_t i = 0; i < path_len; i++) { conf[i] = path[i]; }
   for (size_t i = 0; i < sub_len; i++) {
-    conf[path_len + i] = kLinuxSubPath_[i];
+    conf[path_len + i] = kLinuxSubFolder_[i];
   }
   conf[path_len + sub_len] = '\0';
   return conf;
+
 #else
   // If no OS is defined, we return the conf file name instead.
   return StrCpy(kConfName_);
+
 #endif
 }
 
@@ -96,7 +102,7 @@ char *GetDefaultFile(void) {
  *
  * If the configuration file is null, a default is loaded.
  */
-void Config::Load(char *config_file) {
+void Config::Load(const char *config_file) {
   // Attempts to open the given configuration file.
   FILE *config;
   if (config_file != NULL) {
@@ -127,8 +133,8 @@ void Config::Load(char *config_file) {
 
     // Scan the next line for a key and value, and add them to the dictionary
     // if they're valid.
-    if ((key = ScanKey(key, BUF_LIMIT, config)) == NULL) { continue; }
-    if ((val = ScanVal(val, BUF_LIMIT, config)) == NULL) { continue; }
+    if (ScanKey(key, BUF_LIMIT, config)) { continue; }
+    if (ScanVal(val, BUF_LIMIT, config)) { continue; }
     Set(key, val);
   }
 
@@ -205,7 +211,7 @@ bool Config::ScanVal(char *buf, size_t buf_size, FILE *config) {
 /*
  * Writes the current configuration to the given file.
  */
-void Config::Save(char *config_file) {
+void Config::Save(const char *config_file) {
   // Attempts to open the given configuration file.
   FILE *config;
   if (config_file != NULL) {
@@ -244,7 +250,7 @@ void Config::Save(char *config_file) {
  * Assumes the given file is open and non-null.
  * Assumes the given element is non-null and valid.
  */
-void Config::WriteElem(DictElem *elem, FILE *file) {
+void Config::WriteElem(DictElem *elem, FILE *config) {
   fwrite(elem->key, 1, strlen(elem->key), config);
   fwrite("=", 1, 1, config);
   fwrite(elem->val, 1, strlen(elem->val), config);
@@ -262,7 +268,7 @@ void Config::WriteElem(DictElem *elem, FILE *file) {
  *
  * The returned value must not be deleted.
  */
-char Config::*Get(char *key, char *default_value = NULL) {
+char *Config::Get(const char *key, const char *default_value) {
   // Get the index of the key, and check if it's in the list.
   size_t index = Hash(key);
   DictElem *elem = dict_[index];
@@ -303,7 +309,7 @@ char Config::*Get(char *key, char *default_value = NULL) {
  *
  * Assumes the given key and value are non-null and valid.
  */
-void Config::Set(char *key, char *val) {
+void Config::Set(const char *key, const char *val) {
   // If the key is already in the configuration dictionary, the value
   // is updated.
   size_t index = Hash(key);
@@ -339,9 +345,9 @@ void Config::Set(char *key, char *val) {
  *
  * Assumes the given string is non-null.
  */
-size_t Config::Hash(char *string) {
+size_t Config::Hash(const char *string) {
   // Start with prime numbers for a better distrobution.
-  const size_t prime_start = 31U
+  const size_t prime_start = 31U;
   size_t hash = 3U;
 
   // Use the prime numbers and the values of the characters in the string
@@ -359,7 +365,7 @@ size_t Config::Hash(char *string) {
  */
 Config::~Config(void) {
   // Delete each list of elements.
-  for (int i = 0; i < DICT_SIZE; i++) {
+  for (size_t i = 0; i < DICT_SIZE; i++) {
     DictElem *elem = dict_[i];
     DictElem *next_elem;
     while (elem != NULL) {

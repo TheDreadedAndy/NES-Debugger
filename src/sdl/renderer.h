@@ -5,6 +5,8 @@
 
 #include <SDL2/SDL.h>
 
+#include "../config/config.h"
+
 /*
  * The NES draws a 256x240 pictures, which is padded to 280x240. Most tvs
  * display this picture as 280x224. These constants are used to scale the
@@ -20,9 +22,6 @@
 #define NES_WIDTH_PAD_OFFSET_RATIO (12.0 / 280.0)
 #define NES_W_TO_H (256.0 / 224.0)
 #define NES_TRUE_H_TO_W (224.0 / 280.0)
-
-// The types of rendering supported by the emulator.
-typedef enum { RENDER_SOFTWARE, RENDER_HARDWARE } RenderType;
 
 /*
  * Abstract rendering class, used by the emulation to draw the game to
@@ -49,7 +48,7 @@ class Renderer {
 
   public:
     // Creates the specified renderer, and returns it cast to a Render class.
-    static Renderer *Create(SDL_Window *window, RenderType type);
+    static Renderer *Create(SDL_Window *window, Config *config);
 
     // Draws a pixel to the window. The pixel will not be shown until Frame()
     // is called.

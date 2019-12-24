@@ -26,6 +26,7 @@
 #include "../cpu/cpu.h"
 #include "../sdl/renderer.h"
 #include "../memory/memory.h"
+#include "../config/config.h"
 #include "./palette.h"
 
 /* Emulation constants */
@@ -153,11 +154,12 @@
 #define FLAG_SOAM_BUFFER_PATTERN 0x03U
 
 /*
- * Initializes the PPU and palette, using the given file if possible.
+ * Initializes the PPU and palette, using the palette file specified in the
+ * config if it exists.
  *
  * Assumes the provided renderer and memory object are valid.
  */
-Ppu::Ppu(char *file, Memory *memory, Renderer *render, bool *nmi_line) {
+Ppu::Ppu(Memory *memory, Renderer *render, bool *nmi_line, Config *config) {
   // Prepare the ppu structure.
   soam_eval_buf_ = 1;
   current_scanline_ = 261;
@@ -165,7 +167,7 @@ Ppu::Ppu(char *file, Memory *memory, Renderer *render, bool *nmi_line) {
   frame_odd_ = false;
 
   // Create the palette using the given file.
-  palette_ = new NesPalette(file);
+  palette_ = new NesPalette(config->Get(kPaletteFileKey));
 
   // Allocate the sprite renderering buffers.
   primary_oam_ = new DataWord[PRIMARY_OAM_SIZE]();

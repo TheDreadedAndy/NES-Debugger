@@ -21,6 +21,8 @@
 
 #include <SDL2/SDL.h>
 
+#include "../config/config.h"
+#include "../util/util.h"
 #include "./window.h"
 #include "./hardware_renderer.h"
 #include "./software_renderer.h"
@@ -30,18 +32,16 @@
  *
  * Returns NULL on failure.
  */
-Renderer *Renderer::Create(SDL_Window *window, RenderType type) {
+Renderer *Renderer::Create(SDL_Window *window, Config *config) {
   // Calls the creation function for the appropriate derived class.
-  switch (type) {
-    case RENDER_SOFTWARE:
-      return SoftwareRenderer::Create(window);
-    case RENDER_HARDWARE:
-      return HardwareRenderer::Create(window);
-    default:
-      break;
+  char *type = config->Get(kRendererTypeKey, kRendererHardwareVal);
+  if (StrEq(type, kRendererSurfaceVal)) {
+    return SoftwareRenderer::Create(window);
+  } else if (StrEq(type, kRendererHardwareVal)) {
+    return HardwareRenderer::Create(window);
+  } else {
+    return NULL;
   }
-
-  return NULL;
 }
 
 /*

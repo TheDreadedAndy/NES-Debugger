@@ -45,14 +45,14 @@ int main(int argc, char *argv[]) {
   // Long option array, used to parse input.
   struct option long_opts[] = {
     { "surface", 0, NULL, 's' },
+    { "hardware", 0, NULL, 'h' },
     { "file", 1, NULL, 'f' },
     { "palette", 1, NULL, 'p' }
   };
 
   // Parses the users command line input.
   char *rom_file = NULL;
-  char *pal_file = NULL;
-  RenderType rendering_type = RENDER_HARDWARE;
+  Config *config = new Config(NULL);
   signed char opt;
 
   while ((opt = getopt_long(argc, argv, "hf:p:s", long_opts, NULL)) != -1) {
@@ -61,20 +61,24 @@ int main(int argc, char *argv[]) {
         rom_file = optarg;
         break;
       case 'p':
-        pal_file = optarg;
+        config->Set(kPaletteFileKey, optarg);
         break;
       case 's':
-        rendering_type = RENDER_SOFTWARE;
+        config->Set(kRendererTypeKey, kRendererSurfaceVal);
+        break;
+      case 'v':
+        config->Set(kRendererTypeKey, kRendererHardwareVal);
         break;
       default:
         printf("usage: ndb -f <FILE> -p <PALETTE FILE>\n");
+        delete config;
         exit(0);
         break;
     }
   }
 
   // Create the SDL window used by the emulation.
-  Window *window = Window::Create(NULL, rendering_type);
+  Window *window = Window::Create(config);
 
   // Open the rom. Prompt the user to select one if they did not already provide
   // one.
@@ -97,8 +101,7 @@ int main(int argc, char *argv[]) {
 
   // Use the memory object to create the NES CPU, PPU, and APU.
   Cpu *cpu = new Cpu(memory);
-  Ppu *ppu = new Ppu(pal_file, memory, window->GetRenderer(),
-                                       &(cpu->nmi_line_));
+  Ppu *ppu = new Ppu(memory, window->GetRenderer(), &(cpu->nmi_line_), config);
   Apu *apu = new Apu(window->GetAudioPlayer(), memory, &(cpu->irq_line_));
 
   // Connect the CPU, PPU, and APU to memory.
@@ -122,12 +125,16 @@ int main(int argc, char *argv[]) {
     RunEmulationCycle(cpu, ppu, apu);
   }
 
+  // Saves any changes the user made to the config.
+  config->Save();
+
   // Clean up any allocated memory.
   delete apu;
   delete ppu;
   delete cpu;
   delete memory;
   delete window;
+  delete config;
 
   return 0;
 }

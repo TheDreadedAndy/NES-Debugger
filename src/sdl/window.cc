@@ -31,6 +31,7 @@
 #include "./audio_player.h"
 #include "../util/util.h"
 #include "../ndb.h"
+#include "../config/config.h"
 
 // Window size constants
 #define NES_WIDTH 256
@@ -46,7 +47,7 @@ const char *kWindowName = "NES, I guess?";
  * Attempts to create a Window object. Returns NULL and cleans any data already
  * created on failure.
  */
-Window *Window::Create(char *input_cfg, RenderType rendering_type) {
+Window *Window::Create(Config *config) {
   // Init SDL's video system.
   if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_EVENTS) != 0) {
     fprintf(stderr, "Failed to initialize SDL.\n");
@@ -72,7 +73,7 @@ Window *Window::Create(char *input_cfg, RenderType rendering_type) {
 #endif
 
   // Attempt to create a renderer; error on failure.
-  Renderer *renderer = Renderer::Create(window, rendering_type);
+  Renderer *renderer = Renderer::Create(window, config);
   if (renderer == NULL) {
     fprintf(stderr, "Failed to create a renderer for the SDL window.\n");
     SDL_DestroyWindow(window);
@@ -91,7 +92,7 @@ Window *Window::Create(char *input_cfg, RenderType rendering_type) {
   }
 
   // Open the input config file and setup input.
-  Input *input = new Input(input_cfg);
+  Input *input = new Input(config);
 
   // Create a Window object and return it to the caller.
   return new Window(window, renderer, audio, input);

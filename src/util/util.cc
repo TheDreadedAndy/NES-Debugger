@@ -119,8 +119,8 @@ void OpenFile(FILE **file) {
  * Uses strcmp to compare the given strings. Returns true if they are equal
  * and non-null
  */
-bool StrEq(char *str1, char *str2) {
-  return (string1 != NULL) && (string2 != NULL) && (strcmp(str1, str2) == 0);
+bool StrEq(const char *str1, const char *str2) {
+  return (str1 != NULL) && (str2 != NULL) && (strcmp(str1, str2) == 0);
 }
 
 /*
@@ -128,9 +128,9 @@ bool StrEq(char *str1, char *str2) {
  *
  * Assumes the given string is non-null.
  */
-char *StrCpy(char *str) {
+char *StrCpy(const char *str) {
   size_t len = strlen(str);
   char *copy = new char[len + 1];
   for (size_t i = 0; i <= len; i++) { copy[i] = str[i]; }
-  return;
+  return copy;
 }

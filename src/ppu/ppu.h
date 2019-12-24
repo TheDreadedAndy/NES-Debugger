@@ -7,6 +7,7 @@
 #include "../ppu/palette.h"
 #include "../memory/memory.h"
 #include "../sdl/renderer.h"
+#include "../config/config.h"
 
 // The number of secondary sprite buffers used during rendering.
 #define NUM_SOAM_BUFFERS 2U
@@ -123,7 +124,7 @@ class Ppu {
     // The current OAM address is incremented by this operation.
     void OamDma(DataWord val);
 
-    Ppu(char *file, Memory *memory, Renderer *renderer, bool *nmi_line);
+    Ppu(Memory *memory, Renderer *renderer, bool *nmi_line, Config *config);
     ~Ppu(void);
 };
 

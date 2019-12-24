@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <cerrno>
 
 #ifdef _NES_OSWIN
 #include <windows.h>
@@ -67,7 +68,7 @@ char *Config::GetDefaultFile(void) {
 
   // Otherwise, append the subfolder path to the users folder.
   size_t path_len = strlen(path);
-  size_t sub_len = sizeof(kWinSubFolder_) - 1;
+  size_t sub_len = strlen(kWinSubFolder_);
   char *conf = new char[path_len + sub_len + 1];
   for (size_t i = 0; i < path_len; i++) { conf[i] = path[i]; }
   for (size_t i = 0; i < sub_len; i++) {
@@ -80,7 +81,7 @@ char *Config::GetDefaultFile(void) {
   // Gets the users home folder and appends the subfolder path to it.
   char *path = getenv("HOME");
   size_t path_len = strlen(path);
-  size_t sub_len = sizeof(kLinuxSubFolder_) - 1;
+  size_t sub_len = strlen(kLinuxSubFolder_);
   char *conf = new char[path_len + sub_len + 1];
   for (size_t i = 0; i < path_len; i++) { conf[i] = path[i]; }
   for (size_t i = 0; i < sub_len; i++) {
@@ -106,8 +107,8 @@ void Config::Load(const char *config_file) {
   // Attempts to open the given configuration file.
   FILE *config;
   if (config_file != NULL) {
-    config = fopen(config_file, "a+");
-    if (config == NULL) {
+    config = fopen(config_file, "rb");
+    if ((config == NULL) && (errno != ENOENT)) {
       config_file = NULL;
       fprintf(stderr, "Error: Failed to open the given config file\n");
     }
@@ -115,12 +116,15 @@ void Config::Load(const char *config_file) {
 
   // If no file is given, or it cannot be opened, attempts to open a default.
   if (config_file == NULL) {
-    config = fopen(default_config_, "a+");
-    if (config == NULL) {
+    config = fopen(default_config_, "rb");
+    if ((config == NULL) && (errno != ENOENT)) {
       fprintf(stderr, "Error: Failed to open the default config file\n");
       return;
     }
   }
+
+  // If the requested file did not exist, we do nothing.
+  if (errno == ENOENT) { return; }
 
   // Scans each line of the file for a valid configuration setting.
   // Keys and values can be no larger than BUF_LIMIT characters.
@@ -133,8 +137,8 @@ void Config::Load(const char *config_file) {
 
     // Scan the next line for a key and value, and add them to the dictionary
     // if they're valid.
-    if (ScanKey(key, BUF_LIMIT, config)) { continue; }
-    if (ScanVal(val, BUF_LIMIT, config)) { continue; }
+    if (!ScanKey(key, BUF_LIMIT, config)) { continue; }
+    if (!ScanVal(val, BUF_LIMIT, config)) { continue; }
     Set(key, val);
   }
 
@@ -215,7 +219,7 @@ void Config::Save(const char *config_file) {
   // Attempts to open the given configuration file.
   FILE *config;
   if (config_file != NULL) {
-    config = fopen(config_file, "a+");
+    config = fopen(config_file, "w");
     if (config == NULL) {
       config_file = NULL;
       fprintf(stderr, "Error: Failed to open the specified config file\n");
@@ -225,7 +229,7 @@ void Config::Save(const char *config_file) {
   // If the given config file was NULL, or if it could not be opened,
   // a default is used.
   if (config_file == NULL) {
-    config = fopen(default_config_, "a+");
+    config = fopen(default_config_, "w");
     if (config == NULL) {
       fprintf(stderr, "Error: Failed to open the default config file\n");
       return;

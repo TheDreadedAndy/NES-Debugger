@@ -206,6 +206,8 @@ void Config::Save(const char *config_file) {
     }
   }
 
+  // Close the file and return.
+  fclose(config);
   return;
 }
 

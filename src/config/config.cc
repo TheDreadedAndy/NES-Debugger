@@ -1,5 +1,24 @@
 /*
- * TODO
+ * This class manages the configuration file located in the emulators
+ * configuration directory, the location of which is OS dependent.
+ *
+ * The configuration is stored in memory as a dictionary with keys
+ * and values defined as strings. This dictionary is stored on the disk
+ * as a text file with the format "key=val" once per line.
+ * On creation, the configuration object will attempt to load from this file.
+ * At any point later on, the user can force a load from this file.
+ *
+ * Values in the dictionary can be accessed using the Get and Set methods.
+ * Set will add a value to the dictionary under the given key. Get will
+ * attempt to retrieve the value under the given key, and return NULL
+ * if it does not exist. A default value can be provided to Get, which
+ * will be returned and set if and only if no value exists.
+ *
+ * The Hash of the keys is calculated by multiplying and summing the
+ * contents of the string with prime numbers, where the hash is
+ * defined as: H_i = H_(i-1) * P + S[i], where S is the string and P is the
+ * defined prime number (idealy, close to the range of values each character
+ * can take).
  */
 
 #include "./config.h"

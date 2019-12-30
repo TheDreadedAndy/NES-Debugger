@@ -1,18 +1,20 @@
 /*
- * This file provides several memory and file utilities.
+ * This file provides several memory, file, and string utilities.
  *
  * RandNew() creates an array of DataWords with the requested size, then
  * randomizes the contents of this array. This function is used mainly in
  * memory emulation, as serveral games require memory to be in an undefined
  * on power up.
  *
- * GetFileSize() returns the file size of the given file. It is mainly used to
- * verify the file size of the given NES file.
+ * The file utilities provide the emulator with an OS independent way
+ * to interact with the file system. These functions include getting the
+ * size of a file, opening a file open gui to the user, getting the
+ * configuration folder for the emulator, recursively creating a folder
+ * and its parents, and joining two paths together with the proper folder
+ * seperator.
  *
- * OpenFile() opens the proper open file dialogue for the target OS, and fills
- * the given file pointer with an open file that was selected by the user.
- * It returns NULL on failure. It is called by the emulation when the user
- * fails to specify a rom file in the terminal.
+ * The string utilities provide an easy way to perform basic string operations.
+ * Strings can be equated and copied using the functions in this file.
  */
 
 #include "./util.h"
@@ -130,7 +132,6 @@ void OpenFile(FILE **file) {
  * Attempts to create all missing folders in the given path.
  *
  * Assumes paths will be written with ascii characters.
- * Assumes folders in paths will be divided with '/'.
  *
  * Returns false on failure.
  * Returns true on success or if the folders already exist.
@@ -149,7 +150,7 @@ bool CreatePath(const char *path) {
     // Move the null terminator up a level in the path.
     while (sub_path_len > 0) {
       sub_path_len--;
-      if (buf[sub_path_len] == '/') {
+      if (buf[sub_path_len] == kSlash) {
         buf[sub_path_len] = '\0';
         break;
       }
@@ -164,7 +165,7 @@ bool CreatePath(const char *path) {
   while (sub_path_len < path_len) {
     sub_path_len++;
     if (buf[sub_path_len] == '\0') {
-      buf[sub_path_len] = '/';
+      buf[sub_path_len] = kSlash;
       // If create folder fails here, then it was for some reason other then
       // the parents not existing and we return false.
       if (!CreateFolder(buf)) { return false; }
@@ -238,7 +239,7 @@ char *GetRootFolder(void) {
 }
 
 /*
- * Joins the given paths into one path, adding a '/' between the paths.
+ * Joins the given paths into one path, adding a kSlash between the paths.
  * If the first path is an empty string, a copy of the second path is
  * returned (so that it can be used as a reletive path).
  *

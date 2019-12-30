@@ -12,6 +12,13 @@ const char* const kUndefinedRootFolder = "";
 const char* const kLinuxSubPath = ".config/ndb";
 const char* const kWindowsSubPath = "ndb";
 
+// Folders are seperated differently on windows, because why wouldn't they be.
+#ifdef _NES_OSWIN
+const char kSlash = '\\';
+#else
+const char kSlash = '/';
+#endif
+
 // Returns a randomized array of type word_t. The array is created with new,
 // and must be free'd with delete.
 DataWord *RandNew(size_t size);
@@ -29,7 +36,7 @@ bool CreatePath(const char *str);
 // Gets the configuration directory for the emulator.
 char *GetRootFolder(void);
 
-// Appends two strings to each other, adding a '/' between them.
+// Appends two strings to each other, adding a kSlash between them.
 char *JoinPaths(const char *path1, const char *path2);
 
 // Compares two null-terminated strings and returns true if they are equal.

@@ -50,12 +50,17 @@ int main(int argc, char *argv[]) {
     { "palette", 1, NULL, 'p' }
   };
 
+  // Prepares the configuration object, which can be modified by the
+  // command line input. The configuration folder is created before
+  // creating a configuration object.
+  char *root_path = GetRootFolder();
+  CreatePath(root_path);
+  delete[] root_path;
+  Config *config = new Config(NULL);
 
   // Parses the users command line input.
   char *rom_file = NULL;
-  Config *config = new Config(NULL);
   signed char opt;
-
   while ((opt = getopt_long(argc, argv, "hf:p:s", long_opts, NULL)) != -1) {
     switch (opt) {
       case 'f':
@@ -74,17 +79,8 @@ int main(int argc, char *argv[]) {
         printf("usage: ndb -f <FILE> -p <PALETTE FILE>\n");
         delete config;
         exit(0);
-        break;
     }
   }
-
-  // Create the directory for the emulators persistent files.
-  char *root_path = GetRootFolder();
-  CreatePath(root_path);
-  delete[] root_path;
-
-  // Create the SDL window used by the emulation.
-  Window *window = Window::Create(config);
 
   // Open the rom. Prompt the user to select one if they did not already provide
   // one.
@@ -100,6 +96,9 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "Failed to open the specified file.\n");
     abort();
   }
+
+  // Create the SDL window used by the emulation.
+  Window *window = Window::Create(config);
 
   // Use the rom file to create the memory object.
   Memory *memory = Memory::Create(rom);

@@ -34,7 +34,7 @@
  */
 Renderer *Renderer::Create(SDL_Window *window, Config *config) {
   // Calls the creation function for the appropriate derived class.
-  char *type = config->Get(kRendererTypeKey, kRendererHardwareVal);
+  const char *type = config->Get(kRendererTypeKey, kRendererHardwareVal);
   if (StrEq(type, kRendererSurfaceVal)) {
     return SoftwareRenderer::Create(window);
   } else if (StrEq(type, kRendererHardwareVal)) {

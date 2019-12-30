@@ -22,15 +22,26 @@
 #include <cstdlib>
 #include <ctime>
 #include <cstring>
+#include <cerrno>
 
 #ifdef _NES_OSWIN
 #include <windows.h>
 #endif
 
+#ifdef _NES_OSLIN
+#include <sys/stat.h>
+#endif
+
 #include "./data.h"
 
-// The size of the buffer used to hold the opened files name in open_file()
-#define NAME_BUFFER_SIZE 1024U
+#ifdef _NES_OSLIN
+// The maximum valid path size on linux.
+// Note that windows.h defines this constant as 260.
+#define MAX_PATH 4096U
+#endif
+
+/* Helper function declarations */
+bool CreateFolder(const char *path);
 
 /*
  * Allocates the requested number of words using new, then randomizes the
@@ -79,18 +90,18 @@ size_t GetFileSize(FILE *file) {
  * that file. The opened file is placed in the provided pointer.
  */
 void OpenFile(FILE **file) {
-  char user_file_name[NAME_BUFFER_SIZE];
+  char user_file_name[MAX_PATH + 1];
 
 #ifdef _NES_OSLIN
   // Get the file name of the file the user opened.
   FILE *user_file = popen("zenity --file-selection", "r");
-  if (fgets(user_file_name, NAME_BUFFER_SIZE, user_file) == NULL) {
+  if (fgets(user_file_name, MAX_PATH, user_file) == NULL) {
     *file = NULL;
     return;
   }
 
   // Remove the newline character added by zenity.
-  for (size_t i = 0; i < NAME_BUFFER_SIZE; i++) {
+  for (size_t i = 0; i < MAX_PATH; i++) {
     if (user_file_name[i] == '\n') {
       user_file_name[i] = '\0';
       break;
@@ -103,8 +114,8 @@ void OpenFile(FILE **file) {
   OPENFILENAMEA *prompt_info = new OPENFILENAMEA;
   prompt_info->lStructSize = sizeof(OPENFILENAMEA);
   prompt_info->lpstrFile = user_file_name;
-  prompt_info->nMaxFile = NAME_BUFFER_SIZE;
-  memset(user_file_name, 0, NAME_BUFFER_SIZE);
+  prompt_info->nMaxFile = MAX_PATH;
+  memset(user_file_name, 0, MAX_PATH);
 
   // Open the file prompt.
   GetOpenFileNameA(prompt_info);
@@ -113,6 +124,143 @@ void OpenFile(FILE **file) {
   // Open the provided file.
   *file = fopen(user_file_name, "rb");
   return;
+}
+
+/*
+ * Attempts to create all missing folders in the given path.
+ *
+ * Assumes paths will be written with ascii characters.
+ * Assumes folders in paths will be divided with '/'.
+ *
+ * Returns false on failure.
+ * Returns true on success or if the folders already exist.
+ */
+bool CreatePath(const char *path) {
+  // Create a buffer to hold the provided path, and copy the path in.
+  char buf[MAX_PATH + 1];
+  size_t path_len = strlen(path);
+  if (path_len > MAX_PATH) { return false; }
+  for (size_t i = 0; i <= path_len; i++) { buf[i] = path[i]; }
+
+  // Attempt to create each folder in the path, starting from the latest
+  // and stopping once one is successfully created (or exists).
+  size_t sub_path_len = path_len;
+  while (!CreateFolder(buf)) {
+    // Move the null terminator up a level in the path.
+    while (sub_path_len > 0) {
+      sub_path_len--;
+      if (buf[sub_path_len] == '/') {
+        buf[sub_path_len] = '\0';
+        break;
+      }
+    }
+
+    // We failed to create the top level folder.
+    if (sub_path_len == 0) { return false; }
+  }
+
+  // Repeats the process in the reverse order, creating folders from
+  // the first one that existed one at a time.
+  while (sub_path_len < path_len) {
+    sub_path_len++;
+    if (buf[sub_path_len] == '\0') {
+      buf[sub_path_len] = '/';
+      // If create folder fails here, then it was for some reason other then
+      // the parents not existing and we return false.
+      if (!CreateFolder(buf)) { return false; }
+    }
+  }
+
+  return true;
+}
+
+/*
+ * Attempts to create the given folder.
+ *
+ * Returns true on success, or if the given folder exists already.
+ * Returns false on failure.
+ */
+bool CreateFolder(const char *path) {
+#if defined(_NES_OSLIN)
+  // If the folder is being created on linux, we assume that only the active
+  // user should have permission to use it.
+  return (mkdir(path, S_IRWXU) == 0) || (errno == EEXIST);
+
+#elif defined(_NES_OSWIN)
+  return (CreateDirectoryA(path, NULL))
+      || (GetLastError() == ERROR_ALREADY_EXISTS);
+
+#else
+  return false;
+
+#endif
+}
+
+/*
+ * Gets the location of the configuration folder, which depends on the users OS.
+ * On Windows, this will be C:/Users/USER/My Documents/ndb
+ * On Linux, this will be /home/USER/.config/ndb
+ *
+ * This function always returns some valid string, though the path may be
+ * inaccessible.
+ *
+ * The returned string must be deleted after use.
+ */
+char *GetRootFolder(void) {
+#if defined(_NES_OSLIN)
+  char *home = getenv("HOME");
+  if (home == NULL) {
+    return StrCpy(kUndefinedRootFolder);
+  } else {
+    return JoinPaths(home, kLinuxSubPath);
+  }
+
+#elif defined(_NES_OSWIN)
+  // Attempt to find the users documents folder.
+  char path[MAX_PATH + 1];
+  memset(path, 0, MAX_PATH);
+  HRESULT res = SHGetFolderPath(NULL, CSIDL_MYDOCUMENTS, -1,
+                                SHGFP_TYPE_CURRENT, path);
+
+  // If the users documents folder could not be obtained, we return the
+  // undefined root folder.
+  if (res != S_OK) {
+    fprintf(stderr, "Error: Failed to find the default folder\n");
+    return StrCpy(kUndefinedRootFolder);
+  } else {
+    return JoinPaths(path, kWindowsSubPath);
+  }
+
+#else
+  return StrCpy(kUndefinedRootFolder);
+
+#endif
+}
+
+/*
+ * Joins the given paths into one path, adding a '/' between the paths.
+ * If the first path is an empty string, a copy of the second path is
+ * returned (so that it can be used as a reletive path).
+ *
+ * Assumes both paths are non-null and valid strings.
+ *
+ * The returned string must be deleted after use.
+ */
+char *JoinPaths(const char *path1, const char *path2) {
+  // Return the second path if the first is the undefined root.
+  if (StrEq(kUndefinedRootFolder, path1)) { return StrCpy(path2); }
+
+  // Append path2 to path1.
+  size_t path1_len = strlen(path1);
+  size_t path2_len = strlen(path2);
+  size_t path_len = path1_len + path2_len + 2;
+  char *path = new char[path_len];
+  for (size_t i = 0; i < path1_len; i++) { path[i] = path1[i]; }
+  path[path1_len] = '/';
+  for (size_t i = 0; i <= path2_len; i++) {
+    path[i + path1_len + 1U] = path2[i];
+  }
+  return path;
 }
 
 /*

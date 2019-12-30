@@ -50,6 +50,7 @@ int main(int argc, char *argv[]) {
     { "palette", 1, NULL, 'p' }
   };
 
+
   // Parses the users command line input.
   char *rom_file = NULL;
   Config *config = new Config(NULL);
@@ -76,6 +77,11 @@ int main(int argc, char *argv[]) {
         break;
     }
   }
+
+  // Create the directory for the emulators persistent files.
+  char *root_path = GetRootFolder();
+  CreatePath(root_path);
+  delete[] root_path;
 
   // Create the SDL window used by the emulation.
   Window *window = Window::Create(config);

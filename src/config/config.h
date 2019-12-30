@@ -43,8 +43,6 @@ class Config {
     // The name of the config file, and its full subfolder path from
     // the users home/documents folder.
     const char* const kConfName_ = "ndb.conf";
-    const char* const kLinuxSubFolder_ = "/.config/ndb/ndb.conf";
-    const char* const kWinSubFolder_ = "/ndb/ndb.conf";
 
     // The configuration is stored as a dictionary of strings.
     struct DictElem {
@@ -87,7 +85,7 @@ class Config {
 
     // Gets a field from the loaded configuration file.
     // If the field does not exist, the specified default value is returned.
-    char *Get(const char* key, const char *default_value = NULL);
+    const char *Get(const char* key, const char *default_value = NULL);
 
     // Sets a field in the loaded configuration.
     void Set(const char* key, const char *val);

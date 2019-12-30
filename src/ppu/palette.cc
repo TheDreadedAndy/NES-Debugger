@@ -48,7 +48,7 @@
 /*
  * Initializes the palette using the given file.
  */
-NesPalette::NesPalette(char *file) {
+NesPalette::NesPalette(const char *file) {
   // This variable contains the default palette file.
   extern const DataWord _binary_bins_nes_palette_bin_start[];
 

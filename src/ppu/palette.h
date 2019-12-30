@@ -37,7 +37,7 @@ class NesPalette {
   public:
     // Loads in the given palette file for use in decoding colors.
     // If the file is NULL or invalid, a default is used.
-    NesPalette(char *file);
+    NesPalette(const char *file);
 
     // Decodes an NES color into an RGB color.
     uint32_t Decode(DataWord color);

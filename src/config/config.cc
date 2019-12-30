@@ -52,49 +52,10 @@ Config::Config(const char *config_file) {
  * The returned string must be deleted after use.
  */
 char *Config::GetDefaultFile(void) {
-#if defined(_NES_OSWIN)
-  // Attempts to retrieve the location of the users documents folder.
-  char path[MAX_PATH + 1];
-  memset(path, 0, MAX_PATH);
-  HRESULT res = SHGetFolderPath(NULL, CSIDL_MYDOCUMENTS, -1,
-                                SHGFP_TYPE_CURRENT, path);
-
-  // If the users documents folder could no be obtained, we return the name
-  // of the conf file instead.
-  if (res != S_OK) {
-    fprintf(stderr, "Error: Failed to find default config folder\n");
-    return StrCpy(kConfName_);
-  }
-
-  // Otherwise, append the subfolder path to the users folder.
-  size_t path_len = strlen(path);
-  size_t sub_len = strlen(kWinSubFolder_);
-  char *conf = new char[path_len + sub_len + 1];
-  for (size_t i = 0; i < path_len; i++) { conf[i] = path[i]; }
-  for (size_t i = 0; i < sub_len; i++) {
-    conf[path_len + i] = kWinSubFolder_[i];
-  }
-  conf[path_len + sub_len] = '\0';
-  return conf;
-
-#elif defined(_NES_OSLIN)
-  // Gets the users home folder and appends the subfolder path to it.
-  char *path = getenv("HOME");
-  size_t path_len = strlen(path);
-  size_t sub_len = strlen(kLinuxSubFolder_);
-  char *conf = new char[path_len + sub_len + 1];
-  for (size_t i = 0; i < path_len; i++) { conf[i] = path[i]; }
-  for (size_t i = 0; i < sub_len; i++) {
-    conf[path_len + i] = kLinuxSubFolder_[i];
-  }
-  conf[path_len + sub_len] = '\0';
-  return conf;
-
-#else
-  // If no OS is defined, we return the conf file name instead.
-  return StrCpy(kConfName_);
-
-#endif
+  char *root = GetRootFolder();
+  char *file = JoinPaths(root, kConfName_);
+  delete[] root;
+  return file;
 }
 
 /*
@@ -272,7 +233,7 @@ void Config::WriteElem(DictElem *elem, FILE *config) {
  *
  * The returned value must not be deleted.
  */
-char *Config::Get(const char *key, const char *default_value) {
+const char *Config::Get(const char *key, const char *default_value) {
   // Get the index of the key, and check if it's in the list.
   size_t index = Hash(key);
   DictElem *elem = dict_[index];

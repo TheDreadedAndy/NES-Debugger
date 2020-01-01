@@ -195,9 +195,17 @@ class Cpu {
     bool nmi_line_ = false;
 
     // Creates a new CPU object.
-    Cpu(Memory *memory);
+    Cpu(void);
+
+    // Connects a Memory object to the calling CPU object.
+    void Connect(Memory *memory);
+
+    // Reads the reset vector from memory so that the CPU can start emulating
+    // cycles. Connect() must be called before this function.
+    void Power(void);
 
     // Executes the next cycle of the cpu emulation.
+    // Connect() and Power() must be called before this function.
     void RunCycle(void);
 
     // Starts a DMA transfer from CPU memory to PPU OAM.

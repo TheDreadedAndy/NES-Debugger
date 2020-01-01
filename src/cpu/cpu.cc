@@ -45,11 +45,11 @@
 #define DMA_CYCLE_LENGTH 513U
 
 /*
- * Initializes everything related to the cpu so that the emulation can begin.
+ * Creates a new CPU object. The CPU object will not be in a usable state
+ * until Connect() and Power() have been called.
  */
-Cpu::Cpu(Memory *memory) {
-  // Init all cpu structures.
-  memory_ = memory;
+Cpu::Cpu(void) {
+  // Prepares the CPU's internal structures.
   state_ = new CpuState();
   regs_ = new CpuRegFile();
 
@@ -59,17 +59,38 @@ Cpu::Cpu(Memory *memory) {
   regs_->p.irq_disable = true;
   regs_->s.w[WORD_HI] = MEMORY_STACK_HIGH;
 
-  // Load the reset location into the pc.
-  regs_->pc.w[WORD_LO] = memory_->Read(MEMORY_RESET_ADDR);
-  regs_->pc.w[WORD_HI] = memory_->Read(MEMORY_RESET_ADDR + 1);
+  return;
+}
 
-  // Queue the first cycle to be emulated.
+/*
+ * Connects the given Memory object to the calling CPU object.
+ * This memory object will then be used in the emulation.
+ */
+void Cpu::Connect(Memory *memory) {
+  memory_ = memory;
+  return;
+}
+
+/*
+ * Loads the reset vector from memory and then adds a cycle to the state
+ * queue. This function must be called before RunCycle() can be used.
+ *
+ * Assumes that the CPU has been connected to a valid Memory object.
+ */
+void Cpu::Power(void) {
+  // Loads the reset location into the program counter.
+  regs_->pc.w[WORD_LO] = memory_->Read(MEMORY_RESET_ADDR);
+  regs_->pc.w[WORD_HI] = memory_->Read(MEMORY_RESET_ADDR + 1U);
+
+  // Queues the first cycle to be emulated.
   state_->AddCycle(&Cpu::MemFetch, &Cpu::Nop, PC_INC);
   return;
 }
 
 /*
  * Executes the next cycle in the cpu emulation using the cpu structures.
+ *
+ * Assumes that there is at least one cycle in the state queue.
  */
 void Cpu::RunCycle(void) {
   // Check if the CPU is suspended and executing a DMA.

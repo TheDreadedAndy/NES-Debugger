@@ -108,7 +108,14 @@ class Ppu {
     void MmioVramAddrInc(void);
 
   public:
+    // Creates a PPU object using the provided configuration object.
+    Ppu(Config *config);
+
+    // Connects the PPU to the rest of the emulation.
+    Connect(Memory *memory, Renderer *render, bool *nmi_line);
+
     // Runs the next emulated PPU cycle.
+    // Connect() must be called before this function can be used.
     void RunCycle(void);
 
     // Used to give memory access to the palette decoder.
@@ -124,7 +131,6 @@ class Ppu {
     // The current OAM address is incremented by this operation.
     void OamDma(DataWord val);
 
-    Ppu(Memory *memory, Renderer *renderer, bool *nmi_line, Config *config);
     ~Ppu(void);
 };
 

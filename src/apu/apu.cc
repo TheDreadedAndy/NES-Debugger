@@ -169,16 +169,10 @@ static const DataWord length_table[] = { 10, 254, 20, 2, 40, 4, 80, 6, 160, 8,
                                          28, 32, 30 };
 
 /*
- * Creates an APU object.
- *
- * Assumes the provided memory object and irq line are valid.
+ * Creates an APU object. The object will not be in a valid state until
+ * Connect() has been called.
  */
-Apu::Apu(AudioPlayer *audio, Memory *memory, DataWord *irq_line) {
-  // Stores the provided audio device, memory object, and CPU IRQ line.
-  audio_ = audio;
-  memory_ = memory;
-  irq_line_ = irq_line;
-
+Apu::Apu(void) {
   // Allocate the channels of the APU.
   pulse_a_ = new ApuPulse();
   pulse_b_ = new ApuPulse();
@@ -192,7 +186,20 @@ Apu::Apu(AudioPlayer *audio, Memory *memory, DataWord *irq_line) {
 }
 
 /*
+ * Connects the APU to the reset of the system.
+ * This function must be called before the emulation can begin.
+ */
+void Apu::Connect(Memory *memory, AudioPlayer *audio, DataWord *irq_line) {
+  memory_ = memory;
+  audio_ = audio;
+  irq_line_ = irq_line;
+  return;
+}
+
+/*
  * Runs a cycle of the APU emulation.
+ *
+ * Assumes Connect() has been called.
  */
 void Apu::RunCycle(void) {
   // Only the triangle wave updates on odd cycles.

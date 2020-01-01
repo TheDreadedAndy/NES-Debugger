@@ -30,7 +30,7 @@
 #include "./renderer.h"
 #include "./audio_player.h"
 #include "../util/util.h"
-#include "../ndb.h"
+#include "../emulation/signals.h"
 #include "../config/config.h"
 
 // Window size constants

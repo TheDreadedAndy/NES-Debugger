@@ -149,9 +149,13 @@ class Apu {
 
   public:
     // Creates a new APU.
-    Apu(AudioPlayer *audio, Memory *memory, DataWord *irq_line);
+    Apu(void);
+
+    // Connects the APU to the rest of the console.
+    void Connect(AudioPlayer *audio, Memory *memory, DataWord *irq_line);
 
     // Runs an APU cycle, updating the channels.
+    // Connect() must be called before this function.
     void RunCycle(void);
 
     // Writes to a memory mapped APU register.

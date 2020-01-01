@@ -157,9 +157,9 @@
  * Initializes the PPU and palette, using the palette file specified in the
  * config if it exists.
  *
- * Assumes the provided renderer and memory object are valid.
+ * Assumes the provided configuration object is valid.
  */
-Ppu::Ppu(Memory *memory, Renderer *render, bool *nmi_line, Config *config) {
+Ppu::Ppu(Config *config) {
   // Prepare the ppu structure.
   soam_eval_buf_ = 1;
   current_scanline_ = 261;
@@ -175,17 +175,25 @@ Ppu::Ppu(Memory *memory, Renderer *render, bool *nmi_line, Config *config) {
   soam_buffer_[1] = new DataWord[SOAM_BUFFER_SIZE]();
   oam_buffer_ = new DataWord[OAM_BUFFER_SIZE]();
 
-  // Stores the given Memory and Renderer class for use in the emulation.
+  return;
+}
+
+/*
+ * Connects the PPU to the rest of the emulated system. This function
+ * must be called after initialization to put the PPU in a valid state.
+ */
+void Ppu::Connect(Memory *memory, Renderer *render, bool *nmi_line) {
   memory_ = memory;
   renderer_ = render;
   nmi_line_ = nmi_line;
-
   return;
 }
 
 /*
  * Runs the next cycle in the ppu emulation, then increments the cycle/scanline
  * counters.
+ *
+ * Assumes Connect() has already been called.
  */
 void Ppu::RunCycle(void) {
   // Check if rendering has been disabled by the software.

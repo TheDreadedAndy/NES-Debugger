@@ -257,7 +257,7 @@ char *JoinPaths(const char *path1, const char *path2) {
   size_t path_len = path1_len + path2_len + 2;
   char *path = new char[path_len];
   for (size_t i = 0; i < path1_len; i++) { path[i] = path1[i]; }
-  path[path1_len] = '/';
+  path[path1_len] = kSlash;
   for (size_t i = 0; i <= path2_len; i++) {
     path[i + path1_len + 1U] = path2[i];
   }

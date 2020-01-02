@@ -2,37 +2,15 @@
  * TODO
  */
 
-#include "./ndb.h"
-
 #include <cstdio>
 #include <cstdlib>
 #include <ctime>
 
 #include <getopt.h>
 
-#include "./emulation/emutime.h"
-#include "./sdl/window.h"
-#include "./sdl/renderer.h"
-#include "./sdl/audio_player.h"
-#include "./sdl/input.h"
+#include "./emulation/signals.h"
+#include "./emulation/emulation.h"
 #include "./util/util.h"
-#include "./cpu/cpu.h"
-#include "./memory/memory.h"
-#include "./memory/header.h"
-#include "./ppu/ppu.h"
-#include "./apu/apu.h"
-
-// The number of cpu cycles that will be emulated per emulation cycle.
-// With the current timing system, this must be set to one 60th of the
-// 2A03 clock rate.
-#define EMU_CYCLE_SIZE 29830
-
-// Global running variable. Available to other files through ndb.h.
-// Setting this value to false closes the program.
-bool ndb_running = true;
-
-/* Helper functions */
-static void RunEmulationCycle(Cpu *cpu, Ppu *ppu, Apu *apu);
 
 /*
  * Loads in the users arguments and starts ndb.
@@ -97,67 +75,21 @@ int main(int argc, char *argv[]) {
     abort();
   }
 
-  // Create the SDL window used by the emulation.
-  Window *window = Window::Create(config);
-
-  // Use the rom file to create the memory object.
-  Memory *memory = Memory::Create(rom);
-  memory->AddController(window->GetInput());
-
-  // Use the memory object to create the NES CPU, PPU, and APU.
-  Cpu *cpu = new Cpu(memory);
-  Ppu *ppu = new Ppu(memory, window->GetRenderer(), &(cpu->nmi_line_), config);
-  Apu *apu = new Apu(window->GetAudioPlayer(), memory, &(cpu->irq_line_));
-
-  // Connect the CPU, PPU, and APU to memory.
-  memory->Connect(cpu, ppu, apu);
+  // Create the object that will run the emulation.
+  Emulation *emu = Emulation::Create(rom, config);
 
   // Close the rom file.
   fclose(rom);
 
   // Main emulation loop.
-  while (ndb_running) {
-    // Syncs the emulation to 60 FPS, when possible.
-    EmutimeSyncFrameRate(NES_FRAME_RATE);
-
-    // Update the frame rate display.
-    EmutimeUpdateFrameCounter(NES_FRAME_RATE, window);
-
-    // Process any events on the SDL queue.
-    window->ProcessEvents();
-
-    // Execute the next frame of emulation.
-    RunEmulationCycle(cpu, ppu, apu);
-  }
+  emu->Run();
 
   // Saves any changes the user made to the config.
   config->Save();
 
   // Clean up any allocated memory.
-  delete apu;
-  delete ppu;
-  delete cpu;
-  delete memory;
-  delete window;
+  delete emu;
   delete config;
 
   return 0;
-}
-
-/*
- * Runs a predetermined number of emulation cycles.
- *
- * Assumes the emulation has been initialized.
- */
-static void RunEmulationCycle(Cpu *cpu, Ppu *ppu, Apu *apu) {
-  for (size_t i = 0; i < EMU_CYCLE_SIZE; i++) {
-    // The PPU is clocked at 3x the rate of the CPU, the APU is clocked
-    // at 1/2 the rate of the CPU.
-    ppu->RunCycle();
-    ppu->RunCycle();
-    ppu->RunCycle();
-    cpu->RunCycle();
-    apu->RunCycle();
-  }
-  return;
 }

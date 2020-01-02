@@ -152,7 +152,7 @@ class Apu {
     Apu(void);
 
     // Connects the APU to the rest of the console.
-    void Connect(AudioPlayer *audio, Memory *memory, DataWord *irq_line);
+    void Connect(Memory *memory, AudioPlayer *audio, DataWord *irq_line);
 
     // Runs an APU cycle, updating the channels.
     // Connect() must be called before this function.

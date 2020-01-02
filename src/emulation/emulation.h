@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <ctime>
 
+#include "../config/config.h"
 #include "../sdl/window.h"
 #include "../cpu/cpu.h"
 #include "../ppu/ppu.h"
@@ -27,14 +28,16 @@ class Emulation {
     Ppu *ppu_;
     Apu *apu_;
 
-    /* Functions used to time the emulation */
-
     // Redefinition of the structure used for timing.
     typedef struct timespec EmuTime;
 
     // Used to time the emulator and calculate the frame rate.
-    Emutime last_time = { 0, 0};
-    long frames_counted = 0;
+    EmuTime last_sync_time_ = { 0, 0 };
+    EmuTime last_frame_time_ = { 0, 0 };
+    long frames_counted_ = 0;
+
+    // Stores the objects provided by the factory create function.
+    Emulation(Window *window, Memory *memory, Cpu *cpu, Ppu *ppu, Apu *apu);
 
     // Syncs the emulation to the given frame rate.
     void SyncFrameRate(void);
@@ -51,9 +54,12 @@ class Emulation {
     // Subtracts the first time from the second time, storing the result.
     void TimeDiff(EmuTime *time1, EmuTime *time2, EmuTime *res);
 
+    // Runs the NES emulation for 1/60th of its clock rate.
+    void RunEmulationCycle(void);
+
   public:
-    // Creates a new Emulation object using the provided config.
-    Emulation(FILE *rom, Config *config);
+    // Attempts to create the object used to manage the emulation.
+    static Emulation *Create(FILE *rom, Config *config);
 
     // Starts the main emulation loop. This function does not
     // return until the user or OS closes the emulation window.

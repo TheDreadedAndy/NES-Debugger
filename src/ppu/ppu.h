@@ -112,7 +112,7 @@ class Ppu {
     Ppu(Config *config);
 
     // Connects the PPU to the rest of the emulation.
-    Connect(Memory *memory, Renderer *render, bool *nmi_line);
+    void Connect(Memory *memory, Renderer *render, bool *nmi_line);
 
     // Runs the next emulated PPU cycle.
     // Connect() must be called before this function can be used.

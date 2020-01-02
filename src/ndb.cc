@@ -81,6 +81,9 @@ int main(int argc, char *argv[]) {
   // Close the rom file.
   fclose(rom);
 
+  // Register the signal handlers that will be used to control the emulation.
+  RegisterSignalHandlers();
+
   // Main emulation loop.
   emu->Run();
 

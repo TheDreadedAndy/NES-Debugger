@@ -160,7 +160,8 @@ void Emulation::UpdateFrameCounter(void) {
     frames_counted_ = 0;
 
     // Update the last called time.
-    TimeGet(&last_frame_time_);
+    last_frame_time_.tv_sec = current_time.tv_sec;
+    last_frame_time_.tv_nsec = current_time.tv_nsec;
   }
 
   return;

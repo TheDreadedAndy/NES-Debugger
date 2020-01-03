@@ -1,20 +1,35 @@
-# Creates a list of main files, headers, and objects (that are not main).
-MAINS = ndb.o
-OBJECTS = $(addprefix build/,$(filter-out $(MAINS),$(patsubst %.cc,%.o,$(wildcard */*.cc))))
-HEADERS = $(wildcard */*.h)
+# The names of the binaries to be created.
+# A corresponding .cc file must exist for each entry.
+MAINS = ndb
+
+# The names of all non-main objects.
+OBJECTS = $(addprefix build/,$(filter-out $(addsuffix .o,$(MAINS)),$(patsubst %.cc,%.o,$(wildcard */*.cc))))
+
+# The objects to be compiled from .cc source files and the dependency
+# files corresponding to these objects.
+SRC = $(OBJECTS) $(addprefix build/,$(addsuffix .o,$(MAINS)))
+DEPS = $(patsubst %.o,%.d,$(SRC))
+
+# The binary files to be linked to the executable binary.
 BINS = $(addprefix build/,$(patsubst %.bin,%.o,$(wildcard bins/*.bin)))
-DIRS = $(sort $(dir $(OBJECTS) $(BINS)))
-CC = g++
+
+# The directories to be made before building.
+DIRS = $(sort $(dir $(BINS) $(SRC)))
+
+# The compiler to be used and its flags.
+CXX = g++
+override CXXFLAGS += -std=c++17 -Wall -Wshadow -Wextra -Wold-style-cast -Werror -pedantic -O3 $(shell sdl2-config --cflags)
+
+# Libraries to be linked to the binary.
 LIBS = $(shell sdl2-config --libs)
-override CFLAGS += -std=c++17 -Wall -Wshadow -Wextra -Wold-style-cast -Werror -pedantic -O3 $(shell sdl2-config --cflags)
 
 # Determine which OS is being compiled for.
 ifeq ($(OS),Windows_NT)
-    override CFLAGS += -D_NES_OSWIN
+    override CXXFLAGS += -D_NES_OSWIN
 else
     UNAME := $(shell uname -s)
     ifeq ($(UNAME),Linux)
-        override CFLAGS += -D_NES_OSLIN
+        override CXXFLAGS += -D_NES_OSLIN
     else
         $(error Fatal: Cannot determine target OS.)
     endif
@@ -23,18 +38,24 @@ endif
 # Sets the default command to ndb
 default: ndb
 
-# Builds a general object file.
-$(OBJECTS): build/%.o : %.cc $(DIRS) $(HEADERS)
-	$(CC) $(CFLAGS) -c $(patsubst build/%.o,%.cc,$@) -o $@
+# Builds an object file and an associated dependency file.
+$(SRC): build/%.o : %.cc build/%.d | $(DIRS)
+	$(CXX) $(CXXFLAGS) -MMD -c $(patsubst build/%.o,%.cc,$@) -MF $(patsubst %.o,%.d,$@) -o $@
+
+# Ensures that an object will be rebuilt if its dependency list is missing.
+$(DEPS):;
+
+# Includes all built dependency files as they are created.
+# This ensures that files will be rebuilt when the headers they depend on change.
+-include $(DEPS)
 
 # Setup a binary file to be linked.
-$(BINS): build/%.o : %.bin $(DIRS)
+$(BINS): build/%.o : %.bin | $(DIRS)
 	ld -r -b binary $(patsubst build/%.o,%.bin,$@) -o $@
 
 # General format for building a main file.
-$(patsubst %.o,%,$(MAINS)): $(OBJECTS) $(BINS)
-	$(CC) $(CFLAGS) -c $@.cc -o build/$@.o
-	$(CC) $(OBJECTS) $(BINS) build/$@.o -o $@ $(LIBS)
+$(MAINS): % : build/%.o $(OBJECTS) $(BINS) | $(DIRS)
+	$(CXX) $(OBJECTS) $(BINS) build/$@.o -o $@ $(LIBS)
 
 $(DIRS):
 	mkdir -p $@
@@ -66,5 +87,6 @@ endif
 
 # Removes built files.
 clean:
-	-rm -f $(OBJECTS) $(BINS) $(addprefix build/,$(MAINS))
-	-rm -f $(patsubst %.o,%,$(MAINS))
+	-rm -f $(SRC) $(BINS)
+	-rm -f $(DEPS)
+	-rm -f $(MAINS)

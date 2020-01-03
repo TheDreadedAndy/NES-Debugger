@@ -1,5 +1,6 @@
 *.nes
 *.o
+*.d
 memory-test
 a.out
 ndb

@@ -190,6 +190,42 @@ void Ppu::Connect(Memory *memory, Renderer *render, bool *nmi_line) {
 }
 
 /*
+ * Determines how many cycles can be executed before the ppu will attempt
+ * an action which will effect the state of another chip. This corresponds to
+ * the number of cycles until the next positive NMI edge.
+ *
+ * If NMI's are disable, this function will return 64-bit unsigned int max.
+ */
+size_t Ppu::Schedule(void) {
+  // Constants used to calculate the number of safe cycles.
+  const size_t cycles_per_line = 341;
+  const size_t lines_per_frame = 262;
+  const size_t nmi_line = 241;
+  const size_t nmi_cycle = 1;
+
+  // Check if NMI's are disabled.
+  if (!(ctrl_ & FLAG_ENABLE_VBLANK)) { return ~(0UL); }
+
+  // Calculate the number of cycles until the next NMI.
+  // NMI's can occur on cycle 1 of scanline 241.
+  size_t cycles;
+  if ((current_scanline_ >= 241) && (current_cycle_ > 1)) {
+    // We need to account for the scanline counter wrapping and the cycle
+    // skipped at the end of even frames.
+    cycles = ((nmi_line * cycles_per_line) + nmi_cycle)
+           + ((lines_per_frame - current_scanline_ - 1) * cycles_per_line)
+           + (cycles_per_line - current_cycle_)
+           - (!frame_odd_);
+  } else {
+    cycles = ((nmi_line * cycles_per_line) + nmi_cycle)
+           - ((current_scanline_ * cycles_per_line) + current_cycle_);
+  }
+
+  // Convert PPU cycles to CPU cycles, taking the floor of the result.
+  return static_cast<size_t>((static_cast<float>(cycles) * 0.33f) - 0.33f);
+}
+
+/*
  * Runs the next cycle in the ppu emulation, then increments the cycle/scanline
  * counters.
  *
@@ -889,7 +925,7 @@ void Ppu::Inc(void) {
   current_cycle_++;
 
   // Increment the scanline if it is time to wrap the cycle.
-  if ((current_cycle_ > 340) || (frame_odd_
+  if ((current_cycle_ > 340) || (!frame_odd_
           && (current_cycle_ > 339) && (current_scanline_ >= 261)
           && ((mask_ & FLAG_RENDER_BG)
           || (mask_ & FLAG_RENDER_SPRITES)))) {

@@ -114,6 +114,10 @@ class Ppu {
     // Connects the PPU to the rest of the emulation.
     void Connect(Memory *memory, Renderer *render, bool *nmi_line);
 
+    // Determines how many cycles can be run before the execution will
+    // update the state of another chip. Used to schedule emulator execution.
+    size_t Schedule(void);
+
     // Runs the next emulated PPU cycle.
     // Connect() must be called before this function can be used.
     void RunCycle(void);

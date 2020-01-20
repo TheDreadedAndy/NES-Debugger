@@ -45,4 +45,7 @@ bool StrEq(const char *str1, const char *str2);
 // Copies a null terminated string into a newly allocated string.
 char *StrCpy(const char *str);
 
+// Gets the min of two numbers.
+#define MIN(a, b) ((a < b) ? a : b)
+
 #endif

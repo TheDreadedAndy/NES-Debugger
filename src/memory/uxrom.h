@@ -47,6 +47,8 @@ class Uxrom : public Memory {
     // Functions implemented for the abstract class Memory.
     DataWord Read(DoubleWord addr);
     void Write(DoubleWord addr, DataWord val);
+    bool CheckRead(DoubleWord addr);
+    bool CheckWrite(DoubleWord addr);
     DataWord VramRead(DoubleWord addr);
     void VramWrite(DoubleWord addr, DataWord val);
 

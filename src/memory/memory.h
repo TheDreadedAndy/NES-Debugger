@@ -101,6 +101,10 @@ class Memory {
     virtual DataWord Read(DoubleWord addr) = 0;
     virtual void Write(DoubleWord addr, DataWord val) = 0;
 
+    // Checks if an access to CPU memory will have side effects outside the CPU.
+    virtual bool CheckRead(DoubleWord addr) = 0;
+    virtual bool CheckWrite(DoubleWord addr) = 0;
+
     // Provides access to PPU memory.
     virtual DataWord VramRead(DoubleWord addr) = 0;
     virtual void VramWrite(DoubleWord addr, DataWord val) = 0;

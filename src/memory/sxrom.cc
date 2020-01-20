@@ -320,6 +320,23 @@ void Sxrom::Write(DoubleWord addr, DataWord val) {
 }
 
 /*
+ * Checks if the given address can be read from without side effects outside
+ * the CPU.
+ */
+bool Sxrom::CheckRead(DoubleWord addr) {
+  return (addr < PPU_OFFSET) || (addr >= MAPPER_OFFSET);
+}
+
+/*
+ * Checks if the given address can be written to without side effects outside
+ * the CPU.
+ */
+bool Sxrom::CheckWrite(DoubleWord addr) {
+  return (addr < PPU_OFFSET) || ((addr >= MAPPER_OFFSET)
+                             && (addr < PRG_ROM_A_OFFSET));
+}
+
+/*
  * Updates the controlling registers for the calling object using the
  * given address and values.
  */

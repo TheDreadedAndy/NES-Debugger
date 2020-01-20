@@ -229,12 +229,12 @@ void Cpu::MemBrk(void) {
     irq_ready_ = false;
     state_->AddCycle(&Cpu::MemNmiPcl, &Cpu::DataSei, PC_NOP);
     state_->AddCycle(&Cpu::MemNmiPch, &Cpu::Nop, PC_NOP);
-    state_->AddCycle(&Cpu::MemFetch, &Cpu::Nop, PC_INC);
+    state_->AddCycle(&Cpu::MemFetch, &Cpu::Nop, PC_INC, &Cpu::CheckPcRead);
   } else {
     irq_ready_ = false;
     state_->AddCycle(&Cpu::MemIrqPcl, &Cpu::DataSei, PC_NOP);
     state_->AddCycle(&Cpu::MemIrqPch, &Cpu::Nop, PC_NOP);
-    state_->AddCycle(&Cpu::MemFetch, &Cpu::Nop, PC_INC);
+    state_->AddCycle(&Cpu::MemFetch, &Cpu::Nop, PC_INC, &Cpu::CheckPcRead);
   }
 
   return;
@@ -252,11 +252,11 @@ void Cpu::MemIrq(void) {
     nmi_edge_ = false;
     state_->AddCycle(&Cpu::MemNmiPcl, &Cpu::DataSei, PC_NOP);
     state_->AddCycle(&Cpu::MemNmiPch, &Cpu::Nop, PC_NOP);
-    state_->AddCycle(&Cpu::MemFetch, &Cpu::Nop, PC_INC);
+    state_->AddCycle(&Cpu::MemFetch, &Cpu::Nop, PC_INC, &Cpu::CheckPcRead);
   } else {
     state_->AddCycle(&Cpu::MemIrqPcl, &Cpu::DataSei, PC_NOP);
     state_->AddCycle(&Cpu::MemIrqPch, &Cpu::Nop, PC_NOP);
-    state_->AddCycle(&Cpu::MemFetch, &Cpu::Nop, PC_INC);
+    state_->AddCycle(&Cpu::MemFetch, &Cpu::Nop, PC_INC, &Cpu::CheckPcRead);
   }
 
   return;

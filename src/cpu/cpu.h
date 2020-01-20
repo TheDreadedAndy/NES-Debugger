@@ -189,6 +189,13 @@ class Cpu {
     void MemIrqPcl(void);
     void MemIrqPch(void);
 
+    /* Operations used to check if a memory access is safe */
+    bool CheckPcRead(void);
+    bool CheckAddrRead(void);
+    bool CheckAddrWrite(void);
+    bool CheckPtrRead(void);
+    bool CheckPtrWrite(void);
+
   public:
     // Interrupt lines, which can be set by the PPU/APU.
     DataWord irq_line_ = 0;

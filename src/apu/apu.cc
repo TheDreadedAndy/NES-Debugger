@@ -27,6 +27,7 @@
 #include "./apu.h"
 
 #include <cstdlib>
+#include <cstdint>
 
 #include "../util/util.h"
 #include "../util/data.h"
@@ -194,6 +195,34 @@ void Apu::Connect(Memory *memory, AudioPlayer *audio, DataWord *irq_line) {
   audio_ = audio;
   irq_line_ = irq_line;
   return;
+}
+
+/*
+ * Determines the number of APU cycles until the next interrupt.
+ * Returns UINT_MAX if no interrupts will occur within the current state.
+ */
+size_t Apu::Schedule(void) {
+  // Calculate how many cycles until the DMC raises an IRQ.
+  size_t dmc_cycles;
+  if ((dmc_->control & (FLAG_DMC_IRQ | FLAG_DMC_LOOP)) || dmc_irq_) {
+    dmc_cycles = ~(0UL);
+  } else {
+    dmc_cycles = (((static_cast<size_t>(dmc_->bytes_remaining) << 3)
+               | (dmc_->bits_remaining + 1)) << 1);
+  }
+
+  // Calculate the number of cycles until the next frame IRQ.
+  size_t frame_cycles;
+  if ((frame_control_ & (FLAG_MODE | FLAG_IRQ_DISABLE)) || frame_irq_) {
+    frame_cycles = ~(0UL);
+  } else if (frame_step_ == 3) {
+    frame_cycles = ((FRAME_STEP_LENGTH << 2) - frame_clock_) << 1;
+  } else {
+    frame_cycles = (((3 - frame_step_) * FRAME_STEP_LENGTH)
+                 - frame_clock_) << 1;
+  }
+
+  return MIN(dmc_cycles, frame_cycles);
 }
 
 /*

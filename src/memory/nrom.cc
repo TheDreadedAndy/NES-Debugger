@@ -205,6 +205,24 @@ void Nrom::Write(DoubleWord addr, DataWord val) {
 }
 
 /*
+ * Checks if a read to the given address will have side effects outside
+ * the CPU. Returns true if the operation is safe, and false if there
+ * are side effects.
+ */
+bool Nrom::CheckRead(DoubleWord addr) {
+  return (addr < PPU_OFFSET) || (addr >= MAPPER_OFFSET);
+}
+
+/*
+ * Checks if a write to the given address will have side effects outside
+ * the CPU. Returns true if the operation is safe, and false if there
+ * are side effects.
+ */
+bool Nrom::CheckWrite(DoubleWord addr) {
+  return (addr < PPU_OFFSET) || (addr >= MAPPER_OFFSET);
+}
+
+/*
  * Reads the value at the given address in VRAM.
  */
 DataWord Nrom::VramRead(DoubleWord addr) {

@@ -2,89 +2,11 @@
 #define _NES_APU
 
 #include <cstdlib>
+#include <cstdint>
 
 #include "../sdl/audio_player.h"
 #include "../memory/memory.h"
 #include "../util/data.h"
-
-/*
- * Contains the data related to the operation of an APU pulse channel.
- */
-typedef struct pulse {
-  // Memory mapped registers.
-  DoubleWord timer;
-  DataWord length;
-  DataWord sweep;
-  bool sweep_reload;
-  DataWord control;
-
-  // Internal registers.
-  DataWord sweep_counter;
-  DataWord pos;
-  DoubleWord clock;
-  DataWord output;
-  DataWord env_clock;
-  DataWord env_volume;
-} ApuPulse;
-
-/*
- * Contains the data related to the operation of the APU triangle channel.
- */
-typedef struct triangle {
-  // Memory mapped registers.
-  DoubleWord timer;
-  DataWord length;
-  DataWord control;
-  bool linear_reload;
-
-  // Internal registers.
-  DoubleWord clock;
-  DataWord output;
-  DataWord linear;
-  DataWord pos;
-} ApuTriangle;
-
-/*
- * Contains the data related to the operation of the APU noise channel.
- */
-typedef struct noise {
-  // Memory mapped registers.
-  DataWord period;
-  DataWord length;
-  DataWord control;
-
-  // Internal registers.
-  DoubleWord shift;
-  DoubleWord timer;
-  DoubleWord clock;
-  DataWord env_clock;
-  DataWord env_volume;
-  DataWord output;
-} ApuNoise;
-
-/*
- * Contains the data related to the operation of the APU DMC channel.
- */
-typedef struct dmc {
-  // Memory mapped registers.
-  DataWord control;
-  DataWord rate;
-  DataWord level;
-  DoubleWord addr;
-  DoubleWord length;
-
-  // Internal registers.
-  DoubleWord current_addr;
-  DoubleWord bytes_remaining;
-  DataWord bits_remaining;
-  DataWord sample_buffer;
-  DataWord output;
-  bool silent;
-
-  // The DMC updates whenever this value is greater than the corresponding
-  // rate value.
-  size_t clock;
-} ApuDmc;
 
 /*
  * This class contains all the structures, methods, and data necessary to
@@ -101,6 +23,77 @@ class Apu {
     // Used to communicate with a memory and cpu object.
     Memory *memory_;
     DataWord *irq_line_;
+
+    // Contains the data related to the operation of an APU pulse channel.
+    struct ApuPulse {
+      // Memory mapped registers.
+      DoubleWord timer;
+      DataWord length;
+      DataWord sweep;
+      bool sweep_reload;
+      DataWord control;
+
+      // Internal registers.
+      DataWord sweep_counter;
+      DataWord pos;
+      DoubleWord clock;
+      DataWord output;
+      DataWord env_clock;
+      DataWord env_volume;
+    };
+
+    // Contains the data related to the operation of the APU triangle channel.
+    struct ApuTriangle {
+      // Memory mapped registers.
+      DoubleWord timer;
+      DataWord length;
+      DataWord control;
+      bool linear_reload;
+
+      // Internal registers.
+      DoubleWord clock;
+      DataWord output;
+      DataWord linear;
+      DataWord pos;
+    };
+
+    // Contains the data related to the operation of the APU noise channel.
+    struct ApuNoise {
+      // Memory mapped registers.
+      DataWord period;
+      DataWord length;
+      DataWord control;
+
+      // Internal registers.
+      DoubleWord shift;
+      DoubleWord timer;
+      DoubleWord clock;
+      DataWord env_clock;
+      DataWord env_volume;
+      DataWord output;
+    };
+
+    // Contains the data related to the operation of the APU DMC channel.
+    struct ApuDmc {
+      // Memory mapped registers.
+      DataWord control;
+      DataWord rate;
+      DataWord level;
+      DoubleWord addr;
+      DoubleWord length;
+
+      // Internal registers.
+      DoubleWord current_addr;
+      DoubleWord bytes_remaining;
+      DataWord bits_remaining;
+      DataWord sample_buffer;
+      DataWord output;
+      bool silent;
+
+      // The DMC updates whenever this value is greater than the corresponding
+      // rate value.
+      size_t clock;
+    };
 
     // The individual channels associated with each APU object.
     ApuPulse *pulse_a_;
@@ -153,6 +146,9 @@ class Apu {
 
     // Connects the APU to the rest of the console.
     void Connect(Memory *memory, AudioPlayer *audio, DataWord *irq_line);
+
+    // Returns the number of CPU cycles until the next IRQ from the APU.
+    size_t Schedule(void);
 
     // Runs an APU cycle, updating the channels.
     // Connect() must be called before this function.

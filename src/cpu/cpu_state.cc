@@ -17,6 +17,7 @@
 #include "./cpu_state.h"
 
 #include <new>
+#include <functional>
 #include <cstdlib>
 #include <cstdint>
 #include <cstdio>
@@ -47,12 +48,13 @@ CpuState::CpuState(void) {
  * Uses the given data to create an operation cycle and add it
  * to the state queue.
  */
-void CpuState::AddCycle(CpuOperation mem,
-                        CpuOperation data, bool inc_pc) {
+void CpuState::AddCycle(CpuOperation mem, CpuOperation data, bool inc_pc,
+                        CpuCheck check) {
   // Fill the new operation cycle with the given data.
   OperationCycle *micro = &(state_->queue[state_->back]);
   micro->mem = mem;
   micro->data = data;
+  micro->is_safe = check;
   micro->inc_pc = inc_pc;
 
   // Add the operation cycle to the queue.
@@ -66,7 +68,8 @@ void CpuState::AddCycle(CpuOperation mem,
 /*
  * Pushes a cycle to the state queue.
  */
-void CpuState::PushCycle(CpuOperation mem, CpuOperation data, bool inc_pc) {
+void CpuState::PushCycle(CpuOperation mem, CpuOperation data, bool inc_pc,
+                         CpuCheck check) {
   // Add the operation cycle to the queue.
   state_->size++;
   CONTRACT(state_->size <= STATE_MAX_OPS);
@@ -76,9 +79,19 @@ void CpuState::PushCycle(CpuOperation mem, CpuOperation data, bool inc_pc) {
   OperationCycle *micro = &(state_->queue[state_->front]);
   micro->mem = mem;
   micro->data = data;
+  micro->is_safe = check;
   micro->inc_pc = inc_pc;
 
   return;
+}
+
+/*
+ * Determines if it is safe to execute the next cycle without syncing the
+ * CPU to the APU and PPU.
+ */
+bool CpuState::CheckNextCycle(Cpu *cpu) {
+  OperationCycle *micro = &(state_->queue[state_->front]);
+  return (micro->is_safe == NULL) || (std::invoke(micro->is_safe, cpu));
 }
 
 /*

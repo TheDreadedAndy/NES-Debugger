@@ -498,7 +498,7 @@ void Cpu::DataFixaAddrh(void) {
   if (regs_->addr_carry > 0) {
     regs_->addr.w[WORD_HI] += regs_->addr_carry;
     OperationCycle *op = state_->GetLastCycle();
-    state_->PushCycle(op->mem, &Cpu::Nop, PC_NOP);
+    state_->PushCycle(op->mem, &Cpu::Nop, PC_NOP, &Cpu::CheckAddrRead);
   }
   return;
 }
@@ -555,11 +555,11 @@ void Cpu::DataBranch(void) {
     // Case 2.
     regs_->pc.w[WORD_LO] = res.w[WORD_LO];
     state_->AddCycle(&Cpu::Nop, &Cpu::DataFixPch, PC_NOP);
-    state_->AddCycle(&Cpu::MemFetch, &Cpu::Nop, PC_INC);
+    state_->AddCycle(&Cpu::MemFetch, &Cpu::Nop, PC_INC, &Cpu::CheckPcRead);
   } else {
     // Case 1.
     regs_->pc.w[WORD_LO] = res.w[WORD_LO];
-    state_->AddCycle(&Cpu::MemFetch, &Cpu::Nop, PC_INC);
+    state_->AddCycle(&Cpu::MemFetch, &Cpu::Nop, PC_INC, &Cpu::CheckPcRead);
   }
 
   return;

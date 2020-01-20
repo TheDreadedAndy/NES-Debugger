@@ -13,22 +13,24 @@
  */
 class Cpu;
 typedef void (Cpu::*CpuOperation)(void);
-typedef struct {
+typedef bool (Cpu::*CpuCheck)(void);
+struct OperationCycle {
   CpuOperation mem;
   CpuOperation data;
+  CpuCheck is_safe;
   bool inc_pc;
-} OperationCycle;
+};
 
 /*
  *  System state is managed by a fixed size queue of
  *  micro instructions.
  */
-typedef struct {
+struct StateQueue {
   OperationCycle *queue;
   size_t front;
   size_t back;
   size_t size;
-} StateQueue;
+};
 
 /*
  * A PC operation is simply a boolean value that determines
@@ -51,10 +53,16 @@ class CpuState {
     CpuState(void);
 
     // Adds an operation cycle to the state queue.
-    void AddCycle(CpuOperation mem, CpuOperation data, bool inc_pc);
+    void AddCycle(CpuOperation mem, CpuOperation data, bool inc_pc,
+                  CpuCheck check = NULL);
 
     // Pushes an operation cycle to the state queue.
-    void PushCycle(CpuOperation mem, CpuOperation data, bool inc_pc);
+    void PushCycle(CpuOperation mem, CpuOperation data, bool inc_pc,
+                   CpuCheck check = NULL);
+
+    // Checks if the next cycle on the queue can be executed without syncing
+    // the CPU to the APU and PPU.
+    bool CheckNextCycle(Cpu *cpu);
 
     // Dequeues and returns the next operation cycle.
     OperationCycle *NextCycle(void);

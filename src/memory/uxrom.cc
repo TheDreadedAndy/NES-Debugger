@@ -201,6 +201,23 @@ void Uxrom::Write(DoubleWord addr, DataWord val) {
 }
 
 /*
+ * Checks if the given address can be read from without side effects outside
+ * the CPU.
+ */
+bool Uxrom::CheckRead(DoubleWord addr) {
+  return (addr < PPU_OFFSET) || (addr >= MAPPER_OFFSET);
+}
+
+/*
+ * Checks if the given address can be written to without side effects outside
+ * the CPU.
+ */
+bool Uxrom::CheckWrite(DoubleWord addr) {
+  return (addr < PPU_OFFSET) || ((addr >= MAPPER_OFFSET)
+                             && (addr < BANK_OFFSET));
+}
+
+/*
  * Reads the value at the given address from vram, accounting
  * for mirroring.
  */

@@ -70,6 +70,9 @@ Window *Window::Create(Config *config) {
   // Force the IBus IME to handle text composing.
   // Work around for a known SDL2 crash.
   SDL_SetHint(SDL_HINT_IME_INTERNAL_EDITING, "1");
+
+  // Prevent the application from disabling compositing.
+  SDL_SetHint(SDL_HINT_VIDEO_X11_NET_WM_BYPASS_COMPOSITOR, "0");
 #endif
 
   // Attempt to create a renderer; error on failure.

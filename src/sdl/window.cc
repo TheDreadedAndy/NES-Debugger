@@ -54,6 +54,15 @@ Window *Window::Create(Config *config) {
     return NULL;
   }
 
+#ifdef _NES_OSLIN
+  // Force the IBus IME to handle text composing.
+  // Work around for a known SDL2 crash.
+  SDL_SetHint(SDL_HINT_IME_INTERNAL_EDITING, "1");
+
+  // Prevent the application from disabling compositing.
+  SDL_SetHint(SDL_HINT_VIDEO_X11_NET_WM_BYPASS_COMPOSITOR, "0");
+#endif
+
   // Create window.
   SDL_Window *window = SDL_CreateWindow(kWindowName, SDL_WINDOWPOS_CENTERED,
                                         SDL_WINDOWPOS_CENTERED, WINDOW_WIDTH,
@@ -65,15 +74,6 @@ Window *Window::Create(Config *config) {
     SDL_Quit();
     return NULL;
   }
-
-#ifdef _NES_OSLIN
-  // Force the IBus IME to handle text composing.
-  // Work around for a known SDL2 crash.
-  SDL_SetHint(SDL_HINT_IME_INTERNAL_EDITING, "1");
-
-  // Prevent the application from disabling compositing.
-  SDL_SetHint(SDL_HINT_VIDEO_X11_NET_WM_BYPASS_COMPOSITOR, "0");
-#endif
 
   // Attempt to create a renderer; error on failure.
   Renderer *renderer = Renderer::Create(window, config);

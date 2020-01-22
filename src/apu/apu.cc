@@ -204,10 +204,11 @@ void Apu::Connect(Memory *memory, AudioPlayer *audio, DataWord *irq_line) {
 size_t Apu::Schedule(void) {
   // Calculate how many cycles until the DMC raises an IRQ.
   size_t dmc_cycles;
-  if ((dmc_->control & (FLAG_DMC_IRQ | FLAG_DMC_LOOP)) || dmc_irq_) {
+  if ((dmc_->control & (FLAG_DMC_IRQ | FLAG_DMC_LOOP)) || dmc_irq_
+                                                       || dmc_->silent) {
     dmc_cycles = ~(0UL);
   } else {
-    dmc_cycles = (((static_cast<size_t>(dmc_->bytes_remaining) << 3)
+    dmc_cycles = ((((static_cast<size_t>(dmc_->bytes_remaining)) << 3)
                | (dmc_->bits_remaining + 1)) << 1);
   }
 

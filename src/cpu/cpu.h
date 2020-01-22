@@ -194,7 +194,7 @@ class Cpu {
     bool CheckAddrRead(void);
     bool CheckAddrWrite(void);
     bool CheckPtrRead(void);
-    bool CheckPtrWrite(void);
+    bool CheckPtr1Read(void);
 
   public:
     // Interrupt lines, which can be set by the PPU/APU.
@@ -210,6 +210,10 @@ class Cpu {
     // Reads the reset vector from memory so that the CPU can start emulating
     // cycles. Connect() must be called before this function.
     void Power(void);
+
+    // Executes the CPU emulation until either the requested number of cycles
+    // have been executed, or the CPU must sync with the APU/PPU.
+    size_t RunSchedule(size_t cycles, size_t *syncs);
 
     // Executes the next cycle of the cpu emulation.
     // Connect() and Power() must be called before this function.

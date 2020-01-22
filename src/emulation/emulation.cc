@@ -20,6 +20,7 @@
 #include "../ppu/ppu.h"
 #include "../apu/apu.h"
 #include "../util/contracts.h"
+#include "../util/util.h"
 #include "./signals.h"
 
 // The frame rate of the NES.
@@ -214,14 +215,43 @@ void Emulation::TimeDiff(EmuTime *time1, EmuTime *time2, EmuTime *res) {
  * Runs the NES emulation for 1/60th of its clock rate.
  */
 void Emulation::RunEmulationCycle(void) {
-  for (size_t i = 0; i < EMU_CYCLE_SIZE; i++) {
-    // The PPU is clocked at 3x the rate of the CPU.
-    ppu_->RunCycle();
-    ppu_->RunCycle();
-    ppu_->RunCycle();
-    cpu_->RunCycle();
-    apu_->RunCycle();
+  size_t cycles_remaining = EMU_CYCLE_SIZE;
+  size_t sync_cycles = 0;
+  size_t scheduled_cycles, cpu_cycles, apu_cycles, ppu_cycles;
+
+  while (cycles_remaining > 0) {
+    // Emulate the system with all cycles synced.
+    sync_cycles = MIN(sync_cycles, cycles_remaining);
+    for (size_t i = 0; i < sync_cycles; i++) {
+      // The PPU is clocked at 3x the rate of the CPU.
+      cpu_->RunCycle();
+      apu_->RunCycle();
+      ppu_->RunCycle();
+      ppu_->RunCycle();
+      ppu_->RunCycle();
+    }
+    cycles_remaining -= sync_cycles;
+
+    // Check if the synchronized execution finished this emulation cycle.
+    if (cycles_remaining <= 0) { return; }
+
+    // Determine how long the emulation can run out of sync.
+    ppu_cycles = ppu_->Schedule();
+    apu_cycles = apu_->Schedule();
+    scheduled_cycles = MIN(ppu_cycles, apu_cycles);
+
+    // Run the CPU, then catch up the APU and PPU.
+    cpu_cycles = cpu_->RunSchedule(MIN(scheduled_cycles, cycles_remaining),
+                                   &sync_cycles);
+    for (size_t i = 0; i < cpu_cycles; i++) { apu_->RunCycle(); }
+    for (size_t i = 0; i < cpu_cycles; i++) {
+      ppu_->RunCycle();
+      ppu_->RunCycle();
+      ppu_->RunCycle();
+    }
+    cycles_remaining -= cpu_cycles;
   }
+
   return;
 }
 

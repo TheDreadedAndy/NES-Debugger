@@ -52,10 +52,13 @@ bool Cpu::CheckPtrRead(void) {
 }
 
 /*
- * Checks if a write at the current pointer address will have side effects.
+ * Checks if a read at the current pointer address + 1 will have side effects.
  *
  * Assumes the calling CPU has been connected to a valid Memory object.
  */
-bool Cpu::CheckPtrWrite(void) {
-  return memory_->CheckWrite(regs_->ptr.dw);
+bool Cpu::CheckPtr1Read(void) {
+  regs_->ptr.w[WORD_LO]++;
+  bool res = memory_->CheckWrite(regs_->ptr.dw);
+  regs_->ptr.w[WORD_LO]--;
+  return res;
 }

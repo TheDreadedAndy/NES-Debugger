@@ -1,9 +1,9 @@
 /*
  * The file contains the Ppu class and all of its member functions. The
- * Ppu class is used to emulation the NES's PPU, which rendered tiles and
+ * Ppu class is used to emulation the NES's PPU, which renders tiles and
  * sprites to the screen.
  *
- * The CPU emulation can communicate with this class thorugh memory, which
+ * The CPU emulation can communicate with this class through memory, which
  * properly maps the PPU's MMIO addresses to the MMIO member functions of
  * the Ppu class.
  *
@@ -362,7 +362,7 @@ void Ppu::RenderVisible(void) {
   } else if (current_cycle_ <= 336) {
     // Fetch the background tile data for the next cycle.
     RenderUpdateRegisters();
-    if ((current_cycle_ % 8) == 0) { RenderXinc(); }
+    if ((current_cycle_ & 0x7) == 0) { RenderXinc(); }
   } else if (current_cycle_ > 336 && current_cycle_ <= 340) {
     // Unused NT byte fetches, mappers may clock this.
     RenderDummyNametableAccess();
@@ -387,7 +387,7 @@ void Ppu::RenderUpdateFrame(bool output) {
   RenderUpdateRegisters();
 
   // Update the vram address.
-  if ((current_cycle_ % 8) == 0) {
+  if ((current_cycle_ & 0x7) == 0) {
     // Every 8 cycles, the horizontal vram position is incremented.
     RenderXinc();
     // On cycle 256, the vertical vram position is incremented.
@@ -500,7 +500,7 @@ void Ppu::RenderUpdateRegisters(void) {
   palette_scroll_[1] = (palette_scroll_[1] << 1) | (palette_latch_[1]);
 
   // Reload the queued bits if the queue should now be empty.
-  if ((current_cycle_ % 8) == 0) {
+  if ((current_cycle_ & 0x7) == 0) {
     tile_scroll_[0].w[WORD_LO] = next_tile_[0];
     tile_scroll_[1].w[WORD_LO] = next_tile_[1];
     palette_latch_[0] = next_palette_[0];
@@ -547,9 +547,9 @@ void Ppu::RenderGetAttribute(void) {
   DataWord attribute = memory_->VramRead(attribute_addr);
 
   // Isolate the color bits for the current quadrent the screen is drawing to.
-  DataWord attribute_x_shift = (coarse_x & 2U) ? 2U : 0U;
-  DataWord attribute_y_shift = (coarse_y & 2U) ? 4U : 0U;
-  attribute = attribute >> (attribute_x_shift + attribute_y_shift);
+  DataWord attribute_x_shift = coarse_x & 2U;
+  DataWord attribute_y_shift = (coarse_y & 2U) << 1;
+  attribute = attribute >> (attribute_x_shift | attribute_y_shift);
 
   // Update the color palette bits using the attribute.
   next_palette_[0] = attribute & 1U;
@@ -575,7 +575,7 @@ DataWord Ppu::RenderGetTile(DataWord index, bool plane_high) {
 
   // Get the side of the pattern table to be used from the control register.
   DoubleWord tile_table = (ctrl_ & FLAG_BG_TABLE) ? PATTERN_TABLE_HIGH
-                                                   : PATTERN_TABLE_LOW;
+                                                  : PATTERN_TABLE_LOW;
 
   // Calculate the vram address of the tile byte and return the tile byte.
   DoubleWord tile_address = tile_table | tile_index | tile_plane | tile_offset;
@@ -681,7 +681,7 @@ void Ppu::RenderPre(void) {
   } else if (current_cycle_ > 320 && current_cycle_ <= 336) {
     // Fetch the background tile data for the next cycle.
     RenderUpdateRegisters();
-    if ((current_cycle_ % 8) == 0) { RenderXinc(); }
+    if ((current_cycle_ & 0x7) == 0) { RenderXinc(); }
   } else if (current_cycle_ > 336 && current_cycle_ <= 340) {
     // Unused NT byte fetches, mappers may clock this.
     RenderDummyNametableAccess();
@@ -1048,7 +1048,7 @@ void Ppu::MmioVramAddrInc(void) {
     // Writing to PPU data during rendering causes a X and Y increment.
     // This only happens when the PPU would not otherwise be incrementing them.
     if (!((((current_cycle_ > 0) && (current_cycle_ <= 256))
-         || (current_cycle_ > 320)) && ((current_cycle_ % 8) == 0))) {
+         || (current_cycle_ > 320)) && ((current_cycle_ & 0x7) == 0))) {
       RenderXinc();
     }
     if (current_cycle_ != 256) {

@@ -7,3 +7,4 @@ ndb
 ndb.cfg
 build
 .directory
+perf.*

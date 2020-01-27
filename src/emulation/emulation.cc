@@ -219,6 +219,12 @@ void Emulation::RunEmulationCycle(void) {
   size_t sync_cycles = 0;
   size_t scheduled_cycles, cpu_cycles, apu_cycles, ppu_cycles;
 
+  /*
+   * In order to increase cache hits during emulation, some math is done to
+   * determine how long the individual chips can be run in isolation. Running
+   * them this way prevents the memory systems of the other chips from causing
+   * cache misses as often.
+   */
   while (cycles_remaining > 0) {
     // Emulate the system with all cycles synced.
     sync_cycles = MIN(sync_cycles, cycles_remaining);

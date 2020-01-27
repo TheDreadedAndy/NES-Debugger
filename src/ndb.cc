@@ -50,7 +50,7 @@ int main(int argc, char *argv[]) {
       case 's':
         config->Set(kRendererTypeKey, kRendererSurfaceVal);
         break;
-      case 'v':
+      case 'h':
         config->Set(kRendererTypeKey, kRendererHardwareVal);
         break;
       default:

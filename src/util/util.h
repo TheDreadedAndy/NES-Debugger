@@ -49,4 +49,7 @@ char *StrCpy(const char *str);
 #define MIN(a, b) ((a < b) ? a : b)
 #define MAX(a, b) ((a > b) ? a : b)
 
+// Sets every bit in a word to the lsb.
+#define MASK(m) ((static_cast<int>((m)) << 31U) >> 31U)
+
 #endif

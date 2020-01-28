@@ -402,6 +402,10 @@ void Ppu::RenderUpdateFrame(bool output) {
  * Uses the shift registers and sprite memory to draw the current cycles
  * pixel to the screen
  *
+ * Note that this function is called ~4 million times a second. As such, most
+ * branches have been removed to allow the efficient use of branches
+ * and out-of-order execution.
+ *
  * Assumes the PPU is currently running a cycle between 1 and 256 (inclusive)
  * of a visible scanline.
  */
@@ -410,46 +414,42 @@ void Ppu::RenderDrawPixel(void) {
   size_t screen_x = current_cycle_ - 1;
   size_t screen_y = current_scanline_;
 
-  // Holds the background and sprite palette color index.
-  DataWord bg_pattern = 0;
-
-  // Flags whether the background or sprite pixel should be rendered.
-  bool sprite_on_top = false;
-
-  // Get the background tile pattern.
-  if ((mask_ & FLAG_RENDER_BG) && ((screen_x >= 8)
-                               || (mask_ & FLAG_LEFT_BG))) {
-    bg_pattern = RenderGetTilePattern();
-  }
+  // Get the background tile pattern. The pattern is forced to zero if
+  // background rendering is disabled.
+  DataWord bg_pat_mask = ((mask_ & FLAG_RENDER_BG) && ((screen_x >= 8)
+                      || (mask_ & FLAG_LEFT_BG)));
+  bg_pat_mask |= (bg_pat_mask << 1U);
+  DataWord bg_pattern = RenderGetTilePattern() & bg_pat_mask;
 
   // Get the sprite pattern.
-  DataWord sprite_buf = 0xFF;
-  if ((mask_ & FLAG_RENDER_SPRITES)
-     && ((screen_x >= 8) || (mask_ & FLAG_LEFT_SPRITES))
-     && ((sprite_buf = soam_buffer_[soam_render_buf_][screen_x]) != 0xFF)) {
+  DataWord sprite_buf = soam_buffer_[soam_render_buf_][screen_x];
 
-    // Determine if the pixel should be rendered on top of the background.
-    sprite_on_top = (sprite_buf & FLAG_SOAM_BUFFER_PATTERN)
-                && !(bg_pattern && (sprite_buf & FLAG_SOAM_BUFFER_PRIORITY));
+  // Determine if sprites should be rendered.
+  bool render_sprites = (mask_ & FLAG_RENDER_SPRITES) && (sprite_buf != 0xFF)
+                     && ((screen_x >= 8) || (mask_ & FLAG_LEFT_SPRITES));
 
-    // Updates the sprite zero hit flag (6th bit of status).
-    status_ |= ((sprite_buf & FLAG_SOAM_BUFFER_ZERO)
-             && (bg_pattern) && (screen_x != 255)
-             && (sprite_buf & FLAG_SOAM_BUFFER_PATTERN)) << 6U;
-  }
+  // Updates the sprite zero hit flag (6th bit of status).
+  status_ |= ((sprite_buf & FLAG_SOAM_BUFFER_ZERO)
+           && (bg_pattern) && (screen_x != 255) && (render_sprites)
+           && (sprite_buf & FLAG_SOAM_BUFFER_PATTERN)) << 6U;
 
-  // Check if the pixel is on a scanline that is displayed.
-  // We run this check now because flags can still be set on a line that isn't
-  // displayed.
+  // Check if the pixel is on a scanline that is displayed. We run this check
+  // now because flags can still be set on a line that isn't displayed.
   if ((current_scanline_ < 8) || (current_scanline_ >= 232)) { return; }
 
+  // Determine if the pixel should be rendered on top of the background.
+  int sprite_on_top = MASK((sprite_buf & FLAG_SOAM_BUFFER_PATTERN)
+                    && (render_sprites) && !(bg_pattern
+                    && (sprite_buf & FLAG_SOAM_BUFFER_PRIORITY)));
+
+  // Determine if the background pixel is transparent.
+  int bg_visible = MASK(!!bg_pattern);
+
   // Calculate the address of the pixel to be drawn.
-  DoubleWord pixel_addr = PALETTE_BASE_ADDR;
-  if (sprite_on_top) {
-    pixel_addr |= (sprite_buf & FLAG_SOAM_BUFFER_PALETTE);
-  } else if (bg_pattern != 0) {
-    pixel_addr |= bg_pattern | RenderGetTilePalette();
-  }
+  DoubleWord pixel_addr = PALETTE_BASE_ADDR
+                  | ((sprite_buf & FLAG_SOAM_BUFFER_PALETTE & sprite_on_top)
+                  | ((bg_pattern | RenderGetTilePalette())
+                  & bg_visible & (~sprite_on_top)));
 
   // Get and render the pixel.
   uint32_t pixel = memory_->PaletteRead(pixel_addr);

@@ -440,25 +440,22 @@ void Ppu::RenderDrawPixel(void) {
     }
   }
 
-  // Calculate the address of the pixel to be drawn.
-  DoubleWord pixel_addr;
-  if (sprite_on_top) {
-    pixel_addr = PALETTE_BASE_ADDR | (sprite_buf & FLAG_SOAM_BUFFER_PALETTE);
-  } else if (bg_pattern != 0) {
-    pixel_addr = PALETTE_BASE_ADDR | bg_pattern
-               | RenderGetTilePalette();
-  } else {
-    pixel_addr = PALETTE_BASE_ADDR;
-  }
-
   // Check if the pixel is on a scanline that is displayed.
-  if ((current_scanline_ >= 8) && (current_scanline_ < 232)) {
-    // Get the pixel.
-    uint32_t pixel = memory_->PaletteRead(pixel_addr);
+  // We run this check now because flags can still be set on a line that isn't
+  // displayed.
+  if ((current_scanline_ < 8) || (current_scanline_ >= 232)) { return; }
 
-    // Render the pixel.
-    renderer_->Pixel(screen_y, screen_x, pixel);
+  // Calculate the address of the pixel to be drawn.
+  DoubleWord pixel_addr = PALETTE_BASE_ADDR;
+  if (sprite_on_top) {
+    pixel_addr |= (sprite_buf & FLAG_SOAM_BUFFER_PALETTE);
+  } else if (bg_pattern != 0) {
+    pixel_addr |= bg_pattern | RenderGetTilePalette();
   }
+
+  // Get and render the pixel.
+  uint32_t pixel = memory_->PaletteRead(pixel_addr);
+  renderer_->Pixel(screen_y, screen_x, pixel);
 
   return;
 }

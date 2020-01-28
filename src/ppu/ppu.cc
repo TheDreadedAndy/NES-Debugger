@@ -381,6 +381,7 @@ void Ppu::RenderVisible(void) {
  */
 void Ppu::RenderUpdateFrame(bool output) {
   // Render the pixel.
+  // TODO: Change so that true rendering only happens on [8, 232).
   if (output) { RenderDrawPixel(); }
 
   // Update the background registers.
@@ -427,17 +428,14 @@ void Ppu::RenderDrawPixel(void) {
      && ((screen_x >= 8) || (mask_ & FLAG_LEFT_SPRITES))
      && ((sprite_buf = soam_buffer_[soam_render_buf_][screen_x]) != 0xFF)) {
 
-    // Check if the pixel should be rendered on top of the background.
-    if (((bg_pattern == 0) || !(sprite_buf & FLAG_SOAM_BUFFER_PRIORITY))
-                           && (sprite_buf & FLAG_SOAM_BUFFER_PATTERN)) {
-      sprite_on_top = true;
-    }
+    // Determine if the pixel should be rendered on top of the background.
+    sprite_on_top = (sprite_buf & FLAG_SOAM_BUFFER_PATTERN)
+                && !(bg_pattern && (sprite_buf & FLAG_SOAM_BUFFER_PRIORITY));
 
-    // Check if this counts as a sprite 0 hit.
-    if ((sprite_buf & FLAG_SOAM_BUFFER_ZERO) && (bg_pattern != 0)
-         && (screen_x != 255) && (sprite_buf & FLAG_SOAM_BUFFER_PATTERN)) {
-      status_ |= FLAG_HIT;
-    }
+    // Updates the sprite zero hit flag (6th bit of status).
+    status_ |= ((sprite_buf & FLAG_SOAM_BUFFER_ZERO)
+             && (bg_pattern) && (screen_x != 255)
+             && (sprite_buf & FLAG_SOAM_BUFFER_PATTERN)) << 6U;
   }
 
   // Check if the pixel is on a scanline that is displayed.

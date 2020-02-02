@@ -9,6 +9,7 @@
 #include "../util/data.h"
 #include "./cpu_state.h"
 #include "./cpu_status.h"
+#include "./cpu_operation.h"
 
 // The CPU has a memory mapped register to start a DMA to OAM at this address.
 #define CPU_DMA_ADDR 0x4014U
@@ -73,8 +74,10 @@ class Cpu {
     CpuRegFile *regs_;
 
     /* Helper functions for the CPU emulation */
-    bool CanPoll(void);
     void ExecuteDma(void);
+    bool CanPoll(void);
+    void RunOperation(CpuOperation op);
+    void RunMemoryOperation(CpuOperation &op);
     void Fetch(OperationCycle *op_cycle);
     void DecodeInst(void);
     void DecodeIzpx(CpuOperation op);

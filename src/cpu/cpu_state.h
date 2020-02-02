@@ -3,72 +3,38 @@
 
 #include <cstdlib>
 #include <cstdint>
+#include "./cpu_operation.h"
 
-/*
- * Each micro instruction encodes the opperations that the CPU must
- * perform in that cycle.
- *
- * The CPU can perform one data op, one memory op, and a PC increment
- * in a given cycle.
- */
-class Cpu;
-typedef void (Cpu::*CpuOperation)(void);
-typedef bool (Cpu::*CpuCheck)(void);
-struct OperationCycle {
-  CpuOperation mem;
-  CpuOperation data;
-  CpuCheck is_safe;
-  bool inc_pc;
-};
-
-/*
- *  System state is managed by a fixed size queue of
- *  micro instructions.
- */
-struct StateQueue {
-  OperationCycle *queue;
-  size_t front;
-  size_t back;
-  size_t size;
-};
-
-/*
- * A PC operation is simply a boolean value that determines
- * if the PC should be incremented on that cycle or not.
- */
-#define PC_NOP false
-#define PC_INC true
 
 class CpuState {
   private:
-    // Holds the system state, which is represented as a queue/stack
-    // of micro ops.
-    StateQueue *state_;
+    /*
+     *  System state is managed by a fixed size queue of
+     *  micro instructions.
+     */
+    struct StateQueue {
+      CpuOperation *queue;
+      size_t front;
+      size_t back;
+      size_t size;
+    };
 
-    // Holds the last micro operation returned.
-    OperationCycle *last_op_;
+    // Holds the system state, which is represented as a queue/stack
+    // of CPU operations.
+    StateQueue *state_;
 
   public:
     // Inits the state class, creating the state queue.
     CpuState(void);
 
     // Adds an operation cycle to the state queue.
-    void AddCycle(CpuOperation mem, CpuOperation data, bool inc_pc,
-                  CpuCheck check = NULL);
+    void AddCycle(CpuOperation op);
 
     // Pushes an operation cycle to the state queue.
-    void PushCycle(CpuOperation mem, CpuOperation data, bool inc_pc,
-                   CpuCheck check = NULL);
-
-    // Checks if the next cycle on the queue can be executed without syncing
-    // the CPU to the APU and PPU.
-    bool CheckNextCycle(Cpu *cpu);
+    void PushCycle(CpuOperation op);
 
     // Dequeues and returns the next operation cycle.
-    OperationCycle *NextCycle(void);
-
-    // Returns the last operation cycle dequeued from the state queue.
-    OperationCycle *GetLastCycle(void);
+    CpuOperation NextCycle(void);
 
     // Clears the state queue.
     void Clear(void);

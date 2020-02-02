@@ -17,10 +17,8 @@
 #include "./cpu_state.h"
 
 #include <new>
-#include <functional>
 #include <cstdlib>
 #include <cstdint>
-#include <cstdio>
 
 #include "../util/contracts.h"
 
@@ -29,7 +27,7 @@
  * on each cycle of each instruction. The largest number of cycles an
  * instruction can take is 8.
  *
- * WARNING: Memory corruption will occur if this is not a power of 2!
+ * WARNING: Memory corruption will occur if STATE_MAX_OPS is not a power of 2!
  */
 #define STATE_MAX_OPS 8
 #define STATE_MASK 0x07U
@@ -39,91 +37,56 @@
  */
 CpuState::CpuState(void) {
   state_ = new StateQueue();
-  state_->queue = new OperationCycle[STATE_MAX_OPS]();
-  last_op_ = new OperationCycle();
+  state_->queue = new CpuOperation[STATE_MAX_OPS]();
   return;
 }
 
 /*
- * Uses the given data to create an operation cycle and add it
- * to the state queue.
+ * Adds the given operation to the state queue.
+ *
+ * Assumes that the state queue is not full.
  */
-void CpuState::AddCycle(CpuOperation mem, CpuOperation data, bool inc_pc,
-                        CpuCheck check) {
-  // Fill the new operation cycle with the given data.
-  OperationCycle *micro = &(state_->queue[state_->back]);
-  micro->mem = mem;
-  micro->data = data;
-  micro->is_safe = check;
-  micro->inc_pc = inc_pc;
+void CpuState::AddCycles(CpuOperation op) {
+  CONTRACT(state_->size < STATE_MAX_OPS);
 
-  // Add the operation cycle to the queue.
-  state_->size++;
-  CONTRACT(state_->size <= STATE_MAX_OPS);
+  // Adds the given cycle to the queue.
+  state_->queue[state_->back] = op;
   state_->back = (state_->back + 1) & STATE_MASK;
+  state_->size++;
 
   return;
 }
 
 /*
  * Pushes a cycle to the state queue.
+ *
+ * Assumes that the state queue is not full.
  */
-void CpuState::PushCycle(CpuOperation mem, CpuOperation data, bool inc_pc,
-                         CpuCheck check) {
-  // Add the operation cycle to the queue.
-  state_->size++;
-  CONTRACT(state_->size <= STATE_MAX_OPS);
-  state_->front = (state_->front - 1) & STATE_MASK;
+void CpuState::PushCycle(CpuOperation op) {
+  CONTRACT(state_->size < STATE_MAX_OPS);
 
-  // Fill the new operation cycle with the given data.
-  OperationCycle *micro = &(state_->queue[state_->front]);
-  micro->mem = mem;
-  micro->data = data;
-  micro->is_safe = check;
-  micro->inc_pc = inc_pc;
+  // Pushes the operation to the queue.
+  state_->front = (state_->front - 1) & STATE_MASK;
+  state_->queue[state_->front] = op;
+  state_->size++;
 
   return;
 }
 
 /*
- * Determines if it is safe to execute the next cycle without syncing the
- * CPU to the APU and PPU.
- */
-bool CpuState::CheckNextCycle(Cpu *cpu) {
-  OperationCycle *micro = &(state_->queue[state_->front]);
-  return (micro->is_safe == NULL) || (std::invoke(micro->is_safe, cpu));
-}
-
-/*
  * Dequeues the next state cycle and returns it.
- *
- * The returned operation cycle must not be free'd.
  */
 OperationCycle *CpuState::NextCycle(void) {
   CONTRACT(state_->size > 0);
 
   // Get the next cycle.
-  OperationCycle *micro = &(state_->queue[state_->front]);
-
-  // Copy it into the structure which can be accessed by the user.
-  last_op_->mem = micro->mem;
-  last_op_->data = micro->data;
-  last_op_->inc_pc = micro->inc_pc;
+  CpuOperation next_op = state_->queue[state_->front];
 
   // Remove it from the queue.
   state_->front = (state_->front + 1) & STATE_MASK;
   state_->size--;
 
-  return last_op_;
-}
-
-/*
- * Returns the last state cycle dequeued by NextCycle().
- *
- * The returned operation cycle must not be free'd.
- */
-OperationCycle *CpuState::GetLastCycle(void) {
-  return last_op_;
+  return next_op;
 }
 
 /*
@@ -152,6 +115,5 @@ void CpuState::Clear(void) {
 CpuState::~CpuState() {
   delete[] state_->queue;
   delete state_;
-  delete last_op_;
   return;
 }

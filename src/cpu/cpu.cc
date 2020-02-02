@@ -45,6 +45,22 @@
 // DMA transfers take at least 513 cycles.
 #define DMA_CYCLE_LENGTH 513U
 
+// Used by memory operations to access both the high and low byte of an
+// addressing register.
+#define READ_ADDR_REG(r) ((DoubleWord)((((DoubleWord)(regs_[(r) + 1])) << 8)\
+                                      | ((DoubleWord)(regs_[(r)]))))
+
+// Used to access and update the processor status register.
+#define P_MASK   0xEFU
+#define P_BASE   0x20U
+#define P_FLAG_N 0x80U
+#define P_FLAG_V 0x40U
+#define P_FLAG_B 0x30U
+#define P_FLAG_D 0x08U
+#define P_FLAG_I 0x04U
+#define P_FLAG_Z 0x02U
+#define P_FLAG_C 0x01U
+
 /*
  * Creates a new CPU object. The CPU object will not be in a usable state
  * until Connect() and Power() have been called.
@@ -80,8 +96,8 @@ void Cpu::Connect(Memory *memory) {
  */
 void Cpu::Power(void) {
   // Loads the reset location into the program counter.
-  regs_->pc.w[WORD_LO] = memory_->Read(MEMORY_RESET_ADDR);
-  regs_->pc.w[WORD_HI] = memory_->Read(MEMORY_RESET_ADDR + 1U);
+  regs_->pc_lo = memory_->Read(MEMORY_RESET_ADDR);
+  regs_->pc_hi = memory_->Read(MEMORY_RESET_ADDR + 1U);
 
   // Queues the first cycle to be emulated.
   state_->AddCycle(&Cpu::MemFetch, &Cpu::Nop, PC_INC, &Cpu::CheckPcRead);
@@ -132,10 +148,7 @@ void Cpu::RunCycle(void) {
   }
 
   // Fetch and run the next micro instructions for the cycle.
-  OperationCycle *next_op = state_->NextCycle();
-  std::invoke(next_op->mem, this);
-  std::invoke(next_op->data, this);
-  if (next_op->inc_pc) { regs_->pc.dw++; }
+  RunOperation(state_->NextCycle());
 
   // Poll the interrupt lines and update the detectors.
   PollNmiLine();
@@ -145,15 +158,6 @@ void Cpu::RunCycle(void) {
   cycle_even_ = !cycle_even_;
 
   return;
-}
-
-/*
- * Checks if the cpu should poll for interrupts on this cycle.
- */
-bool Cpu::CanPoll(void) {
-  // Interrupt polling (internal) happens when the cpu is about
-  // to finish an instruction and said instruction is not an interrupt.
-  return (state_->GetSize() == 2) && (regs_->inst != INST_BRK);
 }
 
 /*
@@ -188,6 +192,119 @@ void Cpu::ExecuteDma(void) {
     dma_addr_.w[WORD_LO] = 0;
   }
   dma_cycles_remaining_--;
+
+  return;
+}
+
+/*
+ * Checks if the cpu should poll for interrupts on this cycle.
+ */
+bool Cpu::CanPoll(void) {
+  // Interrupt polling (internal) happens when the cpu is about
+  // to finish an instruction and said instruction is not an interrupt.
+  return (state_->GetSize() == 2) && (regs_->inst != INST_BRK);
+}
+
+/*
+ * Runs the Memory, Data, and PC action specified by the given operation.
+ */
+void Cpu::RunOperation(CpuOperation op) {
+  // Decodes all the information from the operation.
+  CpuReg data_src = GET_DAT_SRC(op);
+  CpuReg data_dst = GET_DAT_DST(op);
+  DataWord data_mask = GET_DAT_MASK(op);
+  DataOpcode data_op = GET_DAT_OP(op);
+  DoubleWord pc_inc = GET_PC_INC(op);
+
+  // Performs the memory operation.
+  RunMemoryOperation(op);
+
+  // Performs the encoded data operation.
+  switch (data_op) {
+  }
+
+  // Increments the PC by the given value.
+  pc_inc = GET_DOUBLE_WORD(regs_->pc_lo, regs_->pc_hi) + pc_inc;
+  regs_->pc_lo = GET_WORD_LO(pc_inc);
+  regs_->pc_hi = GET_WORD_HI(pc_inc);
+
+  return;
+}
+
+/*
+ * Runs the memory operation encoded by the given CPU operation.
+ */
+void Cpu::RunMemoryOperation(CpuOperation &op) {
+  // Decodes the information necessary to complete the memory operation.
+  CpuReg mem_addr = GET_MEM_ADDR(op);
+  CpuReg mem_op1 = GET_MEM_OP1(op);
+  CpuReg mem_op2 = GET_MEM_OP2(op);
+  DoubleWord mem_offset = GET_MEM_OFST(op);
+  MemoryOpcode mem_op = GET_MEM_OP(op);
+
+  // Performs the encoded memory operation.
+  switch (mem_op) {
+    /*
+     * Reads the value from the address specified by the addressing register
+     * plus the offset into the register specified by mem_op1.
+     */
+    case MEM_READ:
+      regs_[mem_op1] = memory_->Read(READ_ADDR_REG(mem_addr) + mem_offset);
+      break;
+
+    /*
+     * Writes the value specified by mem_op1 & mem_op2 into the address
+     * given from the addressing register.
+     */
+    case MEM_WRITE:
+      memory_->Write(READ_ADDR_REG(mem_addr), regs_[mem_op1] & regs_[mem_op2]);
+      break;
+
+    /*
+     * Sets the B flag in P and lowers the irq_ready signal, then passes
+     * off to MEM_IRQ to queue the next cycles according to hijacking behavior.
+     */
+    case MEM_BRQ:
+      regs_->p |= P_FLAG_B;
+      irq_ready_ = false;
+
+    /*
+     * Pushes the state register on the stack, then adds the next cycles of
+     * the interrupt according to hijacking behavior. The B flag is then
+     * masked out of P.
+     */
+    case MEM_IRQ:
+      memory_->Write(READ_ADDR_REG(REG_S), regs_->p);
+
+      // Allows an NMI to hijack the instruction.
+      if (nmi_edge_) {
+        state_->AddCycle(MEM_READ | MEM_ADDR(REG_VEC) | MEM_OP1(REG_PCL)
+                       | MEM_OFFSET(0) | DAT_SET | DAT_MASK(P_FLAG_I));
+        state_->AddCycle(MEM_READ | MEM_ADDR(REG_VEC) | MEM_OP1(REG_PCH)
+                       | MEM_OFFSET(1));
+        state_->AddCycle(MEM_FETCH | PC_INC);
+      } else {
+        state_->AddCycle(MEM_READ | MEM_ADDR(REG_VEC) | MEM_OP1(REG_PCL)
+                       | MEM_OFFSET(4) | DAT_SET | DAT_MASK(P_FLAG_I));
+        state_->AddCycle(MEM_READ | MEM_ADDR(REG_VEC) | MEM_OP1(REG_PCH)
+                       | MEM_OFFSET(5));
+        state_->AddCycle(MEM_FETCH | PC_INC);
+      }
+
+      regs_->p &= P_MASK;
+      break;
+    case MEM_PHP:
+      break;
+    case MEM_PLP:
+      break;
+    case MEM_FETCH:
+      break;
+    case MEM_BRANCH:
+      break;
+    case MEM_NOP:
+    default:
+      break;
+  }
 
   return;
 }

@@ -26,7 +26,7 @@
  */
 
 // The cpu operation data type, which holds the data detailed above.
-typedef uint32_t CpuOperation
+typedef uint32_t CpuOperation;
 
 /* PC encoding constants */
 #define PC_INC 0x01U
@@ -48,7 +48,7 @@ typedef enum { DAT_NOP = 0,   DAT_INC = 2,  DAT_INCNF = 4,  DAT_DEC = 6,
 /* Memory opcode enumerations */
 typedef enum { MEM_NOP = 0,       MEM_READ = 0x10000, MEM_WRITE = 0x20000,
                MEM_IRQ = 0x30000, MEM_BRQ = 0x40000,  MEM_PHP = 0x50000,
-               MEM_PLP = 0x60000 } MemoryOpcode;
+               MEM_PLP = 0x60000, MEM_BRANCH = 0x70000 } MemoryOpcode;
 
 /* Macros for setting each field in a cpu operation */
 #define DAT_SRC(r)  ((((int)(r)) <<  8) & 0x00000F00)

@@ -33,12 +33,12 @@ typedef struct {
   DataWord s_hi = MEMORY_STACK_HIGH;
   DataWord vector_lo = 0;
   DataWord vector_hi = 0;
-  DataWord a;
-  DataWord x;
-  DataWord y;
-  DataWord p;
-  DataWord inst;
-} CpuRegFile;
+  DataWord a = 0;
+  DataWord x = 0;
+  DataWord y = 0;
+  DataWord p = 0x24U; // Bit 5 is always high and the I flag is set on init.
+  DataWord inst = 0;
+} CpuRegFile = 0;
 
 /*
  * Represents an emulated 6502 CPU. The state of the CPU is managed

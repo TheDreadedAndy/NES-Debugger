@@ -20,8 +20,11 @@ typedef union {
 #define WORD_HI 0U
 #endif
 
-// Integer promotion is of the Devil.
-#define WORD_MASK 0xFFU
+// Used to convert between 2 words and a double word.
+#define GET_DOUBLE_WORD(lo, hi) ((DoubleWord)((((DataWord)(hi)) << 8)\
+                                             | ((DataWord)(lo))))
+#define GET_WORD_HI(dw) ((DataWord)(((DoubleWord)(dw)) >> 8))
+#define GET_WORD_LO(dw) ((DataWord)(((DoubleWord)(dw)) & 0xFF))
 
 // Reverses a word.
 DataWord ReverseWord(DataWord word);

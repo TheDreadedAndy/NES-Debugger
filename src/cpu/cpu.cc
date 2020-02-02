@@ -69,13 +69,6 @@ Cpu::Cpu(void) {
   // Prepares the CPU's internal structures.
   state_ = new CpuState();
   regs_ = new CpuRegFile();
-
-  // Setup the cpu register file.
-  // On startup, IRQ's are disabled and the high byte of the stack pointer
-  // is set to 0x01.
-  regs_->p.irq_disable = true;
-  regs_->s.w[WORD_HI] = MEMORY_STACK_HIGH;
-
   return;
 }
 
@@ -293,14 +286,72 @@ void Cpu::RunMemoryOperation(CpuOperation &op) {
 
       regs_->p &= P_MASK;
       break;
+
+    /*
+     * Pushes the status register onto the stack with the B flag set.
+     */
     case MEM_PHP:
+      memory_->Write(READ_ADDR_REG(REG_S), regs_->p | P_FLAG_B);
       break;
+
+    /*
+     * Pulls the status register from the stack, clearing the B flag.
+     */
     case MEM_PLP:
+      regs_->p = memory_->Read(READ_ADDR_REG(REG_S)) & P_MASK;
       break;
+
+    /*
+     * Fetches the next instructions and queues its cycles.
+     */
     case MEM_FETCH:
+      Fetch(op);
       break;
+
+    /*
+     * Executes a branch instruction.
+     * Branch instructions are of the form xxy10000, and are broken into
+     * three cases:
+     * 1) If the flag indicated by xx has value y, then the relative address
+     * is added to the PC.
+     * 2) If case 1 results in a page crossing on the pc, an extra cycle is
+     * added.
+     * 3) If xx does not have value y, this micro op is the same as MEM_FETCH.
+     */
     case MEM_BRANCH:
+      // Calculate whether or not the branch was taken.
+      DataWord flag = (regs_->inst >> 6U) & 0x03U;
+      bool cond = regs_->inst & 0x20U;
+      // Black magic that pulls the proper flag from the status reg.
+      DataWord status = reg_->p;
+      flag = (flag & 2U) ? ((status >> (flag & 1U)) & 1U)
+                         : ((status >> ((~flag) & 0x07U)) & 1U);
+      bool taken = ((static_cast<bool>(flag)) == cond);
+
+      // Add the reletive address to pc_lo. Reletive addressing is signed.
+      DoubleWord res = regs_->pc_lo + regs_->temp1;
+      // Effectively sign extends the MDR in the carry out.
+      regs_->temp2 = (regs_->mdr & 0x80) ? (GET_WORD_HI(res) + 0xFFU)
+                                         :  GET_WORD_HI(res);
+
+      // Execute the proper cycles according to the above results.
+      if (!taken) {
+        // Case 3. We must force a PC increment since this is now a fetch.
+        op |= PC_INC;
+        Fetch(op);
+      } else if (regs_->temp2) {
+        // Case 2.
+        regs_->pc_lo = GET_WORD_LO(res);
+        state_->AddCycle(DAT_ADD | DAT_SRC(REG_TMP2) | DAT_DST(REG_PCH));
+        state_->AddCycle(MEM_FETCH | PC_INC);
+      } else {
+        // Case 1.
+        regs_->pc_lo = GET_WORD_LO(res);
+        state_->AddCycle(MEM_FETCH | PC_INC);
+      }
       break;
+
+    /* Does nothing */
     case MEM_NOP:
     default:
       break;
@@ -312,23 +363,17 @@ void Cpu::RunMemoryOperation(CpuOperation &op) {
 /*
  * Fetches the next instruction to be executing, storing brk instead
  * if an interrupt should be started. Adjusts the PC as necessary, since
- * branch calls which lead into a fetch do not.
- *
- * This functions should only be called from MemFetch().
+ * interrupts do not increment it.
  */
-void Cpu::Fetch(OperationCycle *op) {
+void Cpu::Fetch(CpuOperation &op) {
   // Fetch the next instruction to the instruction register.
   if (!nmi_edge_ && !irq_ready_) {
-    // A non-interrupt fetch should always be paired with a PC increment.
-    // We set the micro ops pc_inc field here, in case we were coming
-    // from a branch.
-    op->inc_pc = PC_INC;
-    regs_->inst = memory_->Read(regs_->pc.dw);
+    regs_->inst = memory_->Read(READ_ADDR_REG(REG_PCL));
   } else {
     // All interrupts fill the instruction register with 0x00 (BRK).
     regs_->inst = INST_BRK;
     // Interrupts should not increment the PC.
-    op->inc_pc = PC_NOP;
+    op &= (~PC_INC);
   }
 
   // Decode the instruction.

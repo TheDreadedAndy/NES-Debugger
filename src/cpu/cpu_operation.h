@@ -61,11 +61,11 @@ typedef enum { MEM_NOP = 0,       MEM_READ = 0x10000, MEM_WRITE = 0x20000,
 
 /* Macros for getting each field in a cpu operation */
 #define GET_PC_INC(op)   ((DoubleWord)   (((int)(op))        & 0x01))
-#define GET_DAT_OP(op)   ((DataOpcode)  ((((int)(op)) >>  1) & 0x7F))
+#define GET_DAT_OP(op)   ((DataOpcode)   (((int)(op))        & 0xFE))
 #define GET_DAT_SRC(op)  ((CpuReg)      ((((int)(op)) >>  8) & 0x0F))
 #define GET_DAT_DST(op)  ((CpuReg)      ((((int)(op)) >> 12) & 0x0F))
 #define GET_DAT_MASK(op) ((DataWord)    ((((int)(op)) >>  8) & 0xFF))
-#define GET_MEM_OP(op)   ((MemoryOpcode)((((int)(op)) >> 16) & 0x0F))
+#define GET_MEM_OP(op)   ((MemoryOpcode) (((int)(op))  & 0x000F0000))
 #define GET_MEM_ADDR(op) ((CpuReg)      ((((int)(op)) >> 20) & 0x0F))
 #define GET_MEM_OFST(op) ((DoubleWord)  ((((int)(op)) >> 24) & 0x0F))
 #define GET_MEM_OP2(op)  ((CpuReg)      ((((int)(op)) >> 24) & 0x0F))

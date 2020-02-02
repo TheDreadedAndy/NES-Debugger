@@ -47,8 +47,9 @@
 
 // Used by memory operations to access both the high and low byte of an
 // addressing register.
-#define READ_ADDR_REG(r) ((DoubleWord)((((DoubleWord)(regs_[(r) + 1])) << 8)\
-                                      | ((DoubleWord)(regs_[(r)]))))
+#define READ_ADDR_REG(r) (static_cast<DoubleWord>(\
+                       (((static_cast<DataWord*>(regs_))[(r) + 1]) << 8)\
+                      | ((static_cast<DataWord*>(regs_))[(r)])))
 
 // Used to access and update the processor status register.
 #define P_MASK   0xEFU
@@ -60,6 +61,11 @@
 #define P_FLAG_I 0x04U
 #define P_FLAG_Z 0x02U
 #define P_FLAG_C 0x01U
+#define P_SET_N(w) (regs_->p = (static_cast<DataWord>(w) & 0x80)\
+                             | (regs_->p & 0x7F))
+#define P_SET_Z(w) (regs_->p = ((static_cast<DataWord>(w) == 0) << 1)\
+                             | (regs_->p & 0xFD))
+#define P_SET_C(b) (regs_->p = ((static_cast<bool>(b)) | (regs_->p & 0xFE)))
 
 /*
  * Creates a new CPU object. The CPU object will not be in a usable state
@@ -202,24 +208,17 @@ bool Cpu::CanPoll(void) {
  * Runs the Memory, Data, and PC action specified by the given operation.
  */
 void Cpu::RunOperation(CpuOperation op) {
-  // Decodes all the information from the operation.
-  CpuReg data_src = GET_DAT_SRC(op);
-  CpuReg data_dst = GET_DAT_DST(op);
-  DataWord data_mask = GET_DAT_MASK(op);
-  DataOpcode data_op = GET_DAT_OP(op);
-  DoubleWord pc_inc = GET_PC_INC(op);
-
   // Performs the memory operation.
   RunMemoryOperation(op);
 
   // Performs the encoded data operation.
-  switch (data_op) {
-  }
+  RunDataOperation(op);
 
   // Increments the PC by the given value.
-  pc_inc = GET_DOUBLE_WORD(regs_->pc_lo, regs_->pc_hi) + pc_inc;
-  regs_->pc_lo = GET_WORD_LO(pc_inc);
-  regs_->pc_hi = GET_WORD_HI(pc_inc);
+  DoubleWord pc_update = GET_DOUBLE_WORD(regs_->pc_lo, regs_->pc_hi)
+                       + GET_PC_INC(op);
+  regs_->pc_lo = GET_WORD_LO(pc_update);
+  regs_->pc_hi = GET_WORD_HI(pc_update);
 
   return;
 }
@@ -234,6 +233,7 @@ void Cpu::RunMemoryOperation(CpuOperation &op) {
   CpuReg mem_op2 = GET_MEM_OP2(op);
   DoubleWord mem_offset = GET_MEM_OFST(op);
   MemoryOpcode mem_op = GET_MEM_OP(op);
+  DataWord *regfile = static_cast<DataWord*>(regs_);
 
   // Performs the encoded memory operation.
   switch (mem_op) {
@@ -242,7 +242,7 @@ void Cpu::RunMemoryOperation(CpuOperation &op) {
      * plus the offset into the register specified by mem_op1.
      */
     case MEM_READ:
-      regs_[mem_op1] = memory_->Read(READ_ADDR_REG(mem_addr) + mem_offset);
+      regfile[mem_op1] = memory_->Read(READ_ADDR_REG(mem_addr) + mem_offset);
       break;
 
     /*
@@ -250,7 +250,8 @@ void Cpu::RunMemoryOperation(CpuOperation &op) {
      * given from the addressing register.
      */
     case MEM_WRITE:
-      memory_->Write(READ_ADDR_REG(mem_addr), regs_[mem_op1] & regs_[mem_op2]);
+      memory_->Write(READ_ADDR_REG(mem_addr), regfile[mem_op1]
+                                            & regfile[mem_op2]);
       break;
 
     /*
@@ -353,6 +354,125 @@ void Cpu::RunMemoryOperation(CpuOperation &op) {
 
     /* Does nothing */
     case MEM_NOP:
+    default:
+      break;
+  }
+
+  return;
+}
+
+/*
+ * Executes the data operation encoded by the given CPU operation.
+ */
+void Cpu::RunDataOperation(CpuOperation &op) {
+  // Decodes the data information from the given operation.
+  CpuReg data_src = GET_DAT_SRC(op);
+  CpuReg data_dst = GET_DAT_DST(op);
+  DataWord data_mask = GET_DAT_MASK(op);
+  DataOpcode data_op = GET_DAT_OP(op);
+  DataWord *regfile = static_cast<DataWord*>(regs_);
+
+  // Performs the specified data operation.
+  switch (data_op) {
+    /*
+     * Increments the specified destination register.
+     * Updates the N and Z flags according to the result.
+     */
+    case DAT_INC:
+      regfile[data_dst]++;
+      P_UPDATE_N(regfile[data_dst]);
+      P_UPDATE_Z(regfile[data_dst]);
+      break;
+
+    /*
+     * Increments the specified destination register.
+     */
+    case DAT_INCNF:
+      regfile[data_dst]++;
+      break;
+
+    /*
+     * Decrements the specified destination register.
+     * Updates the N and Z flags according to the result.
+     */
+    case DAT_DEC:
+      regfile[data_dst]--;
+      P_UPDATE_N(regfile[data_dst]);
+      P_UPDATE_Z(regfile[data_dst]);
+      break;
+
+    /*
+     * Decrements the specified destination register.
+     */
+    case DAT_DECNF:
+      regfile[data_dst]--;
+      break;
+
+    /*
+     * Moves the value of the source register into the destination register.
+     * Updates the N and Z flags based on the result.
+     */
+    case DAT_MOV:
+      regfile[data_dst] = regfile[data_src];
+      P_UPDATE_N(regfile[data_dst]);
+      P_UPDATE_Z(regfile[data_dst]);
+      break;
+
+    /*
+     * Moves the value of the source register into the destination register.
+     */
+    case DAT_MOVNF:
+      regfile[data_dst] = regfile[data_src];
+      break;
+
+    /*
+     * Masks out the bits specified in the data mask from P.
+     */
+    case DAT_CLS:
+      regs_->p &= (~data_mask);
+      break;
+
+    /*
+     * Sets the bits specified in the data mask in P.
+     */
+    case DAT_SET:
+      regs_->p |= data_mask;
+      break;
+
+    /*
+     * Updates the N, Z, and C flags according to the result of (rd - rs).
+     */
+    case DAT_CMP:
+      P_UPDATE_N(regfile[data_dst] - regfile[data_src]);
+      P_UPDATE_C(regfile[data_dst] >= regfile[data_src]);
+      P_UPDATE_Z(regfile[data_dst] - regfile[data_src]);
+      break;
+
+    case DAT_ASL:
+      break;
+    case DAT_LSR:
+      break;
+    case DAT_ROL:
+      break;
+    case DAT_ROR:
+      break;
+    case DAT_XOR:
+      break;
+    case DAT_OR:
+      break;
+    case DAT_AND:
+      break;
+    case DAT_ADD:
+      break;
+    case DAT_SBC:
+      break;
+    case DAT_ADC:
+      break;
+    case DAT_BIT:
+      break;
+    case DAT_VFIX:
+      break;
+    case DAT_NOP:
     default:
       break;
   }

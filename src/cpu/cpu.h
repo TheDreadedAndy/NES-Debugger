@@ -15,23 +15,28 @@
 
 /*
  * This structure represents the register file for the 6502 CPU, and
- * is used in the CPU emulation.
+ * is used in the CPU emulation. The order of the fields in this file
+ * must be consistent with the definitions defined in the operation header.
  *
  * Note that some of these fields are abstractions to make emulation more
  * efficient, and did not exist within the 6502.
  */
 typedef struct {
+  DataWord pc_lo = 0;
+  DataWord pc_hi = 0;
+  DataWord addr_lo = 0;
+  DataWord addr_hi = 0;
+  DataWord temp_lo = 0; // MDR and Pointer low.
+  DataWord temp_hi = 0; // Addr carry and Pointer high.
+  DataWord s_lo = 0;
+  DataWord s_hi = MEMORY_STACK_HIGH;
+  DataWord vector_lo = 0;
+  DataWord vector_hi = 0;
   DataWord a;
   DataWord x;
   DataWord y;
+  DataWord p;
   DataWord inst;
-  DataWord mdr;
-  DataWord addr_carry;
-  MultiWord s;
-  MultiWord pc;
-  MultiWord addr;
-  MultiWord ptr;
-  CpuStatus p;
 } CpuRegFile;
 
 /*

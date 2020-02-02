@@ -18,7 +18,7 @@ DIRS = $(sort $(dir $(BINS) $(SRC)))
 
 # The compiler to be used and its flags.
 CXX = g++
-override CXXFLAGS += -std=c++17 -Wall -Wshadow -Wextra -Wold-style-cast -Werror -pedantic -O3 $(shell sdl2-config --cflags)
+override CXXFLAGS += -std=c++17 -Wall -Wshadow -Wextra -Wold-style-cast -Werror -pedantic -O3 -fno-omit-frame-pointer $(shell sdl2-config --cflags)
 
 # Libraries to be linked to the binary.
 LIBS = $(shell sdl2-config --libs)

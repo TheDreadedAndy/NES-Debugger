@@ -44,8 +44,6 @@ class Ppu {
     DataWord *oam_buffer_;
 
     // Temporary storage used in rendering.
-    // TODO: Remove these in favor of a system which displays tiles as soon
-    // as they are received.
     MultiWord tile_scroll_[PPU_BIT_PLANES];
     DataWord next_tile_[PPU_BIT_PLANES];
     DataWord palette_scroll_[PPU_BIT_PLANES];

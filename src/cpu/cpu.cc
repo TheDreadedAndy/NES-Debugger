@@ -65,6 +65,8 @@
                              | (regs_->p & 0x7F))
 #define P_SET_Z(w) (regs_->p = ((static_cast<DataWord>(w) == 0) << 1)\
                              | (regs_->p & 0xFD))
+#define P_SET_V(b) (regs_->p = (((static_cast<bool>(b)) << 6)\
+                             | (regs_->p & 0xBF))
 #define P_SET_C(b) (regs_->p = ((static_cast<bool>(b)) | (regs_->p & 0xFE)))
 
 /*
@@ -99,7 +101,7 @@ void Cpu::Power(void) {
   regs_->pc_hi = memory_->Read(MEMORY_RESET_ADDR + 1U);
 
   // Queues the first cycle to be emulated.
-  state_->AddCycle(&Cpu::MemFetch, &Cpu::Nop, PC_INC, &Cpu::CheckPcRead);
+  state_->AddCycle(MEM_FETCH | PC_INC);
   return;
 }
 
@@ -143,7 +145,7 @@ void Cpu::RunCycle(void) {
   if (CanPoll()) {
     // irq_ready should only be reset from a fetch call handling it
     // or from interrupts being blocked.
-    irq_ready_ = (irq_ready_ || irq_level_) && !(regs_->p.irq_disable);
+    irq_ready_ = (irq_ready_ || irq_level_) && !(regs_->p & P_FLAG_I);
   }
 
   // Fetch and run the next micro instructions for the cycle.
@@ -373,6 +375,7 @@ void Cpu::RunDataOperation(CpuOperation &op) {
   DataWord *regfile = static_cast<DataWord*>(regs_);
 
   // Performs the specified data operation.
+  DoubleWord res;
   switch (data_op) {
     /*
      * Increments the specified destination register.
@@ -448,30 +451,137 @@ void Cpu::RunDataOperation(CpuOperation &op) {
       P_UPDATE_Z(regfile[data_dst] - regfile[data_src]);
       break;
 
+    /*
+     * Shifts the destination register left once, storing the lost bit in C
+     * and updating N and Z according to the result.
+     */
     case DAT_ASL:
+      P_UPDATE_C(regfile[data_dst] & 0x80);
+      regfile[data_dst] <<= 1;
+      P_UPDATE_N(regfile[data_dst]);
+      P_UPDATE_Z(regfile[data_dst]);
       break;
+
+    /*
+     * Shifts the destination register right once, storing the lost bit in C
+     * and updating N and Z according to the result. The high bit is filled
+     * with 0.
+     */
     case DAT_LSR:
+      P_UPDATE_C(regfile[data_dst] & 0x01);
+      regfile[data_dst] >>= 1;
+      P_UPDATE_N(regfile[data_dst]);
+      P_UPDATE_Z(regfile[data_dst]);
       break;
+
+    /*
+     * Shifts the destination register left once, back filling with C.
+     * Stores the lost bit in C and sets N and Z according to the result.
+     */
     case DAT_ROL:
+      res = (regfile[data_dst] << 1) | (regs_->p & P_FLAG_C);
+      regfile[data_dst] = GET_WORD_LO(res);
+      P_UPDATE_C(GET_WORD_HI(res));
+      P_UPDATE_N(regfile[data_dst]);
+      P_UPDATE_Z(regfile[data_dst]);
       break;
+
+    /*
+     * Shifts the destination register right once, back filling with C.
+     * Stores the lost bit in C and sets N and Z according to the result.
+     */
     case DAT_ROR:
+      res = GET_DOUBLE_WORD(regfile[data_dst], regs_->p);
+      regfile[data_dst] = res >> 1;
+      P_UPDATE_C(res & 0x01);
+      P_UPDATE_N(regfile[data_dst]);
+      P_UPDATE_Z(regfile[data_dst]);
       break;
+
+    /*
+     * XOR's the specified registers and sets the N and Z flags
+     * according to the result.
+     */
     case DAT_XOR:
+      regfile[data_dst] ^= regfile[data_src];
+      P_UPDATE_N(regfile[data_dst]);
+      P_UPDATE_Z(regfile[data_dst]);
       break;
+
+    /*
+     * OR's the specified registers and sets the N and Z flags
+     * according to the result.
+     */
     case DAT_OR:
+      regfile[data_dst] |= regfile[data_src];
+      P_UPDATE_N(regfile[data_dst]);
+      P_UPDATE_Z(regfile[data_dst]);
       break;
+
+    /*
+     * AND's the specified registers and sets the N and Z flags
+     * according to the result.
+     */
     case DAT_AND:
+      regfile[data_dst] &= regfile[data_src];
+      P_UPDATE_N(regfile[data_dst]);
+      P_UPDATE_Z(regfile[data_dst]);
       break;
+
+    /*
+     * Adds the specified registers, storing the carry out in tmp2.
+     */
     case DAT_ADD:
+      res = regfile[data_dst] + regfile[data_src];
+      regfile[data_dst] = GET_WORD_LO(res);
+      regfile[REG_TMP2] = GET_WORD_HI(res);
       break;
+
+    /*
+     * Nots the source register, then passes off to ADC to perform the addition
+     * and set the flags. This is the same as rd = rd - rs - (1 - C).
+     */
     case DAT_SBC:
-      break;
+      regfile[data_src] = ~(regfile[data_src]);
+
+    /*
+     * Adds the source register and the carry flag to the destination register.
+     * Sets the N, V, Z, and C flags according to the result.
+     */
     case DAT_ADC:
+      res = regfile[data_dst] + regfile[data_src] + (regs_->p & P_FLAG_C);
+      P_UPDATE_V(((~(regfile[data_dst] ^ regfile[data_src]))
+                  & (regfile[data_dst] ^ GET_WORD_HI(res))) & 0x80;
+      regfile[data_dst] = GET_WORD_LO(res);
+      P_UPDATE_N(regfile[data_dst]);
+      P_UPDATE_Z(regfile[data_dst]);
+      P_UPDATE_C(GET_WORD_HI(res));
       break;
+
+    /*
+     * Moves the high 2 bits of the source register to P, then sets
+     * the Z flag according to the result of (rd & rs).
+     */
     case DAT_BIT:
+      P_UPDATE_N(regfile[data_src]);
+      P_UPDATE_V(regfile[data_src] & P_FLAG_V);
+      P_UPDATE_Z(regfile[data_dst] & regfile[data_src]);
       break;
+
+    /*
+     * Pushes the last addressing operation back onto the queue if the address
+     * crossed a page bound and needed to be fixed.
+     * The destination register is the high byte of the address, and the source
+     * register is the carry out.
+     */
     case DAT_VFIX:
+      if (regfile[data_src]) {
+        regfile[data_dst] += regfile[data_src];
+        state_->PushCycle(op & MEMORY_OPERATION_MASK);
+      }
       break;
+
+    /* Does nothing. */
     case DAT_NOP:
     default:
       break;

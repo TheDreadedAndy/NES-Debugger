@@ -21,10 +21,13 @@ typedef union {
 #endif
 
 // Used to convert between 2 words and a double word.
-#define GET_DOUBLE_WORD(lo, hi) ((DoubleWord)((((DataWord)(hi)) << 8)\
-                                             | ((DataWord)(lo))))
-#define GET_WORD_HI(dw) ((DataWord)(((DoubleWord)(dw)) >> 8))
-#define GET_WORD_LO(dw) ((DataWord)(((DoubleWord)(dw)) & 0xFF))
+#define GET_DOUBLE_WORD(lo, hi) (static_cast<DoubleWord>(\
+                               ((static_cast<DataWord>(hi)) << 8)\
+                              | (static_cast<DataWord>(lo))))
+#define GET_WORD_HI(dw) (static_cast<DataWord>(\
+                        (static_cast<DoubleWord>(dw)) >> 8))
+#define GET_WORD_LO(dw) (static_cast<DataWord>(\
+                        (static_cast<DoubleWord>(dw)) & 0xFF))
 
 // Reverses a word.
 DataWord ReverseWord(DataWord word);

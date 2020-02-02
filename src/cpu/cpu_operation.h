@@ -51,24 +51,34 @@ typedef enum { MEM_NOP = 0,       MEM_READ = 0x10000, MEM_WRITE = 0x20000,
                MEM_PLP = 0x60000, MEM_BRANCH = 0x70000 } MemoryOpcode;
 
 /* Macros for setting each field in a cpu operation */
-#define DAT_SRC(r)  ((((int)(r)) <<  8) & 0x00000F00)
-#define DAT_DST(r)  ((((int)(r)) << 12) & 0x0000F000)
-#define DAT_MASK(p) ((((int)(p)) <<  8) & 0x0000FF00)
-#define MEM_ADDR(r) ((((int)(r)) << 20) & 0x00F00000)
-#define MEM_OFST(o) ((((int)(o)) << 24) & 0x0F000000)
-#define MEM_OP2(r)  ((((int)(r)) << 24) & 0x0F000000)
-#define MEM_OP1(r)  ((((int)(r)) << 28) & 0xF0000000)
+#define DAT_SRC(r)  (((static_cast<int>(r)) <<  8) & 0x00000F00)
+#define DAT_DST(r)  (((static_cast<int>(r)) << 12) & 0x0000F000)
+#define DAT_MASK(p) (((static_cast<int>(p)) <<  8) & 0x0000FF00)
+#define MEM_ADDR(r) (((static_cast<int>(r)) << 20) & 0x00F00000)
+#define MEM_OFST(o) (((static_cast<int>(o)) << 24) & 0x0F000000)
+#define MEM_OP2(r)  (((static_cast<int>(r)) << 24) & 0x0F000000)
+#define MEM_OP1(r)  (((static_cast<int>(r)) << 28) & 0xF0000000)
 
 /* Macros for getting each field in a cpu operation */
-#define GET_PC_INC(op)   ((DoubleWord)   (((int)(op))        & 0x01))
-#define GET_DAT_OP(op)   ((DataOpcode)   (((int)(op))        & 0xFE))
-#define GET_DAT_SRC(op)  ((CpuReg)      ((((int)(op)) >>  8) & 0x0F))
-#define GET_DAT_DST(op)  ((CpuReg)      ((((int)(op)) >> 12) & 0x0F))
-#define GET_DAT_MASK(op) ((DataWord)    ((((int)(op)) >>  8) & 0xFF))
-#define GET_MEM_OP(op)   ((MemoryOpcode) (((int)(op))  & 0x000F0000))
-#define GET_MEM_ADDR(op) ((CpuReg)      ((((int)(op)) >> 20) & 0x0F))
-#define GET_MEM_OFST(op) ((DoubleWord)  ((((int)(op)) >> 24) & 0x0F))
-#define GET_MEM_OP2(op)  ((CpuReg)      ((((int)(op)) >> 24) & 0x0F))
-#define GET_MEM_OP1(op)  ((CpuReg)      ((((int)(op)) >> 28) & 0x0F))
+#define DATA_OPERATION_MASK 0x0000FFFEU
+#define MEMORY_OPERATION_MASK 0xFFFF0000U
+#define GET_PC_INC(op) (static_cast<DoubleWord>((static_cast<int>(op)) & 0x01))
+#define GET_DAT_OP(op) (static_cast<DataOpcode>((static_cast<int>(op)) & 0xFE))
+#define GET_DAT_SRC(op) (static_cast<CpuReg>(((static_cast<int>(op)) >> 8)\
+                                                                     & 0x0F))
+#define GET_DAT_DST(op) (static_cast<CpuReg>(((static_cast<int>(op)) >> 12)\
+                                                                     & 0x0F))
+#define GET_DAT_MASK(op) (static_cast<DataWord>(((static_cast<int>(op)) >>8)\
+                                                                        & 0xFF))
+#define GET_MEM_OP(op) (static_cast<MemoryOpcode>((static_cast<int>(op))\
+                                                          & 0x000F0000))
+#define GET_MEM_ADDR(op) (static_cast<CpuReg>(((static_cast<int>(op)) >> 20)\
+                                                                      & 0x0F))
+#define GET_MEM_OFST(op) (static_cast<DoubleWord>(((static_cast<int>(op))\
+                                                          >> 24) & 0x0F))
+#define GET_MEM_OP2(op) (static_cast<CpuReg>(((static_cast<int>(op)) >> 24)\
+                                                                     & 0x0F))
+#define GET_MEM_OP1(op) (static_cast<CpuReg>(((static_cast<int>(op)) >> 28)\
+                                                                     & 0x0F))
 
 #endif

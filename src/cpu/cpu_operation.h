@@ -50,6 +50,10 @@ typedef enum { MEM_NOP = 0,       MEM_READ = 0x10000, MEM_WRITE = 0x20000,
                MEM_IRQ = 0x30000, MEM_BRQ = 0x40000,  MEM_PHP = 0x50000,
                MEM_PLP = 0x60000, MEM_BRANCH = 0x70000 } MemoryOpcode;
 
+/* Offsets for selecting the proper vector to access */
+typedef enum { OFFSET_NMIL = 0, OFFSET_NMIH = 1, OFFSET_RSTL = 2,
+               OFFSET_RSTH = 3, OFFSET_IRQL = 4, OFFSET_IRQH = 5 } MemoryOffset;
+
 /* Macros for setting each field in a cpu operation */
 #define DAT_SRC(r)  (((static_cast<int>(r)) <<  8) & 0x00000F00)
 #define DAT_DST(r)  (((static_cast<int>(r)) << 12) & 0x0000F000)

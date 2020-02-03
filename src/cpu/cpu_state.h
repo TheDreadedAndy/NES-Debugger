@@ -36,6 +36,9 @@ class CpuState {
     // Dequeues and returns the next operation cycle.
     CpuOperation NextCycle(void);
 
+    // Returns the next operation cycle without dequeueing it.
+    CpuOperation PeekCycle(void);
+
     // Clears the state queue.
     void Clear(void);
 

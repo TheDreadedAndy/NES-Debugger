@@ -76,7 +76,7 @@ void CpuState::PushCycle(CpuOperation op) {
 /*
  * Dequeues the next state cycle and returns it.
  */
-OperationCycle *CpuState::NextCycle(void) {
+CpuOperation CpuState::NextCycle(void) {
   CONTRACT(state_->size > 0);
 
   // Get the next cycle.
@@ -87,6 +87,13 @@ OperationCycle *CpuState::NextCycle(void) {
   state_->size--;
 
   return next_op;
+}
+
+/*
+ * Returns the cycle at the front of the queue.
+ */
+CpuOperation CpuState::PeekCycle(void) {
+  return state_->queue[state_->front];
 }
 
 /*

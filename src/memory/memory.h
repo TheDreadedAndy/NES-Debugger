@@ -11,6 +11,8 @@
 
 // Memory addressing constants.
 #define MEMORY_STACK_HIGH 0x01U
+#define MEMORY_VECTOR_LOW 0xFAU
+#define MEMORY_VECTOR_HIGH 0xFFU
 #define MEMORY_IRQ_ADDR 0xFFFEU
 #define MEMORY_RESET_ADDR 0xFFFCU
 #define MEMORY_NMI_ADDR 0xFFFAU

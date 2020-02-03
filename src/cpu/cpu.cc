@@ -117,7 +117,7 @@ void Cpu::Power(void) {
 size_t Cpu::RunSchedule(size_t cycles, size_t *syncs) {
   // Execute the CPU until it must be synced.
   size_t execs = 0;
-  while ((state_->CheckNextCycle(this)) && (execs < cycles)
+  while (CheckNextCycle() && (execs < cycles)
                                         && (dma_cycles_remaining_ == 0)) {
     RunCycle();
     execs++;
@@ -126,6 +126,31 @@ size_t Cpu::RunSchedule(size_t cycles, size_t *syncs) {
   // The CPU must be synced for the duration of any DMA.
   *syncs = MAX(dma_cycles_remaining_, 1UL);
   return execs;
+}
+
+/*
+ * Checks if the next memory operation is safe to perform while the CPU
+ * is not synced with the PPU and APU.
+ */
+bool Cpu::CheckNextCycle(void) {
+  // Decodes the information necessary to complete the memory operation.
+  CpuOperation op = state_->PeekCycle();
+  CpuReg mem_addr = GET_MEM_ADDR(op);
+  DoubleWord mem_offset = GET_MEM_OFST(op);
+  MemoryOpcode mem_op = GET_MEM_OP(op);
+
+  // Checks the operation encoded by memory.
+  switch (mem_op) {
+    case MEM_READ:
+      return memory_->CheckRead(READ_ADDR_REG(mem_addr) + mem_offset);
+    case MEM_WRITE:
+      return memory_->CheckWrite(READ_ADDR_REG(mem_addr));
+    case MEM_FETCH:
+    case MEM_BRANCH:
+      return memory_->CheckRead(READ_ADDR_REG(REG_PCL));
+    default:
+      return true;
+  }
 }
 
 /*
@@ -625,25 +650,30 @@ void Cpu::DecodeInst(void) {
     irq_ready_ = false;
 
     // Since an nmi was detected, we queue its cycles and return.
-    state_->AddCycle(&Cpu::MemReadPcNodest, &Cpu::Nop, PC_NOP,
-                     &Cpu::CheckPcRead);
-    state_->AddCycle(&Cpu::MemPushPch, &Cpu::DataDecS, PC_NOP);
-    state_->AddCycle(&Cpu::MemPushPcl, &Cpu::DataDecS, PC_NOP);
-    state_->AddCycle(&Cpu::MemPushP, &Cpu::DataDecS, PC_NOP);
-    state_->AddCycle(&Cpu::MemNmiPcl, &Cpu::DataSei, PC_NOP);
-    state_->AddCycle(&Cpu::MemNmiPch, &Cpu::Nop, PC_NOP);
-    state_->AddCycle(&Cpu::MemFetch, &Cpu::Nop, PC_INC, &Cpu::CheckPcRead);
+    state_->AddCycle(MEM_READ | MEM_ADDR(REG_PCL) | MEM_OP1(REG_TMP2));
+    state_->AddCycle(MEM_WRITE | MEM_ADDR(REG_S) | MEM_OP1(REG_PCH)
+                   | DAT_DECNF | DAT_DST(REG_S));
+    state_->AddCycle(MEM_WRITE | MEM_ADDR(REG_S) | MEM_OP1(REG_PCL)
+                   | DAT_DECNF | DAT_DST(REG_S));
+    state_->AddCycle(MEM_WRITE | MEM_ADDR(REG_S) | MEM_OP1(REG_P)
+                   | DAT_DECNF | DAT_DST(REG_S));
+    state_->AddCycle(MEM_READ | MEM_ADDR(REG_VEC) | MEM_OFST(OFFSET_NMIL)
+                   | MEM_OP1(PCL) | DAT_SET | DAT_MASK(P_FLAG_I));
+    state_->AddCycle(MEM_READ | MEM_ADDR(REG_VEC) | MEM_OFST(OFFSET_NMIH)
+                   | MEM_OP1(PCH));
+    state_->AddCycle(MEM_FETCH | PC_INC);
     return;
   } else if (irq_ready_) {
     // The irq has been handled, so we reset the flag.
     irq_ready_ = false;
 
     // Since an irq was detected, we queue its cycles and return.
-    state_->AddCycle(&Cpu::MemReadPcNodest, &Cpu::Nop, PC_NOP,
-                     &Cpu::CheckPcRead);
-    state_->AddCycle(&Cpu::MemPushPch, &Cpu::DataDecS, PC_NOP);
-    state_->AddCycle(&Cpu::MemPushPcl, &Cpu::DataDecS, PC_NOP);
-    state_->AddCycle(&Cpu::MemIrq, &Cpu::DataDecS, PC_NOP);
+    state_->AddCycle(MEM_READ | MEM_ADDR(REG_PCL) | MEM_OP1(REG_TMP2));
+    state_->AddCycle(MEM_WRITE | MEM_ADDR(REG_S) | MEM_OP1(REG_PCH)
+                   | DAT_DECNF | DAT_DST(REG_S));
+    state_->AddCycle(MEM_WRITE | MEM_ADDR(REG_S) | MEM_OP1(REG_PCL)
+                   | DAT_DECNF | DAT_DST(REG_S));
+    state_->AddCycle(MEM_IRQ | DAT_DECNF | DAT_DST(REG_S));
     return;
   }
 

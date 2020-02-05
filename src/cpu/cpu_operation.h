@@ -52,8 +52,9 @@ typedef enum {
 /* Memory opcode enumerations */
 typedef enum {
   MEM_NOP = 0,       MEM_READ = 0x10000,   MEM_WRITE = 0x20000,
-  MEM_IRQ = 0x30000, MEM_BRQ = 0x40000,    MEM_PHP = 0x50000,
-  MEM_PLP = 0x60000, MEM_BRANCH = 0x70000, MEM_READZP = 0x80000
+  MEM_IRQ = 0x30000, MEM_BRK = 0x40000,    MEM_PHP = 0x50000,
+  MEM_PLP = 0x60000, MEM_BRANCH = 0x70000, MEM_READZP = 0x80000,
+  MEM_FETCH = 0x90000
 } MemoryOpcode;
 
 /* Offsets for selecting the proper vector to access */

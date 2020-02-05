@@ -46,7 +46,7 @@ CpuState::CpuState(void) {
  *
  * Assumes that the state queue is not full.
  */
-void CpuState::AddCycles(CpuOperation op) {
+void CpuState::AddCycle(CpuOperation op) {
   CONTRACT(state_->size < STATE_MAX_OPS);
 
   // Adds the given cycle to the queue.

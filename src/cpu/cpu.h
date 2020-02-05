@@ -8,37 +8,10 @@
 #include "../memory/memory.h"
 #include "../util/data.h"
 #include "./cpu_state.h"
-#include "./cpu_status.h"
 #include "./cpu_operation.h"
 
 // The CPU has a memory mapped register to start a DMA to OAM at this address.
 #define CPU_DMA_ADDR 0x4014U
-
-/*
- * This structure represents the register file for the 6502 CPU, and
- * is used in the CPU emulation. The order of the fields in this file
- * must be consistent with the definitions defined in the operation header.
- *
- * Note that some of these fields are abstractions to make emulation more
- * efficient, and did not exist within the 6502.
- */
-typedef struct {
-  DataWord pc_lo = 0;
-  DataWord pc_hi = 0;
-  DataWord addr_lo = 0;
-  DataWord addr_hi = 0;
-  DataWord temp_lo = 0; // MDR and Pointer low.
-  DataWord temp_hi = 0; // Addr carry and Pointer high.
-  DataWord s_lo = 0;
-  DataWord s_hi = MEMORY_STACK_HIGH;
-  DataWord vector_lo = 0;
-  DataWord vector_hi = 0;
-  DataWord a = 0;
-  DataWord x = 0;
-  DataWord y = 0;
-  DataWord p = 0x24U; // Bit 5 is always high and the I flag is set on init.
-  DataWord inst = 0;
-} CpuRegFile = 0;
 
 /*
  * Represents an emulated 6502 CPU. The state of the CPU is managed
@@ -47,6 +20,32 @@ typedef struct {
  */
 class Cpu {
   private:
+    /*
+     * This structure represents the register file for the 6502 CPU, and
+     * is used in the CPU emulation. The order of the fields in this file
+     * must be consistent with the definitions defined in the operation header.
+     *
+     * Note that some of these fields are abstractions to make emulation more
+     * efficient, and did not exist within the 6502.
+     */
+    typedef struct {
+      DataWord pc_lo = 0;
+      DataWord pc_hi = 0;
+      DataWord addr_lo = 0;
+      DataWord addr_hi = 0;
+      DataWord temp1 = 0; // MDR and Pointer low.
+      DataWord temp2 = 0; // Addr carry and Pointer high.
+      DataWord s_lo = 0;
+      DataWord s_hi = MEMORY_STACK_HIGH;
+      DataWord vector_lo = MEMORY_VECTOR_LOW;
+      DataWord vector_hi = MEMORY_VECTOR_HIGH;
+      DataWord a = 0;
+      DataWord x = 0;
+      DataWord y = 0;
+      DataWord p = 0x24U; // Bit 5 is always high and the I flag is set on init.
+      DataWord inst = 0;
+    } CpuRegFile;
+
     // Used to edge detect the NMI signal.
     bool nmi_prev_ = false;
 
@@ -74,11 +73,13 @@ class Cpu {
     CpuRegFile *regs_;
 
     /* Helper functions for the CPU emulation */
+    bool CheckNextCycle(void);
     void ExecuteDma(void);
     bool CanPoll(void);
     void RunOperation(CpuOperation op);
     void RunMemoryOperation(CpuOperation &op);
-    void Fetch(OperationCycle *op_cycle);
+    void RunDataOperation(CpuOperation &op);
+    void Fetch(CpuOperation &op);
     void DecodeInst(void);
     void DecodeIzpx(CpuOperation op);
     void DecodeZp(CpuOperation op);
@@ -106,103 +107,6 @@ class Cpu {
     void DecodePull(CpuOperation op);
     void PollNmiLine(void);
     void PollIrqLine(void);
-
-    /* Data operations */
-    void Nop(void);
-    void DataIncS(void);
-    void DataIncX(void);
-    void DataIncY(void);
-    void DataIncMdr(void);
-    void DataDecS(void);
-    void DataDecX(void);
-    void DataDecY(void);
-    void DataDecMdr(void);
-    void DataMovAX(void);
-    void DataMovAY(void);
-    void DataMovSX(void);
-    void DataMovXA(void);
-    void DataMovXS(void);
-    void DataMovYA(void);
-    void DataMovMdrPcl(void);
-    void DataMovMdrA(void);
-    void DataMovMdrX(void);
-    void DataMovMdrY(void);
-    void DataClc(void);
-    void DataCld(void);
-    void DataCli(void);
-    void DataClv(void);
-    void DataSec(void);
-    void DataSed(void);
-    void DataSei(void);
-    void DataCmpMdrA(void);
-    void DataCmpMdrX(void);
-    void DataCmpMdrY(void);
-    void DataAslMdr(void);
-    void DataAslA(void);
-    void DataLsrMdr(void);
-    void DataLsrA(void);
-    void DataRolMdr(void);
-    void DataRolA(void);
-    void DataRorMdr(void);
-    void DataRorA(void);
-    void DataEorMdrA(void);
-    void DataAndMdrA(void);
-    void DataOraMdrA(void);
-    void DataAdcMdrA(void);
-    void DataSbcMdrA(void);
-    void DataBitMdrA(void);
-    void DataAddAddrlX(void);
-    void DataAddAddrlY(void);
-    void DataAddPtrlX(void);
-    void DataFixaAddrh(void);
-    void DataFixAddrh(void);
-    void DataFixPch(void);
-    void DataBranch(void);
-
-    /* Memory operations */
-    void MemFetch(void);
-    void MemReadPcNodest(void);
-    void MemReadPcMdr(void);
-    void MemReadPcPch(void);
-    void MemReadPcZpAddr(void);
-    void MemReadPcAddrl(void);
-    void MemReadPcAddrh(void);
-    void MemReadPcZpPtr(void);
-    void MemReadPcPtrl(void);
-    void MemReadPcPtrh(void);
-    void MemReadAddrMdr(void);
-    void MemReadPtrMdr(void);
-    void MemReadPtrAddrl(void);
-    void MemReadPtr1Addrh(void);
-    void MemReadPtr1Pch(void);
-    void MemWriteMdrAddr(void);
-    void MemWriteAAddr(void);
-    void MemWriteXAddr(void);
-    void MemWriteYAddr(void);
-    void MemPushPcl(void);
-    void MemPushPch(void);
-    void MemPushA(void);
-    void MemPushP(void);
-    void MemPushPB(void);
-    void MemBrk(void);
-    void MemIrq(void);
-    void MemPullPcl(void);
-    void MemPullPch(void);
-    void MemPullA(void);
-    void MemPullP(void);
-    void MemNmiPcl(void);
-    void MemNmiPch(void);
-    void MemResetPcl(void);
-    void MemResetPch(void);
-    void MemIrqPcl(void);
-    void MemIrqPch(void);
-
-    /* Operations used to check if a memory access is safe */
-    bool CheckPcRead(void);
-    bool CheckAddrRead(void);
-    bool CheckAddrWrite(void);
-    bool CheckPtrRead(void);
-    bool CheckPtr1Read(void);
 
   public:
     // Interrupt lines, which can be set by the PPU/APU.

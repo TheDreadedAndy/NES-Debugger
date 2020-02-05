@@ -57,8 +57,10 @@ typedef enum {
 } MemoryOpcode;
 
 /* Offsets for selecting the proper vector to access */
-typedef enum { OFFSET_NMIL = 0, OFFSET_NMIH = 1, OFFSET_RSTL = 2,
-               OFFSET_RSTH = 3, OFFSET_IRQL = 4, OFFSET_IRQH = 5 } MemoryOffset;
+typedef enum {
+  OFFSET_NMIL = 0, OFFSET_NMIH = 1, OFFSET_RSTL = 2,
+  OFFSET_RSTH = 3, OFFSET_IRQL = 4, OFFSET_IRQH = 5
+} MemoryOffset;
 
 /* Macros for setting each field in a cpu operation */
 #define DAT_SRC(r)  (((static_cast<int>(r)) <<  8) & 0x00000F00)

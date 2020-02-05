@@ -687,369 +687,366 @@ void Cpu::DecodeInst(void) {
    */
   switch (regs_->inst) {
     case INST_ORA_IZPX:
-      DecodeIzpx(&Cpu::DataOraMdrA);
+      DecodeIzpx(DAT_OR | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
       break;
     case INST_ORA_ZP:
-      DecodeZp(&Cpu::DataOraMdrA);
+      DecodeZp(DAT_OR | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
       break;
     case INST_ORA_IMM:
-      DecodeImm(&Cpu::DataOraMdrA);
+      DecodeImm(DAT_OR | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
       break;
     case INST_ORA_ABS:
-      DecodeAbs(&Cpu::DataOraMdrA);
+      DecodeAbs(DAT_OR | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
       break;
     case INST_ORA_IZP_Y:
-      DecodeIzpY(&Cpu::DataOraMdrA);
+      DecodeIzpY(DAT_OR | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
       break;
     case INST_ORA_ZPX:
-      DecodeZpx(&Cpu::DataOraMdrA);
+      DecodeZpx(DAT_OR | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
       break;
     case INST_ORA_ABY:
-      DecodeAby(&Cpu::DataOraMdrA);
+      DecodeAby(DAT_OR | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
       break;
     case INST_ORA_ABX:
-      DecodeAbx(&Cpu::DataOraMdrA);
+      DecodeAbx(DAT_OR | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
       break;
     case INST_AND_IZPX:
-      DecodeIzpx(&Cpu::DataAndMdrA);
+      DecodeIzpx(DAT_AND | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
       break;
     case INST_AND_ZP:
-      DecodeZp(&Cpu::DataAndMdrA);
+      DecodeZp(DAT_AND | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
       break;
     case INST_AND_IMM:
-      DecodeImm(&Cpu::DataAndMdrA);
+      DecodeImm(DAT_AND | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
       break;
     case INST_AND_ABS:
-      DecodeAbs(&Cpu::DataAndMdrA);
+      DecodeAbs(DAT_AND | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
       break;
     case INST_AND_IZP_Y:
-      DecodeIzpY(&Cpu::DataAndMdrA);
+      DecodeIzpY(DAT_AND | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
       break;
     case INST_AND_ZPX:
-      DecodeZpx(&Cpu::DataAndMdrA);
+      DecodeZpx(DAT_AND | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
       break;
     case INST_AND_ABY:
-      DecodeAby(&Cpu::DataAndMdrA);
+      DecodeAby(DAT_AND | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
       break;
     case INST_AND_ABX:
-      DecodeAbx(&Cpu::DataAndMdrA);
+      DecodeAbx(DAT_AND | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
       break;
     case INST_EOR_IZPX:
-      DecodeIzpx(&Cpu::DataEorMdrA);
+      DecodeIzpx(DAT_XOR | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
       break;
     case INST_EOR_ZP:
-      DecodeZp(&Cpu::DataEorMdrA);
+      DecodeZp(DAT_XOR | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
       break;
     case INST_EOR_IMM:
-      DecodeImm(&Cpu::DataEorMdrA);
+      DecodeImm(DAT_XOR | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
       break;
     case INST_EOR_ABS:
-      DecodeAbs(&Cpu::DataEorMdrA);
+      DecodeAbs(DAT_XOR | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
       break;
     case INST_EOR_IZP_Y:
-      DecodeIzpY(&Cpu::DataEorMdrA);
+      DecodeIzpY(DAT_XOR | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
       break;
     case INST_EOR_ZPX:
-      DecodeZpx(&Cpu::DataEorMdrA);
+      DecodeZpx(DAT_XOR | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
       break;
     case INST_EOR_ABY:
-      DecodeAby(&Cpu::DataEorMdrA);
+      DecodeAby(DAT_XOR | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
       break;
     case INST_EOR_ABX:
-      DecodeAbx(&Cpu::DataEorMdrA);
+      DecodeAbx(DAT_XOR | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
       break;
     case INST_ADC_IZPX:
-      DecodeIzpx(&Cpu::DataAdcMdrA);
+      DecodeIzpx(DAT_ADC | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
       break;
     case INST_ADC_ZP:
-      DecodeZp(&Cpu::DataAdcMdrA);
+      DecodeZp(DAT_ADC | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
       break;
     case INST_ADC_IMM:
-      DecodeImm(&Cpu::DataAdcMdrA);
+      DecodeImm(DAT_ADC | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
       break;
     case INST_ADC_ABS:
-      DecodeAbs(&Cpu::DataAdcMdrA);
+      DecodeAbs(DAT_ADC | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
       break;
     case INST_ADC_IZP_Y:
-      DecodeIzpY(&Cpu::DataAdcMdrA);
+      DecodeIzpY(DAT_ADC | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
       break;
     case INST_ADC_ZPX:
-      DecodeZpx(&Cpu::DataAdcMdrA);
+      DecodeZpx(DAT_ADC | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
       break;
     case INST_ADC_ABY:
-      DecodeAby(&Cpu::DataAdcMdrA);
+      DecodeAby(DAT_ADC | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
       break;
     case INST_ADC_ABX:
-      DecodeAbx(&Cpu::DataAdcMdrA);
+      DecodeAbx(DAT_ADC | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
       break;
     case INST_STA_IZPX:
-      DecodeWIzpx(&Cpu::MemWriteAAddr);
+      DecodeWIzpx(MEM_WRITE | MEM_OP1(REG_A) | MEM_ADDR(REG_ADDRL));
       break;
     case INST_STA_ZP:
-      DecodeWZp(&Cpu::MemWriteAAddr);
+      DecodeWZp(MEM_WRITE | MEM_OP1(REG_A) | MEM_ADDR(REG_ADDRL));
       break;
     case INST_STA_ABS:
-      DecodeWAbs(&Cpu::MemWriteAAddr);
+      DecodeWAbs(MEM_WRITE | MEM_OP1(REG_A) | MEM_ADDR(REG_ADDRL));
       break;
     case INST_STA_IZP_Y:
-      DecodeWIzpY(&Cpu::MemWriteAAddr);
+      DecodeWIzpY(MEM_WRITE | MEM_OP1(REG_A) | MEM_ADDR(REG_ADDRL));
       break;
     case INST_STA_ZPX:
-      DecodeWZpx(&Cpu::MemWriteAAddr);
+      DecodeWZpx(MEM_WRITE | MEM_OP1(REG_A) | MEM_ADDR(REG_ADDRL));
       break;
     case INST_STA_ABY:
-      DecodeWAby(&Cpu::MemWriteAAddr);
+      DecodeWAby(MEM_WRITE | MEM_OP1(REG_A) | MEM_ADDR(REG_ADDRL));
       break;
     case INST_STA_ABX:
-      DecodeWAbx(&Cpu::MemWriteAAddr);
+      DecodeWAbx(MEM_WRITE | MEM_OP1(REG_A) | MEM_ADDR(REG_ADDRL));
       break;
     case INST_LDA_IZPX:
-      DecodeIzpx(&Cpu::DataMovMdrA);
+      DecodeIzpx(DAT_MOV | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
       break;
     case INST_LDA_ZP:
-      DecodeZp(&Cpu::DataMovMdrA);
+      DecodeZp(DAT_MOV | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
       break;
     case INST_LDA_IMM:
-      DecodeImm(&Cpu::DataMovMdrA);
+      DecodeImm(DAT_MOV | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
       break;
     case INST_LDA_ABS:
-      DecodeAbs(&Cpu::DataMovMdrA);
+      DecodeAbs(DAT_MOV | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
       break;
     case INST_LDA_IZP_Y:
-      DecodeIzpY(&Cpu::DataMovMdrA);
+      DecodeIzpY(DAT_MOV | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
       break;
     case INST_LDA_ZPX:
-      DecodeZpx(&Cpu::DataMovMdrA);
+      DecodeZpx(DAT_MOV | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
       break;
     case INST_LDA_ABY:
-      DecodeAby(&Cpu::DataMovMdrA);
+      DecodeAby(DAT_MOV | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
       break;
     case INST_LDA_ABX:
-      DecodeAbx(&Cpu::DataMovMdrA);
+      DecodeAbx(DAT_MOV | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
       break;
     case INST_CMP_IZPX:
-      DecodeIzpx(&Cpu::DataCmpMdrA);
+      DecodeIzpx(DAT_CMP | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
       break;
     case INST_CMP_ZP:
-      DecodeZp(&Cpu::DataCmpMdrA);
+      DecodeZp(DAT_CMP | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
       break;
     case INST_CMP_IMM:
-      DecodeImm(&Cpu::DataCmpMdrA);
+      DecodeImm(DAT_CMP | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
       break;
     case INST_CMP_ABS:
-      DecodeAbs(&Cpu::DataCmpMdrA);
+      DecodeAbs(DAT_CMP | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
       break;
     case INST_CMP_IZP_Y:
-      DecodeIzpY(&Cpu::DataCmpMdrA);
+      DecodeIzpY(DAT_CMP | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
       break;
     case INST_CMP_ZPX:
-      DecodeZpx(&Cpu::DataCmpMdrA);
+      DecodeZpx(DAT_CMP | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
       break;
     case INST_CMP_ABY:
-      DecodeAby(&Cpu::DataCmpMdrA);
+      DecodeAby(DAT_CMP | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
       break;
     case INST_CMP_ABX:
-      DecodeAbx(&Cpu::DataCmpMdrA);
+      DecodeAbx(DAT_CMP | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
       break;
     case INST_SBC_IZPX:
-      DecodeIzpx(&Cpu::DataSbcMdrA);
+      DecodeIzpx(DAT_SBC | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
       break;
     case INST_SBC_ZP:
-      DecodeZp(&Cpu::DataSbcMdrA);
+      DecodeZp(DAT_SBC | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
       break;
     case INST_SBC_IMM:
-      DecodeImm(&Cpu::DataSbcMdrA);
+      DecodeImm(DAT_SBC | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
       break;
     case INST_SBC_ABS:
-      DecodeAbs(&Cpu::DataSbcMdrA);
+      DecodeAbs(DAT_SBC | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
       break;
     case INST_SBC_IZP_Y:
-      DecodeIzpY(&Cpu::DataSbcMdrA);
+      DecodeIzpY(DAT_SBC | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
       break;
     case INST_SBC_ZPX:
-      DecodeZpx(&Cpu::DataSbcMdrA);
+      DecodeZpx(DAT_SBC | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
       break;
     case INST_SBC_ABY:
-      DecodeAby(&Cpu::DataSbcMdrA);
+      DecodeAby(DAT_SBC | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
       break;
     case INST_SBC_ABX:
-      DecodeAbx(&Cpu::DataSbcMdrA);
+      DecodeAbx(DAT_SBC | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
       break;
     case INST_ASL_ZP:
-      DecodeRwZp(&Cpu::DataAslMdr);
+      DecodeRwZp(DAT_ASL | DAT_DST(REG_TMP1));
       break;
     case INST_ASL_ACC:
-      DecodeNomem(&Cpu::DataAslA);
+      DecodeNomem(DAT_ASL | DAT_DST(REG_A));
       break;
     case INST_ASL_ABS:
-      DecodeRwAbs(&Cpu::DataAslMdr);
+      DecodeRwAbs(DAT_ASL | DAT_DST(REG_TMP1));
       break;
     case INST_ASL_ZPX:
-      DecodeRwZpx(&Cpu::DataAslMdr);
+      DecodeRwZpx(DAT_ASL | DAT_DST(REG_TMP1));
       break;
     case INST_ASL_ABX:
-      DecodeRwAbx(&Cpu::DataAslMdr);
+      DecodeRwAbx(DAT_ASL | DAT_DST(REG_TMP1));
       break;
     case INST_ROL_ZP:
-      DecodeRwZp(&Cpu::DataRolMdr);
+      DecodeRwZp(DAT_ROL | DAT_DST(REG_TMP1));
       break;
     case INST_ROL_ACC:
-      DecodeNomem(&Cpu::DataRolA);
+      DecodeNomem(DAT_ROL | DAT_DST(REG_A));
       break;
     case INST_ROL_ABS:
-      DecodeRwAbs(&Cpu::DataRolMdr);
+      DecodeRwAbs(DAT_ROL | DAT_DST(REG_TMP1));
       break;
     case INST_ROL_ZPX:
-      DecodeRwZpx(&Cpu::DataRolMdr);
+      DecodeRwZpx(DAT_ROL | DAT_DST(REG_TMP1));
       break;
     case INST_ROL_ABX:
-      DecodeRwAbx(&Cpu::DataRolMdr);
+      DecodeRwAbx(DAT_ROL | DAT_DST(REG_TMP1));
       break;
     case INST_LSR_ZP:
-      DecodeRwZp(&Cpu::DataLsrMdr);
+      DecodeRwZp(DAT_LSR | DAT_DST(REG_TMP1));
       break;
     case INST_LSR_ACC:
-      DecodeNomem(&Cpu::DataLsrA);
+      DecodeNomem(DAT_LSR | DAT_DST(REG_A));
       break;
     case INST_LSR_ABS:
-      DecodeRwAbs(&Cpu::DataLsrMdr);
+      DecodeRwAbs(DAT_LSR | DAT_DST(REG_TMP1));
       break;
     case INST_LSR_ZPX:
-      DecodeRwZpx(&Cpu::DataLsrMdr);
+      DecodeRwZpx(DAT_LSR | DAT_DST(REG_TMP1));
       break;
     case INST_LSR_ABX:
-      DecodeRwAbx(&Cpu::DataLsrMdr);
+      DecodeRwAbx(DAT_LSR | DAT_DST(REG_TMP1));
       break;
     case INST_ROR_ZP:
-      DecodeRwZp(&Cpu::DataRorMdr);
+      DecodeRwZp(DAT_ROR | DAT_DST(REG_TMP1));
       break;
     case INST_ROR_ACC:
-      DecodeNomem(&Cpu::DataRorA);
+      DecodeNomem(DAT_ROR | DAT_DST(REG_A));
       break;
     case INST_ROR_ABS:
-      DecodeRwAbs(&Cpu::DataRorMdr);
+      DecodeRwAbs(DAT_ROR | DAT_DST(REG_TMP1));
       break;
     case INST_ROR_ZPX:
-      DecodeRwZpx(&Cpu::DataRorMdr);
+      DecodeRwZpx(DAT_ROR | DAT_DST(REG_TMP1));
       break;
     case INST_ROR_ABX:
-      DecodeRwAbx(&Cpu::DataRorMdr);
+      DecodeRwAbx(DAT_ROR | DAT_DST(REG_TMP1));
       break;
     case INST_STX_ZP:
-      DecodeWZp(&Cpu::MemWriteXAddr);
+      DecodeWZp(MEM_WRITE | MEM_OP1(REG_X) | MEM_ADDR(REG_ADDRL));
       break;
     case INST_STX_ABS:
-      DecodeWAbs(&Cpu::MemWriteXAddr);
+      DecodeWAbs(MEM_WRITE | MEM_OP1(REG_X) | MEM_ADDR(REG_ADDRL));
       break;
     case INST_STX_ZPY:
-      DecodeWZpy(&Cpu::MemWriteXAddr);
+      DecodeWZpy(MEM_WRITE | MEM_OP1(REG_X) | MEM_ADDR(REG_ADDRL));
       break;
     case INST_LDX_IMM:
-      DecodeImm(&Cpu::DataMovMdrX);
+      DecodeImm(DAT_MOV | DAT_DST(REG_X) | DAT_SRC(REG_TMP1));
       break;
     case INST_LDX_ZP:
-      DecodeZp(&Cpu::DataMovMdrX);
+      DecodeZp(DAT_MOV | DAT_DST(REG_X) | DAT_SRC(REG_TMP1));
       break;
     case INST_LDX_ABS:
-      DecodeAbs(&Cpu::DataMovMdrX);
+      DecodeAbs(DAT_MOV | DAT_DST(REG_X) | DAT_SRC(REG_TMP1));
       break;
     case INST_LDX_ZPY:
-      DecodeZpy(&Cpu::DataMovMdrX);
+      DecodeZpy(DAT_MOV | DAT_DST(REG_X) | DAT_SRC(REG_TMP1));
       break;
     case INST_LDX_ABY:
-      DecodeAby(&Cpu::DataMovMdrX);
+      DecodeAby(DAT_MOV | DAT_DST(REG_X) | DAT_SRC(REG_TMP1));
       break;
     case INST_DEC_ZP:
-      DecodeRwZp(&Cpu::DataDecMdr);
+      DecodeRwZp(DAT_DEC | DAT_DST(REG_TMP1));
       break;
     case INST_DEC_ABS:
-      DecodeRwAbs(&Cpu::DataDecMdr);
+      DecodeRwAbs(DAT_DEC | DAT_DST(REG_TMP1));
       break;
     case INST_DEC_ZPX:
-      DecodeRwZpx(&Cpu::DataDecMdr);
+      DecodeRwZpx(DAT_DEC | DAT_DST(REG_TMP1));
       break;
     case INST_DEC_ABX:
-      DecodeRwAbx(&Cpu::DataDecMdr);
+      DecodeRwAbx(DAT_DEC | DAT_DST(REG_TMP1));
       break;
     case INST_INC_ZP:
-      DecodeRwZp(&Cpu::DataIncMdr);
+      DecodeRwZp(DAT_INC | DAT_DST(REG_TMP1));
       break;
     case INST_INC_ABS:
-      DecodeRwAbs(&Cpu::DataIncMdr);
+      DecodeRwAbs(DAT_INC | DAT_DST(REG_TMP1));
       break;
     case INST_INC_ZPX:
-      DecodeRwZpx(&Cpu::DataIncMdr);
+      DecodeRwZpx(DAT_INC | DAT_DST(REG_TMP1));
       break;
     case INST_INC_ABX:
-      DecodeRwAbx(&Cpu::DataIncMdr);
+      DecodeRwAbx(DAT_INC | DAT_DST(REG_TMP1));
       break;
     case INST_BIT_ZP:
-      DecodeZp(&Cpu::DataBitMdrA);
+      DecodeZp(DAT_BIT | DAT_DST(REG_A) | DAT_SRC(REG_TMP0));
       break;
     case INST_BIT_ABS:
-      DecodeAbs(&Cpu::DataBitMdrA);
+      DecodeAbs(DAT_BIT | DAT_DST(REG_A) | DAT_SRC(REG_TMP0));
       break;
     case INST_JMP:
-      state_->AddCycle(&Cpu::MemReadPcMdr, &Cpu::Nop, PC_INC,
-                       &Cpu::CheckPcRead);
-      state_->AddCycle(&Cpu::MemReadPcPch, &Cpu::DataMovMdrPcl, PC_NOP,
-                       &Cpu::CheckPcRead);
-      state_->AddCycle(&Cpu::MemFetch, &Cpu::Nop, PC_INC,
-                       &Cpu::CheckPcRead);
+      state_->AddCycle(MEM_READ | MEM_OP1(REG_TMP1) | REG_ADDR(REG_PCL)
+                     | PC_INC);
+      state_->AddCycle(MEM_READ | MEM_OP1(REG_PCH) | MEM_ADDR(REG_PCL) |
+                       DAT_MOV | DAT_DST(REG_PCL) | DAT_SRC(REG_TMP1));
+      state_->AddCycle(MEM_FETCH | PC_INC);
       break;
     case INST_JMPI:
-      state_->AddCycle(&Cpu::MemReadPcPtrl, &Cpu::Nop, PC_INC,
-                       &Cpu::CheckPcRead);
-      state_->AddCycle(&Cpu::MemReadPcPtrh, &Cpu::Nop, PC_INC,
-                       &Cpu::CheckPcRead);
-      state_->AddCycle(&Cpu::MemReadPtrMdr, &Cpu::Nop, PC_NOP,
-                       &Cpu::CheckPtrRead);
-      state_->AddCycle(&Cpu::MemReadPtr1Pch, &Cpu::DataMovMdrPcl, PC_NOP,
-                       &Cpu::CheckPtr1Read);
-      state_->AddCycle(&Cpu::MemFetch, &Cpu::Nop, PC_INC,
-                       &Cpu::CheckPcRead);
+      state_->AddCycle(MEM_READ | MEM_OP1(REG_TMP1) | MEM_ADDR(REG_PCL)
+                     | PC_INC);
+      state_->AddCycle(MEM_READ | MEM_OP1(REG_TMP2) | MEM_ADDR(REG_PCL)
+                     | PC_INC);
+      state_->AddCycle(MEM_READ | MEM_OP1(REG_PCL) | MEM_ADDR(REG_TMP1));
+      state_->AddCycle(MEM_READ | MEM_OP1(REG_PCH) | MEM_ADDR(REG_TMP1)
+                                                   | MEM_OFST(1));
+      state_->AddCycle(MEM_FETCH | PC_INC);
       break;
     case INST_STY_ZP:
-      DecodeWZp(&Cpu::MemWriteYAddr);
+      DecodeWZp(MEM_WRITE | MEM_OP1(REG_Y) | MEM_ADDR(REG_ADDRL));
       break;
     case INST_STY_ABS:
-      DecodeWAbs(&Cpu::MemWriteYAddr);
+      DecodeWAbs(MEM_WRITE | MEM_OP1(REG_Y) | MEM_ADDR(REG_ADDRL));
       break;
     case INST_STY_ZPX:
-      DecodeWZpx(&Cpu::MemWriteYAddr);
+      DecodeWZpx(MEM_WRITE | MEM_OP1(REG_Y) | MEM_ADDR(REG_ADDRL));
       break;
     case INST_LDY_IMM:
-      DecodeImm(&Cpu::DataMovMdrY);
+      DecodeImm(DAT_MOV | DAT_DST(REG_Y) | DAT_SRC(REG_TMP1));
       break;
     case INST_LDY_ZP:
-      DecodeZp(&Cpu::DataMovMdrY);
+      DecodeZp(DAT_MOV | DAT_DST(REG_Y) | DAT_SRC(REG_TMP1));
       break;
     case INST_LDY_ABS:
-      DecodeAbs(&Cpu::DataMovMdrY);
+      DecodeAbs(DAT_MOV | DAT_DST(REG_Y) | DAT_SRC(REG_TMP1));
       break;
     case INST_LDY_ZPX:
-      DecodeZpx(&Cpu::DataMovMdrY);
+      DecodeZpx(DAT_MOV | DAT_DST(REG_Y) | DAT_SRC(REG_TMP1));
       break;
     case INST_LDY_ABX:
-      DecodeAbx(&Cpu::DataMovMdrY);
+      DecodeAbx(DAT_MOV | DAT_DST(REG_Y) | DAT_SRC(REG_TMP1));
       break;
     case INST_CPY_IMM:
-      DecodeImm(&Cpu::DataCmpMdrY);
+      DecodeImm(DAT_CMP | DAT_DST(REG_Y) | DAT_SRC(REG_TMP1));
       break;
     case INST_CPY_ZP:
-      DecodeZp(&Cpu::DataCmpMdrY);
+      DecodeZp(DAT_CMP | DAT_DST(REG_Y) | DAT_SRC(REG_TMP1));
       break;
     case INST_CPY_ABS:
-      DecodeAbs(&Cpu::DataCmpMdrY);
+      DecodeAbs(DAT_CMP | DAT_DST(REG_Y) | DAT_SRC(REG_TMP1));
       break;
     case INST_CPX_IMM:
-      DecodeImm(&Cpu::DataCmpMdrX);
+      DecodeImm(DAT_CMP | DAT_DST(REG_X) | DAT_SRC(REG_TMP1));
       break;
     case INST_CPX_ZP:
-      DecodeZp(&Cpu::DataCmpMdrX);
+      DecodeZp(DAT_CMP | DAT_DST(REG_X) | DAT_SRC(REG_TMP1));
       break;
     case INST_CPX_ABS:
-      DecodeAbs(&Cpu::DataCmpMdrX);
+      DecodeAbs(DAT_CMP | DAT_DST(REG_X) | DAT_SRC(REG_TMP1));
       break;
     case INST_BPL:
     case INST_BMI:
@@ -1060,48 +1057,49 @@ void Cpu::DecodeInst(void) {
     case INST_BNE:
     case INST_BEQ:
       // The branch micro instruction handles all branches.
-      state_->AddCycle(&Cpu::MemReadPcMdr, &Cpu::Nop, PC_INC,
-                       &Cpu::CheckPcRead);
-      state_->AddCycle(&Cpu::Nop, &Cpu::DataBranch, PC_NOP,
-                       &Cpu::CheckPcRead);
+      state_->AddCycle(MEM_READ | MEM_OP1(REG_TMP1) | REG_ADDR(REG_PCL)
+                     | PC_INC);
+      state_->AddCycle(MEM_BRANCH);
       break;
     case INST_BRK:
-      state_->AddCycle(&Cpu::MemReadPcNodest, &Cpu::Nop, PC_INC,
-                       &Cpu::CheckPcRead);
-      state_->AddCycle(&Cpu::MemPushPch, &Cpu::DataDecS, PC_NOP);
-      state_->AddCycle(&Cpu::MemPushPcl, &Cpu::DataDecS, PC_NOP);
-      state_->AddCycle(&Cpu::MemBrk, &Cpu::DataDecS, PC_NOP);
+      state_->AddCycle(MEM_READ | MEM_OP1(REG_TMP2) | MEM_ADDR(REG_PCL)
+                     | PC_INC);
+      state_->AddCycle(MEM_WRITE | MEM_OP1(REG_PCH) | MEM_ADDR(REG_S)
+                     | DAT_DECNF | DAT_DST(REG_S));
+      state_->AddCycle(MEM_WRITE | MEM_OP1(REG_PCL) | MEM_ADDR(REG_S)
+                     | DAT_DECNF | DAT_DST(REG_S));
+      state_->AddCycle(MEM_BRK | DAT_DECNF | DAT_DST(REG_S));
       break;
     case INST_JSR:
-      state_->AddCycle(&Cpu::MemReadPcMdr, &Cpu::Nop, PC_INC,
-                       &Cpu::CheckPcRead);
-      state_->AddCycle(&Cpu::Nop, &Cpu::Nop, PC_NOP);
-      state_->AddCycle(&Cpu::MemPushPch, &Cpu::DataDecS, PC_NOP);
-      state_->AddCycle(&Cpu::MemPushPcl, &Cpu::DataDecS, PC_NOP);
-      state_->AddCycle(&Cpu::MemReadPcPch, &Cpu::DataMovMdrPcl, PC_NOP,
-                       &Cpu::CheckPcRead);
-      state_->AddCycle(&Cpu::MemFetch, &Cpu::Nop, PC_INC,
-                       &Cpu::CheckPcRead);
+      state_->AddCycle(MEM_READ | MEM_OP1(REG_TMP1) | REG_ADDR(REG_PCL)
+                     | PC_INC);
+      state_->AddCycle(MEM_NOP | DAT_NOP);
+      state_->AddCycle(MEM_WRITE | MEM_OP1(REG_PCH) | MEM_ADDR(REG_S)
+                     | DAT_DECNF | DAT_DST(REG_S));
+      state_->AddCycle(MEM_WRITE | MEM_OP1(REG_PCL) | MEM_ADDR(REG_S)
+                     | DAT_DECNF | DAT_DST(REG_S));
+      state_->AddCycle(MEM_READ | MEM_OP1(REG_PCH) | MEM_ADDR(REG_PCL)
+                     | DAT_MOV | DAT_DST(REG_PCL) | DAT_SRC(REG_TMP1));
+      state_->AddCycle(MEM_FETCH | PC_INC);
       break;
     case INST_RTI:
-      state_->AddCycle(&Cpu::MemReadPcNodest, &Cpu::Nop, PC_NOP,
-                       &Cpu::CheckPcRead);
-      state_->AddCycle(&Cpu::Nop, &Cpu::DataIncS, PC_NOP);
-      state_->AddCycle(&Cpu::MemPullP, &Cpu::DataIncS, PC_NOP);
-      state_->AddCycle(&Cpu::MemPullPcl, &Cpu::DataIncS, PC_NOP);
-      state_->AddCycle(&Cpu::MemPullPch, &Cpu::Nop, PC_NOP);
-      state_->AddCycle(&Cpu::MemFetch, &Cpu::Nop, PC_INC,
-                       &Cpu::CheckPcRead);
+      state_->AddCycle(MEM_READ | MEM_OP1(REG_TMP2) | MEM_ADDR(REG_PCL));
+      state_->AddCycle(, &Cpu::DataIncS, );
+      state_->AddCycle(&Cpu::MemPullP, &Cpu::DataIncS, );
+      state_->AddCycle(&Cpu::MemPullPcl, &Cpu::DataIncS, );
+      state_->AddCycle(&Cpu::MemPullPch, , );
+      state_->AddCycle(MEM_FETCH, , PC_INC,
+                       );
       break;
     case INST_RTS:
-      state_->AddCycle(&Cpu::MemReadPcNodest, &Cpu::Nop, PC_NOP,
-                       &Cpu::CheckPcRead);
-      state_->AddCycle(&Cpu::Nop, &Cpu::DataIncS, PC_NOP);
-      state_->AddCycle(&Cpu::MemPullPcl, &Cpu::DataIncS, PC_NOP);
-      state_->AddCycle(&Cpu::MemPullPch, &Cpu::Nop, PC_NOP);
-      state_->AddCycle(&Cpu::Nop, &Cpu::Nop, PC_INC);
-      state_->AddCycle(&Cpu::MemFetch, &Cpu::Nop, PC_INC,
-                       &Cpu::CheckPcRead);
+      state_->AddCycle(MEM_READ | MEM_OP1(REG_TMP2) | MEM_ADDR(REG_PCL), , ,
+                       );
+      state_->AddCycle(, &Cpu::DataIncS, );
+      state_->AddCycle(&Cpu::MemPullPcl, &Cpu::DataIncS, );
+      state_->AddCycle(&Cpu::MemPullPch, , );
+      state_->AddCycle(, , PC_INC);
+      state_->AddCycle(MEM_FETCH, , PC_INC,
+                       );
       break;
     case INST_PHP:
       DecodePush(&Cpu::MemPushPB);
@@ -1167,7 +1165,7 @@ void Cpu::DecodeInst(void) {
       DecodeNomem(&Cpu::DataMovSX);
       break;
     case INST_NOP:
-      DecodeNomem(&Cpu::Nop);
+      DecodeNomem();
       break;
     default:
       printf("Instruction %x is not implemented\n", regs_->inst);
@@ -1181,18 +1179,18 @@ void Cpu::DecodeInst(void) {
  * micro operation.
  */
 void Cpu::DecodeIzpx(CpuOperation op) {
-  state_->AddCycle(&Cpu::MemReadPcZpPtr, &Cpu::Nop, PC_INC,
-                   &Cpu::CheckPcRead);
-  state_->AddCycle(&Cpu::MemReadPtrAddrl, &Cpu::DataAddPtrlX, PC_NOP,
-                   &Cpu::CheckPtrRead);
-  state_->AddCycle(&Cpu::MemReadPtrAddrl, &Cpu::Nop, PC_NOP,
-                   &Cpu::CheckPtrRead);
-  state_->AddCycle(&Cpu::MemReadPtr1Addrh, &Cpu::Nop, PC_NOP,
-                   &Cpu::CheckPtr1Read);
-  state_->AddCycle(&Cpu::MemReadAddrMdr, &Cpu::Nop, PC_NOP,
-                   &Cpu::CheckAddrRead);
-  state_->AddCycle(&Cpu::MemFetch, op, PC_INC,
-                   &Cpu::CheckPcRead);
+  state_->AddCycle(&Cpu::MemReadPcZpPtr, , PC_INC,
+                   );
+  state_->AddCycle(&Cpu::MemReadPtrAddrl, &Cpu::DataAddPtrlX, ,
+                   );
+  state_->AddCycle(&Cpu::MemReadPtrAddrl, , ,
+                   );
+  state_->AddCycle(&Cpu::MemReadPtr1Addrh, , ,
+                   );
+  state_->AddCycle(&Cpu::MemReadAddrMdr, , ,
+                   );
+  state_->AddCycle(MEM_FETCH, op, PC_INC,
+                   );
   return;
 }
 
@@ -1200,12 +1198,12 @@ void Cpu::DecodeIzpx(CpuOperation op) {
  * Queues a zero page read instruction using the given micro operation.
  */
 void Cpu::DecodeZp(CpuOperation op) {
-  state_->AddCycle(&Cpu::MemReadPcZpAddr, &Cpu::Nop, PC_INC,
-                   &Cpu::CheckPcRead);
-  state_->AddCycle(&Cpu::MemReadAddrMdr, &Cpu::Nop, PC_NOP,
-                   &Cpu::CheckAddrRead);
-  state_->AddCycle(&Cpu::MemFetch, op, PC_INC,
-                   &Cpu::CheckPcRead);
+  state_->AddCycle(&Cpu::MemReadPcZpAddr, , PC_INC,
+                   );
+  state_->AddCycle(&Cpu::MemReadAddrMdr, , ,
+                   );
+  state_->AddCycle(MEM_FETCH, op, PC_INC,
+                   );
   return;
 }
 
@@ -1213,10 +1211,10 @@ void Cpu::DecodeZp(CpuOperation op) {
  * Queues a read immediate instruction using the given micro operation.
  */
 void Cpu::DecodeImm(CpuOperation op) {
-  state_->AddCycle(&Cpu::MemReadPcMdr, &Cpu::Nop, PC_INC,
-                   &Cpu::CheckPcRead);
-  state_->AddCycle(&Cpu::MemFetch, op, PC_INC,
-                   &Cpu::CheckPcRead);
+  state_->AddCycle(MEM_READ | MEM_OP1(REG_TMP1) | REG_ADDR(REG_PCL), , PC_INC,
+                   );
+  state_->AddCycle(MEM_FETCH, op, PC_INC,
+                   );
   return;
 }
 
@@ -1225,14 +1223,14 @@ void Cpu::DecodeImm(CpuOperation op) {
  * operation.
  */
 void Cpu::DecodeAbs(CpuOperation op) {
-  state_->AddCycle(&Cpu::MemReadPcAddrl, &Cpu::Nop, PC_INC,
-                   &Cpu::CheckPcRead);
-  state_->AddCycle(&Cpu::MemReadPcAddrh, &Cpu::Nop, PC_INC,
-                   &Cpu::CheckPcRead);
-  state_->AddCycle(&Cpu::MemReadAddrMdr, &Cpu::Nop, PC_NOP,
-                   &Cpu::CheckAddrRead);
-  state_->AddCycle(&Cpu::MemFetch, op, PC_INC,
-                   &Cpu::CheckPcRead);
+  state_->AddCycle(&Cpu::MemReadPcAddrl, , PC_INC,
+                   );
+  state_->AddCycle(&Cpu::MemReadPcAddrh, , PC_INC,
+                   );
+  state_->AddCycle(&Cpu::MemReadAddrMdr, , ,
+                   );
+  state_->AddCycle(MEM_FETCH, op, PC_INC,
+                   );
   return;
 }
 
@@ -1241,16 +1239,16 @@ void Cpu::DecodeAbs(CpuOperation op) {
  * operation.
  */
 void Cpu::DecodeIzpY(CpuOperation op) {
-  state_->AddCycle(&Cpu::MemReadPcZpPtr, &Cpu::Nop, PC_INC,
-                   &Cpu::CheckPcRead);
-  state_->AddCycle(&Cpu::MemReadPtrAddrl, &Cpu::Nop, PC_NOP,
-                   &Cpu::CheckPtrRead);
-  state_->AddCycle(&Cpu::MemReadPtr1Addrh, &Cpu::DataAddAddrlY, PC_NOP,
-                   &Cpu::CheckPtr1Read);
-  state_->AddCycle(&Cpu::MemReadAddrMdr, &Cpu::DataFixaAddrh, PC_NOP,
-                   &Cpu::CheckAddrRead);
-  state_->AddCycle(&Cpu::MemFetch, op, PC_INC,
-                   &Cpu::CheckPcRead);
+  state_->AddCycle(&Cpu::MemReadPcZpPtr, , PC_INC,
+                   );
+  state_->AddCycle(&Cpu::MemReadPtrAddrl, , ,
+                   );
+  state_->AddCycle(&Cpu::MemReadPtr1Addrh, &Cpu::DataAddAddrlY, ,
+                   );
+  state_->AddCycle(&Cpu::MemReadAddrMdr, &Cpu::DataFixaAddrh, ,
+                   );
+  state_->AddCycle(MEM_FETCH, op, PC_INC,
+                   );
   return;
 }
 
@@ -1259,14 +1257,14 @@ void Cpu::DecodeIzpY(CpuOperation op) {
  * operation.
  */
 void Cpu::DecodeZpx(CpuOperation op) {
-  state_->AddCycle(&Cpu::MemReadPcZpAddr, &Cpu::Nop, PC_INC,
-                   &Cpu::CheckPcRead);
-  state_->AddCycle(&Cpu::MemReadAddrMdr, &Cpu::DataAddAddrlX, PC_NOP,
-                   &Cpu::CheckAddrRead);
-  state_->AddCycle(&Cpu::MemReadAddrMdr, &Cpu::Nop, PC_NOP,
-                   &Cpu::CheckAddrRead);
-  state_->AddCycle(&Cpu::MemFetch, op, PC_INC,
-                   &Cpu::CheckPcRead);
+  state_->AddCycle(&Cpu::MemReadPcZpAddr, , PC_INC,
+                   );
+  state_->AddCycle(&Cpu::MemReadAddrMdr, &Cpu::DataAddAddrlX, ,
+                   );
+  state_->AddCycle(&Cpu::MemReadAddrMdr, , ,
+                   );
+  state_->AddCycle(MEM_FETCH, op, PC_INC,
+                   );
   return;
 }
 
@@ -1275,14 +1273,14 @@ void Cpu::DecodeZpx(CpuOperation op) {
  * operation.
  */
 void Cpu::DecodeZpy(CpuOperation op) {
-  state_->AddCycle(&Cpu::MemReadPcZpAddr, &Cpu::Nop, PC_INC,
-                   &Cpu::CheckPcRead);
-  state_->AddCycle(&Cpu::MemReadAddrMdr, &Cpu::DataAddAddrlY, PC_NOP,
-                   &Cpu::CheckAddrRead);
-  state_->AddCycle(&Cpu::MemReadAddrMdr, &Cpu::Nop, PC_NOP,
-                   &Cpu::CheckAddrRead);
-  state_->AddCycle(&Cpu::MemFetch, op, PC_INC,
-                   &Cpu::CheckPcRead);
+  state_->AddCycle(&Cpu::MemReadPcZpAddr, , PC_INC,
+                   );
+  state_->AddCycle(&Cpu::MemReadAddrMdr, &Cpu::DataAddAddrlY, ,
+                   );
+  state_->AddCycle(&Cpu::MemReadAddrMdr, , ,
+                   );
+  state_->AddCycle(MEM_FETCH, op, PC_INC,
+                   );
   return;
 }
 
@@ -1291,14 +1289,14 @@ void Cpu::DecodeZpy(CpuOperation op) {
  * micro operation.
  */
 void Cpu::DecodeAby(CpuOperation op) {
-  state_->AddCycle(&Cpu::MemReadPcAddrl, &Cpu::Nop, PC_INC,
-                   &Cpu::CheckPcRead);
+  state_->AddCycle(&Cpu::MemReadPcAddrl, , PC_INC,
+                   );
   state_->AddCycle(&Cpu::MemReadPcAddrh, &Cpu::DataAddAddrlY, PC_INC,
-                   &Cpu::CheckPcRead);
-  state_->AddCycle(&Cpu::MemReadAddrMdr, &Cpu::DataFixaAddrh, PC_NOP,
-                   &Cpu::CheckAddrRead);
-  state_->AddCycle(&Cpu::MemFetch, op, PC_INC,
-                   &Cpu::CheckPcRead);
+                   );
+  state_->AddCycle(&Cpu::MemReadAddrMdr, &Cpu::DataFixaAddrh, ,
+                   );
+  state_->AddCycle(MEM_FETCH, op, PC_INC,
+                   );
   return;
 }
 
@@ -1307,14 +1305,14 @@ void Cpu::DecodeAby(CpuOperation op) {
  * micro operation.
  */
 void Cpu::DecodeAbx(CpuOperation op) {
-  state_->AddCycle(&Cpu::MemReadPcAddrl, &Cpu::Nop, PC_INC,
-                   &Cpu::CheckPcRead);
+  state_->AddCycle(&Cpu::MemReadPcAddrl, , PC_INC,
+                   );
   state_->AddCycle(&Cpu::MemReadPcAddrh, &Cpu::DataAddAddrlX, PC_INC,
-                   &Cpu::CheckPcRead);
-  state_->AddCycle(&Cpu::MemReadAddrMdr, &Cpu::DataFixaAddrh, PC_NOP,
-                   &Cpu::CheckAddrRead);
-  state_->AddCycle(&Cpu::MemFetch, op, PC_INC,
-                   &Cpu::CheckPcRead);
+                   );
+  state_->AddCycle(&Cpu::MemReadAddrMdr, &Cpu::DataFixaAddrh, ,
+                   );
+  state_->AddCycle(MEM_FETCH, op, PC_INC,
+                   );
   return;
 }
 
@@ -1323,10 +1321,10 @@ void Cpu::DecodeAbx(CpuOperation op) {
  * micro operation.
  */
 void Cpu::DecodeNomem(CpuOperation op) {
-  state_->AddCycle(&Cpu::MemReadPcNodest, &Cpu::Nop, PC_NOP,
-                   &Cpu::CheckPcRead);
-  state_->AddCycle(&Cpu::MemFetch, op, PC_INC,
-                   &Cpu::CheckPcRead);
+  state_->AddCycle(MEM_READ | MEM_OP1(REG_TMP2) | MEM_ADDR(REG_PCL), , ,
+                   );
+  state_->AddCycle(MEM_FETCH, op, PC_INC,
+                   );
   return;
 }
 
@@ -1334,16 +1332,16 @@ void Cpu::DecodeNomem(CpuOperation op) {
  * Queues a zero page read-write instruction using the given micro operation.
  */
 void Cpu::DecodeRwZp(CpuOperation op) {
-  state_->AddCycle(&Cpu::MemReadPcZpAddr, &Cpu::Nop, PC_INC,
-                   &Cpu::CheckPcRead);
-  state_->AddCycle(&Cpu::MemReadAddrMdr, &Cpu::Nop, PC_NOP,
-                   &Cpu::CheckAddrRead);
-  state_->AddCycle(&Cpu::MemWriteMdrAddr, op, PC_NOP,
-                   &Cpu::CheckAddrWrite);
-  state_->AddCycle(&Cpu::MemWriteMdrAddr, &Cpu::Nop, PC_NOP,
-                   &Cpu::CheckAddrWrite);
-  state_->AddCycle(&Cpu::MemFetch, &Cpu::Nop, PC_INC,
-                   &Cpu::CheckPcRead);
+  state_->AddCycle(&Cpu::MemReadPcZpAddr, , PC_INC,
+                   );
+  state_->AddCycle(&Cpu::MemReadAddrMdr, , ,
+                   );
+  state_->AddCycle(&Cpu::MemWriteMdrAddr, op, ,
+                   );
+  state_->AddCycle(&Cpu::MemWriteMdrAddr, , ,
+                   );
+  state_->AddCycle(MEM_FETCH, , PC_INC,
+                   );
   return;
 }
 
@@ -1352,18 +1350,18 @@ void Cpu::DecodeRwZp(CpuOperation op) {
  * operation.
  */
 void Cpu::DecodeRwAbs(CpuOperation op) {
-  state_->AddCycle(&Cpu::MemReadPcAddrl, &Cpu::Nop, PC_INC,
-                   &Cpu::CheckPcRead);
-  state_->AddCycle(&Cpu::MemReadPcAddrh, &Cpu::Nop, PC_INC,
-                   &Cpu::CheckPcRead);
-  state_->AddCycle(&Cpu::MemReadAddrMdr, &Cpu::Nop, PC_NOP,
-                   &Cpu::CheckAddrRead);
-  state_->AddCycle(&Cpu::MemWriteMdrAddr, op, PC_NOP,
-                   &Cpu::CheckAddrWrite);
-  state_->AddCycle(&Cpu::MemWriteMdrAddr, &Cpu::Nop, PC_NOP,
-                   &Cpu::CheckAddrWrite);
-  state_->AddCycle(&Cpu::MemFetch, &Cpu::Nop, PC_INC,
-                   &Cpu::CheckPcRead);
+  state_->AddCycle(&Cpu::MemReadPcAddrl, , PC_INC,
+                   );
+  state_->AddCycle(&Cpu::MemReadPcAddrh, , PC_INC,
+                   );
+  state_->AddCycle(&Cpu::MemReadAddrMdr, , ,
+                   );
+  state_->AddCycle(&Cpu::MemWriteMdrAddr, op, ,
+                   );
+  state_->AddCycle(&Cpu::MemWriteMdrAddr, , ,
+                   );
+  state_->AddCycle(MEM_FETCH, , PC_INC,
+                   );
   return;
 }
 
@@ -1372,18 +1370,18 @@ void Cpu::DecodeRwAbs(CpuOperation op) {
  * operation.
  */
 void Cpu::DecodeRwZpx(CpuOperation op) {
-  state_->AddCycle(&Cpu::MemReadPcZpAddr, &Cpu::Nop, PC_INC,
-                   &Cpu::CheckPcRead);
-  state_->AddCycle(&Cpu::MemReadAddrMdr, &Cpu::DataAddAddrlX, PC_NOP,
-                   &Cpu::CheckAddrRead);
-  state_->AddCycle(&Cpu::MemReadAddrMdr, &Cpu::Nop, PC_NOP,
-                   &Cpu::CheckAddrRead);
-  state_->AddCycle(&Cpu::MemWriteMdrAddr, op, PC_NOP,
-                   &Cpu::CheckAddrWrite);
-  state_->AddCycle(&Cpu::MemWriteMdrAddr, &Cpu::Nop, PC_NOP,
-                   &Cpu::CheckAddrWrite);
-  state_->AddCycle(&Cpu::MemFetch, &Cpu::Nop, PC_INC,
-                   &Cpu::CheckPcRead);
+  state_->AddCycle(&Cpu::MemReadPcZpAddr, , PC_INC,
+                   );
+  state_->AddCycle(&Cpu::MemReadAddrMdr, &Cpu::DataAddAddrlX, ,
+                   );
+  state_->AddCycle(&Cpu::MemReadAddrMdr, , ,
+                   );
+  state_->AddCycle(&Cpu::MemWriteMdrAddr, op, ,
+                   );
+  state_->AddCycle(&Cpu::MemWriteMdrAddr, , ,
+                   );
+  state_->AddCycle(MEM_FETCH, , PC_INC,
+                   );
   return;
 }
 
@@ -1392,20 +1390,20 @@ void Cpu::DecodeRwZpx(CpuOperation op) {
  * given micro operation.
  */
 void Cpu::DecodeRwAbx(CpuOperation op) {
-  state_->AddCycle(&Cpu::MemReadPcAddrl, &Cpu::Nop, PC_INC,
-                   &Cpu::CheckPcRead);
+  state_->AddCycle(&Cpu::MemReadPcAddrl, , PC_INC,
+                   );
   state_->AddCycle(&Cpu::MemReadPcAddrh, &Cpu::DataAddAddrlX, PC_INC,
-                   &Cpu::CheckPcRead);
-  state_->AddCycle(&Cpu::MemReadAddrMdr, &Cpu::DataFixAddrh, PC_NOP,
-                   &Cpu::CheckAddrRead);
-  state_->AddCycle(&Cpu::MemReadAddrMdr, &Cpu::Nop, PC_NOP,
-                   &Cpu::CheckAddrRead);
-  state_->AddCycle(&Cpu::MemWriteMdrAddr, op, PC_NOP,
-                   &Cpu::CheckAddrWrite);
-  state_->AddCycle(&Cpu::MemWriteMdrAddr, &Cpu::Nop, PC_NOP,
-                   &Cpu::CheckAddrWrite);
-  state_->AddCycle(&Cpu::MemFetch, &Cpu::Nop, PC_INC,
-                   &Cpu::CheckPcRead);
+                   );
+  state_->AddCycle(&Cpu::MemReadAddrMdr, &Cpu::DataFixAddrh, ,
+                   );
+  state_->AddCycle(&Cpu::MemReadAddrMdr, , ,
+                   );
+  state_->AddCycle(&Cpu::MemWriteMdrAddr, op, ,
+                   );
+  state_->AddCycle(&Cpu::MemWriteMdrAddr, , ,
+                   );
+  state_->AddCycle(MEM_FETCH, , PC_INC,
+                   );
   return;
 }
 
@@ -1414,18 +1412,18 @@ void Cpu::DecodeRwAbx(CpuOperation op) {
  * micro operation.
  */
 void Cpu::DecodeWIzpx(CpuOperation op) {
-  state_->AddCycle(&Cpu::MemReadPcZpPtr, &Cpu::Nop, PC_INC,
-                   &Cpu::CheckPcRead);
-  state_->AddCycle(&Cpu::MemReadPtrAddrl, &Cpu::DataAddPtrlX, PC_NOP,
-                   &Cpu::CheckPtrRead);
-  state_->AddCycle(&Cpu::MemReadPtrAddrl, &Cpu::Nop, PC_NOP,
-                   &Cpu::CheckPtrRead);
-  state_->AddCycle(&Cpu::MemReadPtr1Addrh, &Cpu::Nop, PC_NOP,
-                   &Cpu::CheckPtr1Read);
-  state_->AddCycle(op, &Cpu::Nop, PC_NOP,
-                   &Cpu::CheckAddrWrite);
-  state_->AddCycle(&Cpu::MemFetch, &Cpu::Nop, PC_INC,
-                   &Cpu::CheckPcRead);
+  state_->AddCycle(&Cpu::MemReadPcZpPtr, , PC_INC,
+                   );
+  state_->AddCycle(&Cpu::MemReadPtrAddrl, &Cpu::DataAddPtrlX, ,
+                   );
+  state_->AddCycle(&Cpu::MemReadPtrAddrl, , ,
+                   );
+  state_->AddCycle(&Cpu::MemReadPtr1Addrh, , ,
+                   );
+  state_->AddCycle(op, , ,
+                   );
+  state_->AddCycle(MEM_FETCH, , PC_INC,
+                   );
   return;
 }
 
@@ -1433,12 +1431,12 @@ void Cpu::DecodeWIzpx(CpuOperation op) {
  * Queues a zero page write instruction using the given micro operation.
  */
 void Cpu::DecodeWZp(CpuOperation op) {
-  state_->AddCycle(&Cpu::MemReadPcZpAddr, &Cpu::Nop, PC_INC,
-                   &Cpu::CheckPcRead);
-  state_->AddCycle(op, &Cpu::Nop, PC_NOP,
-                   &Cpu::CheckAddrWrite);
-  state_->AddCycle(&Cpu::MemFetch, &Cpu::Nop, PC_INC,
-                   &Cpu::CheckPcRead);
+  state_->AddCycle(&Cpu::MemReadPcZpAddr, , PC_INC,
+                   );
+  state_->AddCycle(op, , ,
+                   );
+  state_->AddCycle(MEM_FETCH, , PC_INC,
+                   );
   return;
 }
 
@@ -1447,14 +1445,14 @@ void Cpu::DecodeWZp(CpuOperation op) {
  * operation.
  */
 void Cpu::DecodeWAbs(CpuOperation op) {
-  state_->AddCycle(&Cpu::MemReadPcAddrl, &Cpu::Nop, PC_INC,
-                   &Cpu::CheckPcRead);
-  state_->AddCycle(&Cpu::MemReadPcAddrh, &Cpu::Nop, PC_INC,
-                   &Cpu::CheckPcRead);
-  state_->AddCycle(op, &Cpu::Nop, PC_NOP,
-                   &Cpu::CheckAddrWrite);
-  state_->AddCycle(&Cpu::MemFetch, &Cpu::Nop, PC_INC,
-                   &Cpu::CheckPcRead);
+  state_->AddCycle(&Cpu::MemReadPcAddrl, , PC_INC,
+                   );
+  state_->AddCycle(&Cpu::MemReadPcAddrh, , PC_INC,
+                   );
+  state_->AddCycle(op, , ,
+                   );
+  state_->AddCycle(MEM_FETCH, , PC_INC,
+                   );
   return;
 }
 
@@ -1463,18 +1461,18 @@ void Cpu::DecodeWAbs(CpuOperation op) {
  * given micro operation.
  */
 void Cpu::DecodeWIzpY(CpuOperation op) {
-  state_->AddCycle(&Cpu::MemReadPcZpPtr, &Cpu::Nop, PC_INC,
-                   &Cpu::CheckPcRead);
-  state_->AddCycle(&Cpu::MemReadPtrAddrl, &Cpu::Nop, PC_NOP,
-                   &Cpu::CheckPtrRead);
-  state_->AddCycle(&Cpu::MemReadPtr1Addrh, &Cpu::DataAddAddrlY, PC_NOP,
-                   &Cpu::CheckPtr1Read);
-  state_->AddCycle(&Cpu::MemReadAddrMdr, &Cpu::DataFixAddrh, PC_NOP,
-                   &Cpu::CheckAddrRead);
-  state_->AddCycle(op, &Cpu::Nop, PC_NOP,
-                   &Cpu::CheckAddrWrite);
-  state_->AddCycle(&Cpu::MemFetch, &Cpu::Nop, PC_INC,
-                   &Cpu::CheckPcRead);
+  state_->AddCycle(&Cpu::MemReadPcZpPtr, , PC_INC,
+                   );
+  state_->AddCycle(&Cpu::MemReadPtrAddrl, , ,
+                   );
+  state_->AddCycle(&Cpu::MemReadPtr1Addrh, &Cpu::DataAddAddrlY, ,
+                   );
+  state_->AddCycle(&Cpu::MemReadAddrMdr, &Cpu::DataFixAddrh, ,
+                   );
+  state_->AddCycle(op, , ,
+                   );
+  state_->AddCycle(MEM_FETCH, , PC_INC,
+                   );
   return;
 }
 
@@ -1483,14 +1481,14 @@ void Cpu::DecodeWIzpY(CpuOperation op) {
  * operation.
  */
 void Cpu::DecodeWZpx(CpuOperation op) {
-  state_->AddCycle(&Cpu::MemReadPcZpAddr, &Cpu::Nop, PC_INC,
-                   &Cpu::CheckPcRead);
-  state_->AddCycle(&Cpu::MemReadAddrMdr, &Cpu::DataAddAddrlX, PC_NOP,
-                   &Cpu::CheckAddrRead);
-  state_->AddCycle(op, &Cpu::Nop, PC_NOP,
-                   &Cpu::CheckAddrWrite);
-  state_->AddCycle(&Cpu::MemFetch, &Cpu::Nop, PC_INC,
-                   &Cpu::CheckPcRead);
+  state_->AddCycle(&Cpu::MemReadPcZpAddr, , PC_INC,
+                   );
+  state_->AddCycle(&Cpu::MemReadAddrMdr, &Cpu::DataAddAddrlX, ,
+                   );
+  state_->AddCycle(op, , ,
+                   );
+  state_->AddCycle(MEM_FETCH, , PC_INC,
+                   );
   return;
 }
 
@@ -1499,14 +1497,14 @@ void Cpu::DecodeWZpx(CpuOperation op) {
  * operation.
  */
 void Cpu::DecodeWZpy(CpuOperation op) {
-  state_->AddCycle(&Cpu::MemReadPcZpAddr, &Cpu::Nop, PC_INC,
-                   &Cpu::CheckPcRead);
-  state_->AddCycle(&Cpu::MemReadAddrMdr, &Cpu::DataAddAddrlY, PC_NOP,
-                   &Cpu::CheckAddrRead);
-  state_->AddCycle(op, &Cpu::Nop, PC_NOP,
-                   &Cpu::CheckAddrWrite);
-  state_->AddCycle(&Cpu::MemFetch, &Cpu::Nop, PC_INC,
-                   &Cpu::CheckPcRead);
+  state_->AddCycle(&Cpu::MemReadPcZpAddr, , PC_INC,
+                   );
+  state_->AddCycle(&Cpu::MemReadAddrMdr, &Cpu::DataAddAddrlY, ,
+                   );
+  state_->AddCycle(op, , ,
+                   );
+  state_->AddCycle(MEM_FETCH, , PC_INC,
+                   );
   return;
 }
 
@@ -1515,16 +1513,16 @@ void Cpu::DecodeWZpy(CpuOperation op) {
  * micro operation.
  */
 void Cpu::DecodeWAby(CpuOperation op) {
-  state_->AddCycle(&Cpu::MemReadPcAddrl, &Cpu::Nop, PC_INC,
-                   &Cpu::CheckPcRead);
+  state_->AddCycle(&Cpu::MemReadPcAddrl, , PC_INC,
+                   );
   state_->AddCycle(&Cpu::MemReadPcAddrh, &Cpu::DataAddAddrlY, PC_INC,
-                   &Cpu::CheckPcRead);
-  state_->AddCycle(&Cpu::MemReadAddrMdr, &Cpu::DataFixAddrh, PC_NOP,
-                   &Cpu::CheckAddrRead);
-  state_->AddCycle(op, &Cpu::Nop, PC_NOP,
-                   &Cpu::CheckAddrWrite);
-  state_->AddCycle(&Cpu::MemFetch, &Cpu::Nop, PC_INC,
-                   &Cpu::CheckPcRead);
+                   );
+  state_->AddCycle(&Cpu::MemReadAddrMdr, &Cpu::DataFixAddrh, ,
+                   );
+  state_->AddCycle(op, , ,
+                   );
+  state_->AddCycle(MEM_FETCH, , PC_INC,
+                   );
   return;
 }
 
@@ -1533,16 +1531,16 @@ void Cpu::DecodeWAby(CpuOperation op) {
  * micro operation.
  */
 void Cpu::DecodeWAbx(CpuOperation op) {
-  state_->AddCycle(&Cpu::MemReadPcAddrl, &Cpu::Nop, PC_INC,
-                   &Cpu::CheckPcRead);
+  state_->AddCycle(&Cpu::MemReadPcAddrl, , PC_INC,
+                   );
   state_->AddCycle(&Cpu::MemReadPcAddrh, &Cpu::DataAddAddrlX, PC_INC,
-                   &Cpu::CheckPcRead);
-  state_->AddCycle(&Cpu::MemReadAddrMdr, &Cpu::DataFixAddrh, PC_NOP,
-                   &Cpu::CheckAddrRead);
-  state_->AddCycle(op, &Cpu::Nop, PC_NOP,
-                   &Cpu::CheckAddrWrite);
-  state_->AddCycle(&Cpu::MemFetch, &Cpu::Nop, PC_INC,
-                   &Cpu::CheckPcRead);
+                   );
+  state_->AddCycle(&Cpu::MemReadAddrMdr, &Cpu::DataFixAddrh, ,
+                   );
+  state_->AddCycle(op, , ,
+                   );
+  state_->AddCycle(MEM_FETCH, , PC_INC,
+                   );
   return;
 }
 
@@ -1550,11 +1548,11 @@ void Cpu::DecodeWAbx(CpuOperation op) {
  * Queues a stack push instruction using the given micro operation.
  */
 void Cpu::DecodePush(CpuOperation op) {
-  state_->AddCycle(&Cpu::MemReadPcNodest, &Cpu::Nop, PC_NOP,
-                   &Cpu::CheckPcRead);
-  state_->AddCycle(op, &Cpu::DataDecS, PC_NOP);
-  state_->AddCycle(&Cpu::MemFetch, &Cpu::Nop, PC_INC,
-                   &Cpu::CheckPcRead);
+  state_->AddCycle(MEM_READ | MEM_OP1(REG_TMP2) | MEM_ADDR(REG_PCL), , ,
+                   );
+  state_->AddCycle(op, DAT_DECNF | DAT_DST(REG_S), );
+  state_->AddCycle(MEM_FETCH, , PC_INC,
+                   );
   return;
 }
 
@@ -1562,12 +1560,12 @@ void Cpu::DecodePush(CpuOperation op) {
  * Queues a stack pull instruction using the given micro operation.
  */
 void Cpu::DecodePull(CpuOperation op) {
-  state_->AddCycle(&Cpu::MemReadPcNodest, &Cpu::Nop, PC_NOP,
-                   &Cpu::CheckPcRead);
-  state_->AddCycle(&Cpu::Nop, &Cpu::DataIncS, PC_NOP);
-  state_->AddCycle(op, &Cpu::Nop, PC_NOP);
-  state_->AddCycle(&Cpu::MemFetch, &Cpu::Nop, PC_INC,
-                   &Cpu::CheckPcRead);
+  state_->AddCycle(MEM_READ | MEM_OP1(REG_TMP2) | MEM_ADDR(REG_PCL), , ,
+                   );
+  state_->AddCycle(, &Cpu::DataIncS, );
+  state_->AddCycle(op, , );
+  state_->AddCycle(MEM_FETCH, , PC_INC,
+                   );
   return;
 }
 

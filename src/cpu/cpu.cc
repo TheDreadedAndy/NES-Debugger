@@ -47,9 +47,9 @@
 
 // Used by memory operations to access both the high and low byte of an
 // addressing register.
-#define READ_ADDR_REG(r) (static_cast<DoubleWord>(\
+#define READ_ADDR_REG(r, o) (static_cast<DoubleWord>(\
                        (((static_cast<DataWord*>(regs_))[(r) + 1]) << 8)\
-                      | ((static_cast<DataWord*>(regs_))[(r)])))
+                      | ((((static_cast<DataWord*>(regs_))[(r)]) + o) & 0xFF)))
 
 // Used to access and update the processor status register.
 #define P_MASK   0xEFU
@@ -142,12 +142,13 @@ bool Cpu::CheckNextCycle(void) {
   // Checks the operation encoded by memory.
   switch (mem_op) {
     case MEM_READ:
-      return memory_->CheckRead(READ_ADDR_REG(mem_addr) + mem_offset);
+    case MEM_READZP:
+      return memory_->CheckRead(READ_ADDR_REG(mem_addr, mem_offset));
     case MEM_WRITE:
-      return memory_->CheckWrite(READ_ADDR_REG(mem_addr));
+      return memory_->CheckWrite(READ_ADDR_REG(mem_addr, 0));
     case MEM_FETCH:
     case MEM_BRANCH:
-      return memory_->CheckRead(READ_ADDR_REG(REG_PCL));
+      return memory_->CheckRead(READ_ADDR_REG(REG_PCL, 0));
     default:
       return true;
   }
@@ -269,7 +270,17 @@ void Cpu::RunMemoryOperation(CpuOperation &op) {
      * plus the offset into the register specified by mem_op1.
      */
     case MEM_READ:
-      regfile[mem_op1] = memory_->Read(READ_ADDR_REG(mem_addr) + mem_offset);
+      regfile[mem_op1] = memory_->Read(READ_ADDR_REG(mem_addr), mem_offset);
+      break;
+
+    /*
+     * Reads the value from the address specified by the addressing register
+     * plus the offset into the register specified by mem_op1. Sets the high
+     * byte of mem_op1 (The register at mem_op1 + 1) to 0.
+     */
+    case MEM_READZP:
+      regfile[mem_op1] = memory_->Read(READ_ADDR_REG(mem_addr), mem_offset);
+      regfile[mem_op1 + 1] = 0;
       break;
 
     /*
@@ -277,8 +288,8 @@ void Cpu::RunMemoryOperation(CpuOperation &op) {
      * given from the addressing register.
      */
     case MEM_WRITE:
-      memory_->Write(READ_ADDR_REG(mem_addr), regfile[mem_op1]
-                                            & regfile[mem_op2]);
+      memory_->Write(READ_ADDR_REG(mem_addr, 0), regfile[mem_op1]
+                                               & regfile[mem_op2]);
       break;
 
     /*
@@ -295,7 +306,7 @@ void Cpu::RunMemoryOperation(CpuOperation &op) {
      * masked out of P.
      */
     case MEM_IRQ:
-      memory_->Write(READ_ADDR_REG(REG_S), regs_->p);
+      memory_->Write(READ_ADDR_REG(REG_S, 0), regs_->p);
 
       // Allows an NMI to hijack the instruction.
       if (nmi_edge_) {
@@ -319,14 +330,14 @@ void Cpu::RunMemoryOperation(CpuOperation &op) {
      * Pushes the status register onto the stack with the B flag set.
      */
     case MEM_PHP:
-      memory_->Write(READ_ADDR_REG(REG_S), regs_->p | P_FLAG_B);
+      memory_->Write(READ_ADDR_REG(REG_S, 0), regs_->p | P_FLAG_B);
       break;
 
     /*
      * Pulls the status register from the stack, clearing the B flag.
      */
     case MEM_PLP:
-      regs_->p = memory_->Read(READ_ADDR_REG(REG_S)) & P_MASK;
+      regs_->p = memory_->Read(READ_ADDR_REG(REG_S, 0)) & P_MASK;
       break;
 
     /*
@@ -623,7 +634,7 @@ void Cpu::RunDataOperation(CpuOperation &op) {
 void Cpu::Fetch(CpuOperation &op) {
   // Fetch the next instruction to the instruction register.
   if (!nmi_edge_ && !irq_ready_) {
-    regs_->inst = memory_->Read(READ_ADDR_REG(REG_PCL));
+    regs_->inst = memory_->Read(READ_ADDR_REG(REG_PCL, 0));
   } else {
     // All interrupts fill the instruction register with 0x00 (BRK).
     regs_->inst = INST_BRK;

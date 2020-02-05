@@ -32,23 +32,29 @@ typedef uint32_t CpuOperation;
 #define PC_INC 0x01U
 
 /* Register location enumeration, which can be shifted into a location field */
-typedef enum { REG_PCL = 0, REG_PCH = 1, REG_ADDRL = 2, REG_ADDRH = 3,
-               REG_TMP1 = 4, REG_TMP2 = 5, REG_S = 6, REG_V = 8,
-               REG_A = 10, REG_X = 11, REG_Y = 12,
-               REG_P = 13, REG_INST = 14 } CpuReg;
+typedef enum {
+  REG_PCL = 0,  REG_PCH = 1,  REG_ADDRL = 2, REG_ADDRH = 3,
+  REG_TMP1 = 4, REG_TMP2 = 5, REG_S = 6,     REG_VEC = 8,
+  REG_A = 10,   REG_X = 11,   REG_Y = 12,    REG_P = 13,
+  REG_INST = 14
+} CpuReg;
 
 /* Data opcode enumerations */
-typedef enum { DAT_NOP = 0,   DAT_INC = 2,  DAT_INCNF = 4,  DAT_DEC = 6,
-               DAT_DECNF = 8, DAT_MOV = 10, DAT_MOVNF = 12, DAT_CLS = 14,
-               DAT_SET = 16,  DAT_CMP = 18, DAT_ASL = 20,   DAT_LSR = 22,
-               DAT_ROL = 24,  DAT_ROR = 26, DAT_XOR = 28,   DAT_OR = 30,
-               DAT_AND = 32,  DAT_ADD = 34, DAT_ADC = 36,   DAT_SBC = 38,
-               DAT_BIT = 40,  DAT_VFIX = 42 } DataOpcode;
+typedef enum {
+  DAT_NOP = 0,   DAT_INC = 2,  DAT_INCNF = 4,  DAT_DEC = 6,
+  DAT_DECNF = 8, DAT_MOV = 10, DAT_MOVNF = 12, DAT_CLS = 14,
+  DAT_SET = 16,  DAT_CMP = 18, DAT_ASL = 20,   DAT_LSR = 22,
+  DAT_ROL = 24,  DAT_ROR = 26, DAT_XOR = 28,   DAT_OR = 30,
+  DAT_AND = 32,  DAT_ADD = 34, DAT_ADC = 36,   DAT_SBC = 38,
+  DAT_BIT = 40,  DAT_VFIX = 42
+} DataOpcode;
 
 /* Memory opcode enumerations */
-typedef enum { MEM_NOP = 0,       MEM_READ = 0x10000, MEM_WRITE = 0x20000,
-               MEM_IRQ = 0x30000, MEM_BRQ = 0x40000,  MEM_PHP = 0x50000,
-               MEM_PLP = 0x60000, MEM_BRANCH = 0x70000 } MemoryOpcode;
+typedef enum {
+  MEM_NOP = 0,       MEM_READ = 0x10000,   MEM_WRITE = 0x20000,
+  MEM_IRQ = 0x30000, MEM_BRQ = 0x40000,    MEM_PHP = 0x50000,
+  MEM_PLP = 0x60000, MEM_BRANCH = 0x70000, MEM_READZP = 0x80000
+} MemoryOpcode;
 
 /* Offsets for selecting the proper vector to access */
 typedef enum { OFFSET_NMIL = 0, OFFSET_NMIH = 1, OFFSET_RSTL = 2,

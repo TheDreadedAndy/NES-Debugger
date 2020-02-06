@@ -86,10 +86,8 @@ class Cpu {
     void DecodeImm(CpuOperation op);
     void DecodeAbs(CpuOperation op);
     void DecodeIzpY(CpuOperation op);
-    void DecodeZpx(CpuOperation op);
-    void DecodeZpy(CpuOperation op);
-    void DecodeAbx(CpuOperation op);
-    void DecodeAby(CpuOperation op);
+    void DecodeZpR(CpuOperation op, CpuReg reg);
+    void DecodeAbR(CpuOperation op, CpuReg reg);
     void DecodeNomem(CpuOperation op);
     void DecodeRwZp(CpuOperation op);
     void DecodeRwAbs(CpuOperation op);
@@ -99,10 +97,8 @@ class Cpu {
     void DecodeWZp(CpuOperation op);
     void DecodeWAbs(CpuOperation op);
     void DecodeWIzpY(CpuOperation op);
-    void DecodeWZpx(CpuOperation op);
-    void DecodeWZpy(CpuOperation op);
-    void DecodeWAbx(CpuOperation op);
-    void DecodeWAby(CpuOperation op);
+    void DecodeWZpR(CpuOperation op, CpuReg reg);
+    void DecodeWAbR(CpuOperation op, CpuReg reg);
     void DecodePush(CpuOperation op);
     void DecodePull(CpuOperation op);
     void PollNmiLine(void);

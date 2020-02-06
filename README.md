@@ -16,7 +16,7 @@ the given make file. The emulator will be created as the executable "ndb".
 Compiling on windows is untested as of now, though I've attempted not to rule
 out support for it.
 
-The current status of the project is as follows:  
-Working on: Rewrite of the processor emulation.  
-Compiles?: No (Last working commit is 62733c72dad6140ccf35530a42f0daaa564012a2).  
-Next up: PPU rewrite or Memory rewrite to begin work on the disassembler.  
+The current status of the project is as follows:
+Working on: Rewrite of the processor emulation.
+Compiles?: Yes.
+Next up: PPU rewrite or Memory rewrite to begin work on the disassembler.

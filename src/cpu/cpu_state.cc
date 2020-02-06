@@ -23,23 +23,15 @@
 #include "../util/contracts.h"
 
 /*
- * The state manages the individual micro instructions that happen
- * on each cycle of each instruction. The largest number of cycles an
- * instruction can take is 8.
- *
- * WARNING: Memory corruption will occur if STATE_MAX_OPS is not a power of 2!
- */
-#define STATE_MAX_OPS 8
-#define STATE_MASK 0x07U
-
-/*
- * Creates the state queue for the given CpuState with size STATE_MAX_OPS.
+ * Prepares the state queue for use by reseting its position counters.
  */
 CpuState::CpuState(void) {
-  state_ = new StateQueue();
-  state_->queue = new CpuOperation[STATE_MAX_OPS]();
+  Clear();
   return;
 }
+
+/* The state class need not clean up any memory on exit. */
+CpuState::~CpuState(void) { return; }
 
 /*
  * Adds the given operation to the state queue.
@@ -47,12 +39,12 @@ CpuState::CpuState(void) {
  * Assumes that the state queue is not full.
  */
 void CpuState::AddCycle(CpuOperation op) {
-  CONTRACT(state_->size < STATE_MAX_OPS);
+  CONTRACT(state_.size < kStateMaxSize_);
 
   // Adds the given cycle to the queue.
-  state_->queue[state_->back] = op;
-  state_->back = (state_->back + 1) & STATE_MASK;
-  state_->size++;
+  state_.queue[state_.back] = op;
+  state_.back = (state_.back + 1) & kStateMask_;
+  state_.size++;
 
   return;
 }
@@ -63,12 +55,12 @@ void CpuState::AddCycle(CpuOperation op) {
  * Assumes that the state queue is not full.
  */
 void CpuState::PushCycle(CpuOperation op) {
-  CONTRACT(state_->size < STATE_MAX_OPS);
+  CONTRACT(state_.size < kStateMaxSize_);
 
   // Pushes the operation to the queue.
-  state_->front = (state_->front - 1) & STATE_MASK;
-  state_->queue[state_->front] = op;
-  state_->size++;
+  state_.front = (state_.front - 1) & kStateMask_;
+  state_.queue[state_.front] = op;
+  state_.size++;
 
   return;
 }
@@ -77,14 +69,14 @@ void CpuState::PushCycle(CpuOperation op) {
  * Dequeues the next state cycle and returns it.
  */
 CpuOperation CpuState::NextCycle(void) {
-  CONTRACT(state_->size > 0);
+  CONTRACT(state_.size > 0);
 
   // Get the next cycle.
-  CpuOperation next_op = state_->queue[state_->front];
+  CpuOperation next_op = state_.queue[state_.front];
 
   // Remove it from the queue.
-  state_->front = (state_->front + 1) & STATE_MASK;
-  state_->size--;
+  state_.front = (state_.front + 1) & kStateMask_;
+  state_.size--;
 
   return next_op;
 }
@@ -93,14 +85,14 @@ CpuOperation CpuState::NextCycle(void) {
  * Returns the cycle at the front of the queue.
  */
 CpuOperation CpuState::PeekCycle(void) {
-  return state_->queue[state_->front];
+  return state_.queue[state_.front];
 }
 
 /*
  * Returns the number of elements in the queue of the given state.
  */
 int CpuState::GetSize(void) {
-  return state_->size;
+  return state_.size;
 }
 
 /*
@@ -109,18 +101,9 @@ int CpuState::GetSize(void) {
 void CpuState::Clear(void) {
   // We need only set the size and index fields to zero, since off-queue
   // operation cycles are undefined.
-  state_->front = 0;
-  state_->back = 0;
-  state_->size = 0;
+  state_.front = 0;
+  state_.back = 0;
+  state_.size = 0;
 
-  return;
-}
-
-/*
- * Frees the state queue and last operation.
- */
-CpuState::~CpuState() {
-  delete[] state_->queue;
-  delete state_;
   return;
 }

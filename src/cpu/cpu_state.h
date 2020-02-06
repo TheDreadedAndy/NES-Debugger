@@ -8,20 +8,24 @@
 
 class CpuState {
   private:
+    // Used to size the state queue and wrap its position counters.
+    static const uint8_t kStateMaxSize_ = 8;
+    static const uint8_t kStateMask_ = 0x07;
+
     /*
      *  System state is managed by a fixed size queue of
      *  micro instructions.
      */
     struct StateQueue {
-      CpuOperation *queue;
-      size_t front;
-      size_t back;
-      size_t size;
+      CpuOperation queue[kStateMaxSize_];
+      uint8_t front;
+      uint8_t back;
+      uint8_t size;
     };
 
     // Holds the system state, which is represented as a queue/stack
     // of CPU operations.
-    StateQueue *state_;
+    StateQueue state_;
 
   public:
     // Inits the state class, creating the state queue.

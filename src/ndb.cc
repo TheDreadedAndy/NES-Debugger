@@ -16,7 +16,6 @@
  * Loads in the users arguments and starts ndb.
  */
 int main(int argc, char *argv[]) {
-
   // Global variables needed for getopt.
   extern char *optarg;
 
@@ -54,7 +53,7 @@ int main(int argc, char *argv[]) {
         config->Set(kRendererTypeKey, kRendererHardwareVal);
         break;
       default:
-        printf("usage: ndb -f <FILE> -p <PALETTE FILE>\n");
+        printf("Usage: ndb -f <FILE>\n");
         delete config;
         exit(0);
     }

@@ -381,7 +381,6 @@ void Ppu::RenderVisible(void) {
  */
 void Ppu::RenderUpdateFrame(bool output) {
   // Render the pixel.
-  // TODO: Change so that true rendering only happens on [8, 232).
   if (output) { RenderDrawPixel(); }
 
   // Update the background registers.
@@ -402,10 +401,6 @@ void Ppu::RenderUpdateFrame(bool output) {
  * Uses the shift registers and sprite memory to draw the current cycles
  * pixel to the screen
  *
- * Note that this function is called ~4 million times a second. As such, most
- * branches have been removed to allow the efficient use of branches
- * and out-of-order execution.
- *
  * Assumes the PPU is currently running a cycle between 1 and 256 (inclusive)
  * of a visible scanline.
  */
@@ -414,42 +409,41 @@ void Ppu::RenderDrawPixel(void) {
   size_t screen_x = current_cycle_ - 1;
   size_t screen_y = current_scanline_;
 
-  // Get the background tile pattern. The pattern is forced to zero if
-  // background rendering is disabled.
-  DataWord bg_pat_mask = ((mask_ & FLAG_RENDER_BG) && ((screen_x >= 8)
-                      || (mask_ & FLAG_LEFT_BG)));
-  bg_pat_mask |= (bg_pat_mask << 1U);
-  DataWord bg_pattern = RenderGetTilePattern() & bg_pat_mask;
+  // Holds the background color index.
+  DataWord bg_pattern = 0;
 
-  // Get the sprite pattern.
+  // Holds the address of the pixel to be drawn.
+  DoubleWord pixel_addr = PALETTE_BASE_ADDR;
+
+  // Get the background tile data.
+  if ((mask_ & FLAG_RENDER_BG) && ((screen_x >= 8)
+                               || (mask_ & FLAG_LEFT_BG))) {
+    bg_pattern = RenderGetTilePattern();
+    pixel_addr = PALETTE_BASE_ADDR | bg_pattern | RenderGetTilePalette();
+  }
+
+  // Pull the sprite from the buffer and check if it should be rendered.
   DataWord sprite_buf = soam_buffer_[soam_render_buf_][screen_x];
+  bool render_sprites = ((sprite_buf != 0xFF) && (mask_ & FLAG_RENDER_SPRITES)
+                      && ((screen_x >= 8) || (mask_ & FLAG_LEFT_SPRITES))
+                      && (sprite_buf & FLAG_SOAM_BUFFER_PATTERN));
 
-  // Determine if sprites should be rendered.
-  bool render_sprites = (mask_ & FLAG_RENDER_SPRITES) && (sprite_buf != 0xFF)
-                     && ((screen_x >= 8) || (mask_ & FLAG_LEFT_SPRITES));
+  // Check if this counts as a sprite 0 hit.
+  if (render_sprites && (sprite_buf & FLAG_SOAM_BUFFER_ZERO)
+                     && (bg_pattern != 0) && (screen_x != 255)) {
+    status_ |= FLAG_HIT;
+  }
 
-  // Updates the sprite zero hit flag (6th bit of status).
-  status_ |= ((sprite_buf & FLAG_SOAM_BUFFER_ZERO)
-           && (bg_pattern) && (screen_x != 255) && (render_sprites)
-           && (sprite_buf & FLAG_SOAM_BUFFER_PATTERN)) << 6U;
-
-  // Check if the pixel is on a scanline that is displayed. We run this check
-  // now because flags can still be set on a line that isn't displayed.
+  // Check if the pixel is on a scanline that is displayed.
+  // We run this check now because flags can still be set on a line that isn't
+  // displayed.
   if ((current_scanline_ < 8) || (current_scanline_ >= 232)) { return; }
 
-  // Determine if the pixel should be rendered on top of the background.
-  int sprite_on_top = MASK((sprite_buf & FLAG_SOAM_BUFFER_PATTERN)
-                    && (render_sprites) && !(bg_pattern
-                    && (sprite_buf & FLAG_SOAM_BUFFER_PRIORITY)));
-
-  // Determine if the background pixel is transparent.
-  int bg_visible = MASK(!!bg_pattern);
-
-  // Calculate the address of the pixel to be drawn.
-  DoubleWord pixel_addr = PALETTE_BASE_ADDR
-                  | ((sprite_buf & FLAG_SOAM_BUFFER_PALETTE & sprite_on_top)
-                  | ((bg_pattern | RenderGetTilePalette())
-                  & bg_visible & (~sprite_on_top)));
+  // Check if the pixel should be rendered on top of the background.
+  if (render_sprites && ((bg_pattern == 0)
+                     || !(sprite_buf & FLAG_SOAM_BUFFER_PRIORITY))) {
+    pixel_addr = PALETTE_BASE_ADDR | (sprite_buf & FLAG_SOAM_BUFFER_PALETTE);
+  }
 
   // Get and render the pixel.
   uint32_t pixel = memory_->PaletteRead(pixel_addr);
@@ -819,8 +813,8 @@ void Ppu::EvalFillSoamBuffer(DataWord *sprite_data, bool is_zero) {
     DataWord buf_byte = soam_buffer_[soam_eval_buf_][i];
     if ((buf_byte == 0xFF) || !(buf_byte & FLAG_SOAM_BUFFER_PATTERN))  {
       soam_buffer_[soam_eval_buf_][i] = base_byte
-                                              | ((pat_hi >> 6U) & 2U)
-                                              | ((pat_lo >> 7U) & 1U);
+                                      | ((pat_hi >> 6U) & 2U)
+                                      | ((pat_lo >> 7U) & 1U);
     }
 
     // Shift the data to the next sprite pixel.

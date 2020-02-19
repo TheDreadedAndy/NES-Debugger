@@ -417,7 +417,7 @@ void Ppu::RenderDrawPixel(void) {
   if ((mask_ & FLAG_RENDER_BG) && ((screen_x >= 8)
                                || (mask_ & FLAG_LEFT_BG))) {
     bg_pattern = RenderGetTilePattern();
-    pixel_addr = bg_pattern | RenderGetTilePalette();
+    pixel_addr = (bg_pattern) ? bg_pattern | RenderGetTilePalette() : 0;
   }
 
   // Pull the sprite from the buffer and check if it should be rendered.

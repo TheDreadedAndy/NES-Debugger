@@ -13,6 +13,9 @@
 #define PALETTE_BMASK 0x000000FFU
 #define PIXEL_MASK 0x3FU
 
+// Abstract the format of pixels away from the emulation.
+typedef uint32_t Pixel;
+
 /*
  * Uses the provided file as an NES palette, allowing colors to be decoded
  * into RGB colors.
@@ -32,7 +35,7 @@ class NesPalette {
 
     // Stores the decoded paletter, where each index holds its
     // corresponding color.
-    uint32_t *decoded_palette_;
+    Pixel *decoded_palette_;
 
   public:
     // Loads in the given palette file for use in decoding colors.
@@ -40,7 +43,7 @@ class NesPalette {
     NesPalette(const char *file);
 
     // Decodes an NES color into an RGB color.
-    uint32_t Decode(DataWord color);
+    Pixel Decode(DataWord color);
 
     // Updates the mask settings of the palette.
     void UpdateMask(DataWord mask);

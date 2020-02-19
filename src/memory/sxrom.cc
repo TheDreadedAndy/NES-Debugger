@@ -18,6 +18,7 @@
 
 #include "../util/util.h"
 #include "../util/data.h"
+#include "../config/config.h"
 #include "../cpu/cpu.h"
 #include "../ppu/ppu.h"
 #include "../apu/apu.h"
@@ -70,7 +71,8 @@
  *
  * Assumes the provided rom file and header are valid.
  */
-Sxrom::Sxrom(FILE *rom_file, RomHeader *header) : Memory(header) {
+Sxrom::Sxrom(FILE *rom_file, RomHeader *header, Config *config)
+     : Memory(header, config) {
   // Setup the NES ram space.
   ram_ = RandNew(RAM_SIZE);
 
@@ -495,10 +497,8 @@ DataWord Sxrom::VramRead(DoubleWord addr) {
     DataWord table = (addr & NAMETABLE_SELECT_MASK) >> NAMETABLE_SELECT_SHIFT;
     return nametable_[table][addr & NAMETABLE_ADDR_MASK];
   } else {
-    // Convert the address into an access to the palette data array.
-    addr = (addr & PALETTE_BG_ACCESS_MASK) ? (addr & PALETTE_ADDR_MASK)
-                                           : (addr & PALETTE_BG_MASK);
-    return palette_data_[addr] >> PALETTE_NES_PIXEL_SHIFT;
+    // Access the palette.
+    return PaletteRead(addr);
   }
 }
 

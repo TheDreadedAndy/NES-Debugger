@@ -7,6 +7,8 @@
 #include "../util/data.h"
 #include "../sdl/input.h"
 #include "../io/controller.h"
+#include "../config/config.h"
+#include "./palette.h"
 #include "./header.h"
 
 // Memory addressing constants.
@@ -39,15 +41,9 @@
 #define NAMETABLE_SELECT_MASK 0x0C00U
 #define NAMETABLE_ADDR_MASK 0x03FFU
 #define PALETTE_ADDR_MASK 0x001FU
-#define PALETTE_BG_ACCESS_MASK 0x0003U
-#define PALETTE_BG_MASK 0x000CU
 
 // PPU memory size values.
 #define NAMETABLE_SIZE 0x0400U
-
-// Used to interact with the optimized palette.
-#define PALETTE_NES_PIXEL_SHIFT 24U
-#define PALETTE_XRGB_MASK 0x00FFFFFFU
 
 /*
  * Forward declarations for the other chip emulations.
@@ -76,15 +72,20 @@ class Apu;
  * before they can be used.
  */
 class Memory {
+  private:
+    // The decoded palette, which is used to convert NES pixels to pixel format
+    // used by the emulation.
+    NesPalette *palette_;
+
+    // The palette array holds the NES representation of the palette, exposed
+    // to the emulated software. The pixel data array mirrors the palette
+    // in the pixel format of the emulator.
+    DataWord *palette_data_;
+    Pixel *pixel_data_;
+
   protected:
     // Points the header structure asssociated with the loaded rom.
     RomHeader *header_;
-
-    // Holds the current palette in memory, stored in an xRGB format with
-    // the high byte set to the NES color byte. All implementations of memory
-    // must fill this array with the current palette data using PaletteWrite.
-    uint32_t *palette_data_;
-    void PaletteWrite(DoubleWord addr, DataWord val);
 
     // Points to the associated Ppp/Cpu/Apu classes for this memory class.
     // Necessary to perform most MMIO opperations.
@@ -96,7 +97,12 @@ class Memory {
     Controller *controller_ = NULL;
 
     // Stores the rom header and allocates the palette data array.
-    Memory(RomHeader *header);
+    Memory(RomHeader *header, Config *config);
+
+    // All implementations of memory should access the palette only through
+    // these helper functions.
+    DataWord PaletteRead(DoubleWord addr);
+    void PaletteWrite(DoubleWord addr, DataWord val);
 
   public:
     // Provides access to CPU memory.
@@ -111,9 +117,12 @@ class Memory {
     virtual DataWord VramRead(DoubleWord addr) = 0;
     virtual void VramWrite(DoubleWord addr, DataWord val) = 0;
 
-    // Provides quick access to the colors in the palette.
-    uint32_t PaletteRead(DoubleWord addr);
-    void PaletteUpdate();
+    // Allows the PPU to update the current mask setting of the palette.
+    void PaletteUpdate(DataWord mask);
+
+    // Exposes the decoded palette to the PPU.
+    // The exposed data must not be modified.
+    const Pixel *PaletteExpose(void);
 
     // Gives the memory access to its associated Ppu/Cpu classes.
     // Must be called before using r/w functions.
@@ -125,7 +134,7 @@ class Memory {
 
     // Creates a derived memory object for the mapper of the given
     // rom file. Returns NULL on failure.
-    static Memory *Create(FILE *rom_file);
+    static Memory *Create(FILE *rom_file, Config *config);
 
     // Frees the rom header and palette data array.
     virtual ~Memory(void);

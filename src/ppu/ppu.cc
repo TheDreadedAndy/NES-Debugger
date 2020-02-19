@@ -26,8 +26,7 @@
 #include "../cpu/cpu.h"
 #include "../sdl/renderer.h"
 #include "../memory/memory.h"
-#include "../config/config.h"
-#include "./palette.h"
+#include "../memory/palette.h"
 
 /* Emulation constants */
 
@@ -159,15 +158,12 @@
  *
  * Assumes the provided configuration object is valid.
  */
-Ppu::Ppu(Config *config) {
+Ppu::Ppu(void) {
   // Prepare the ppu structure.
   soam_eval_buf_ = 1;
   current_scanline_ = 261;
   current_cycle_ = 0;
   frame_odd_ = false;
-
-  // Create the palette using the given file.
-  palette_ = new NesPalette(config->Get(kPaletteFileKey));
 
   // Allocate the sprite renderering buffers.
   primary_oam_ = new DataWord[PRIMARY_OAM_SIZE]();
@@ -183,9 +179,14 @@ Ppu::Ppu(Config *config) {
  * must be called after initialization to put the PPU in a valid state.
  */
 void Ppu::Connect(Memory *memory, Renderer *render, bool *nmi_line) {
+  // Store the given objects.
   memory_ = memory;
   renderer_ = render;
   nmi_line_ = nmi_line;
+
+  // Get a pointer to the palette data in memory.
+  pixel_data_ = memory_->PaletteExpose();
+
   return;
 }
 
@@ -296,7 +297,7 @@ void Ppu::DrawBackground(void) {
   }
 
   // Get the background color pixel.
-  uint32_t pixel = memory_->PaletteRead(color_addr);
+  uint32_t pixel = pixel_data_[color_addr & PALETTE_ADDR_MASK];
 
   // Render the pixel.
   renderer_->Pixel(screen_y, screen_x, pixel);
@@ -446,7 +447,7 @@ void Ppu::RenderDrawPixel(void) {
   }
 
   // Get and render the pixel.
-  uint32_t pixel = memory_->PaletteRead(pixel_addr);
+  Pixel pixel = pixel_data_[pixel_addr & PALETTE_ADDR_MASK];
   renderer_->Pixel(screen_y, screen_x, pixel);
 
   return;
@@ -950,8 +951,7 @@ void Ppu::Write(DoubleWord reg_addr, DataWord val) {
       break;
     case PPU_MASK_ACCESS:
       mask_ = val;
-      palette_->UpdateMask(val);
-      memory_->PaletteUpdate();
+      memory_->PaletteUpdate(val);
       break;
     case PPU_STATUS_ACCESS:
       // Read only.
@@ -1049,13 +1049,6 @@ void Ppu::MmioVramAddrInc(void) {
 }
 
 /*
- * Exposes the palette to the caller.
- */
-NesPalette *Ppu::GetPalette(void) {
-  return palette_;
-}
-
-/*
  * Takes in an address from cpu memory and uses it to read from
  * the corresponding mmio in the ppu.
  */
@@ -1141,9 +1134,6 @@ Ppu::~Ppu() {
   delete[] soam_buffer_[0];
   delete[] soam_buffer_[1];
   delete[] oam_buffer_;
-
-  // Free the NES palette data.
-  delete palette_;
 
   return;
 }

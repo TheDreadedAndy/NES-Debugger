@@ -5,6 +5,7 @@
 #include <cstdint>
 
 #include "../util/data.h"
+#include "../config/config.h"
 #include "./memory.h"
 #include "./header.h"
 
@@ -52,7 +53,7 @@ class Uxrom : public Memory {
     DataWord VramRead(DoubleWord addr);
     void VramWrite(DoubleWord addr, DataWord val);
 
-    Uxrom(FILE *rom_file, RomHeader *header);
+    Uxrom(FILE *rom_file, RomHeader *header, Config *config);
     ~Uxrom(void);
 };
 

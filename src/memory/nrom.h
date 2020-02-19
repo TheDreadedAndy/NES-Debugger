@@ -5,6 +5,7 @@
 #include <cstdint>
 
 #include "../util/data.h"
+#include "../config/config.h"
 #include "./memory.h"
 #include "./header.h"
 
@@ -48,7 +49,7 @@ class Nrom : public Memory {
     DataWord VramRead(DoubleWord addr);
     void VramWrite(DoubleWord addr, DataWord val);
 
-    Nrom(FILE *rom_file, RomHeader *header);
+    Nrom(FILE *rom_file, RomHeader *header, Config *config);
     ~Nrom(void);
 };
 

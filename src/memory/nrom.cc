@@ -16,6 +16,7 @@
 
 #include "../util/util.h"
 #include "../util/data.h"
+#include "../config/config.h"
 #include "../cpu/cpu.h"
 #include "../ppu/ppu.h"
 #include "../apu/apu.h"
@@ -45,7 +46,8 @@
  * Assumes the provided ROM file is non-null and points to a valid NES ROM.
  * Assumes the provided header is valid and was created using said ROM.
  */
-Nrom::Nrom(FILE *rom_file, RomHeader *header) : Memory(header) {
+Nrom::Nrom(FILE *rom_file, RomHeader *header, Config *config)
+    : Memory(header, config) {
   // Setup cart and NES RAM.
   ram_ = RandNew(RAM_SIZE);
   bat_ = RandNew(BAT_SIZE);
@@ -238,10 +240,8 @@ DataWord Nrom::VramRead(DoubleWord addr) {
     DataWord table = (addr & NAMETABLE_SELECT_MASK) >> 10U;
     return nametable_[table][addr & NAMETABLE_ADDR_MASK];
   } else {
-    // Convert the address into an access to the palette data array.
-    addr = (addr & PALETTE_BG_ACCESS_MASK) ? (addr & PALETTE_ADDR_MASK)
-                                           : (addr & PALETTE_BG_MASK);
-    return palette_data_[addr] >> PALETTE_NES_PIXEL_SHIFT;
+    // Palette is being accessed.
+    return PaletteRead(addr);
   }
 }
 

@@ -17,7 +17,7 @@
 #include <SDL2/SDL.h>
 
 #include "../util/contracts.h"
-#include "../ppu/palette.h"
+#include "../memory/palette.h"
 #include "./window.h"
 #include "./renderer.h"
 

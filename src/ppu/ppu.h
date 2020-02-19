@@ -4,10 +4,9 @@
 #include <cstdlib>
 
 #include "../util/data.h"
-#include "../ppu/palette.h"
+#include "../memory/palette.h"
 #include "../memory/memory.h"
 #include "../sdl/renderer.h"
-#include "../config/config.h"
 
 // The number of secondary sprite buffers used during rendering.
 #define NUM_SOAM_BUFFERS 2U
@@ -59,11 +58,11 @@ class Ppu {
     size_t current_cycle_ = 0;
     bool frame_odd_ = false;
 
-    // Holds the palette to be used to convert NES colors to RGB colors.
-    NesPalette *palette_;
-
     // Holds the Memory class to be used to access VRAM.
     Memory *memory_;
+
+    // Holds a pointer to the current set of palette data in the pixel format.
+    const Pixel *pixel_data_;
 
     // Holds the Renderer class to be used to draw pixels to the screen.
     Renderer *renderer_;
@@ -106,8 +105,8 @@ class Ppu {
     void MmioVramAddrInc(void);
 
   public:
-    // Creates a PPU object using the provided configuration object.
-    Ppu(Config *config);
+    // Creates a PPU object.
+    Ppu(void);
 
     // Connects the PPU to the rest of the emulation.
     void Connect(Memory *memory, Renderer *render, bool *nmi_line);
@@ -119,9 +118,6 @@ class Ppu {
     // Runs the next emulated PPU cycle.
     // Connect() must be called before this function can be used.
     void RunCycle(void);
-
-    // Used to give memory access to the palette decoder.
-    NesPalette *GetPalette(void);
 
     // Reads from a memory mapped PPU register.
     DataWord Read(DoubleWord reg_addr);

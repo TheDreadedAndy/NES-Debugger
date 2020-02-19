@@ -23,11 +23,11 @@
 #include "../util/util.h"
 #include "../util/data.h"
 #include "../ppu/ppu.h"
-#include "../ppu/palette.h"
 #include "../cpu/cpu.h"
 #include "../io/controller.h"
 #include "../apu/apu.h"
 #include "./header.h"
+#include "./palette.h"
 #include "./nrom.h"
 #include "./sxrom.h"
 #include "./uxrom.h"
@@ -44,7 +44,7 @@
  *
  * Assumes the provided rom file is non-null and a valid NES rom.
  */
-Memory *Memory::Create(FILE *rom_file) {
+Memory *Memory::Create(FILE *rom_file, Config *config) {
   // Use the provided rom file to create a decoded rom header.
   RomHeader *header = DecodeHeader(rom_file);
   if (header == NULL) { return NULL; }
@@ -53,13 +53,13 @@ Memory *Memory::Create(FILE *rom_file) {
   Memory *mem = NULL;
   switch(header->mapper) {
     case NROM_MAPPER:
-      mem = new Nrom(rom_file, header);
+      mem = new Nrom(rom_file, header, config);
       break;
     case SXROM_MAPPER:
-      mem = new Sxrom(rom_file, header);
+      mem = new Sxrom(rom_file, header, config);
       break;
     case UXROM_MAPPER:
-      mem = new Uxrom(rom_file, header);
+      mem = new Uxrom(rom_file, header, config);
       break;
     default:
       fprintf(stderr, "Error: Rom requires unimplemented mapper: %d\n",
@@ -75,57 +75,79 @@ Memory *Memory::Create(FILE *rom_file) {
 /*
  * Stores the provided header and allocates the palette array.
  */
-Memory::Memory(RomHeader *header) {
+Memory::Memory(RomHeader *header, Config *config) {
+  // Load in the header and setup the palette data arrays.
   header_ = header;
-  palette_data_ = new uint32_t[PALETTE_DATA_SIZE]();
+  palette_data_ = new DataWord[PALETTE_DATA_SIZE]();
+  pixel_data_ = new Pixel[PALETTE_DATA_SIZE]();
+
+  // Create a palette structure using the given configuration.
+  palette_ = new NesPalette(config->Get(kPaletteFileKey));
+
   return;
 }
 
 /*
- * Reads an xRGB color from the palette.
+ * Reads an NES pixel from palette data.
  */
-uint32_t Memory::PaletteRead(DoubleWord addr) {
+DataWord Memory::PaletteRead(DoubleWord addr) {
   // Convert the address into an access to the palette data array.
-  addr = (addr & PALETTE_BG_ACCESS_MASK) ? (addr & PALETTE_ADDR_MASK)
-                                         : (addr & PALETTE_BG_MASK);
-  return palette_data_[addr] & PALETTE_XRGB_MASK;
+  return palette_data_[addr & PALETTE_ADDR_MASK];
 }
 
 /*
- * Uses the provided value to read a color from the palette; Then stores
- * the value and color in the palette data array using the provided address.
+ * Writes the given value to the palette data array, then decodes the value
+ * and writes it to the pixel data array. If the value is at a mirrored
+ * address, then it is written again to the mirrored position in both arrays.
  *
  * Assumes that the palette has been initialized.
  */
 void Memory::PaletteWrite(DoubleWord addr, DataWord val) {
-  // Create the NES/xRGB pixel to be written.
-  uint32_t pixel = (val << PALETTE_NES_PIXEL_SHIFT)
-                 | ((ppu_->GetPalette())->Decode(val));
+  // Used to check if a palette access needs to be mirrored.
+  const DoubleWord kPaletteMirrorAccessMask = 0x03U;
+  const DoubleWord kPaletteMirrorBit = 0x10U;
 
-  // Convert the address into an access to the palette data array.
-  addr = (addr & PALETTE_BG_ACCESS_MASK) ? (addr & PALETTE_ADDR_MASK)
-                                         : (addr & PALETTE_BG_MASK);
-  palette_data_[addr] = pixel;
+  // Update the palette and pixel arrays.
+  addr &= PALETTE_ADDR_MASK;
+  Pixel pixel_val = palette_->Decode(val);
+  palette_data_[addr] = val;
+  pixel_data_[addr] = pixel_val;
+
+  // Check if the address is mirrored, and update its mirror if it is.
+  // Values whose low 2 bits are zero are mirrored.
+  if ((addr & kPaletteMirrorAccessMask) == 0) {
+    addr ^= kPaletteMirrorBit;
+    palette_data_[addr] = val;
+    pixel_data_[addr] = pixel_val;
+  }
 
   return;
 }
 
 /*
- * Refreshes the xRGB pixels that are stored in the palette.
+ * Updates the mask selection of the palette, then refreshes the pixel data.
  *
- * Assumes that the palette has been initialized.
+ * Assumes the palette has been initialized.
  */
-void Memory::PaletteUpdate(void) {
-  // Update each entry in the palette.
-  DataWord nes_pixel;
-  uint32_t pixel;
+void Memory::PaletteUpdate(DataWord mask) {
+  // Updates the palette mask.
+  palette_->UpdateMask(mask);
+
+  // Update each entry in the pixel array.
   for (size_t i = 0; i < PALETTE_DATA_SIZE; i++) {
-    nes_pixel = palette_data_[i] >> PALETTE_NES_PIXEL_SHIFT;
-    pixel = (nes_pixel << PALETTE_NES_PIXEL_SHIFT)
-          | ((ppu_->GetPalette())->Decode(nes_pixel));
-    palette_data_[i] = pixel;
+    pixel_data_[i] = palette_->Decode(palette_data_[i]);
   }
+
   return;
+}
+
+/*
+ * Exposes the pixel data to the caller. The exposed data must not be modified.
+ *
+ * Assumes the palette has been initialized.
+ */
+const Pixel *Memory::PaletteExpose(void) {
+  return const_cast<const Pixel*>(pixel_data_);
 }
 
 /*
@@ -158,11 +180,13 @@ void Memory::AddController(Input *input) {
 
 
 /*
- * Frees the header and palatte data array associated with this memory class.
+ * Frees the structures and objects associated with this class.
  */
 Memory::~Memory(void) {
   delete header_;
   delete[] palette_data_;
+  delete[] pixel_data_;
+  delete palette_;
   if (controller_ != NULL) { delete controller_; }
   return;
 }

@@ -5,6 +5,7 @@
 #include <cstdint>
 
 #include "../util/data.h"
+#include "../config/config.h"
 #include "./memory.h"
 #include "./header.h"
 
@@ -83,7 +84,7 @@ class Sxrom : public Memory {
     DataWord VramRead(DoubleWord addr);
     void VramWrite(DoubleWord addr, DataWord val);
 
-    Sxrom(FILE *rom_file, RomHeader *header);
+    Sxrom(FILE *rom_file, RomHeader *header, Config *config);
     ~Sxrom(void);
 };
 

@@ -50,7 +50,7 @@ Emulation *Emulation::Create(FILE *rom, Config *config) {
   }
 
   // Attempt to create a Memory object with the given rom file.
-  Memory *memory = Memory::Create(rom);
+  Memory *memory = Memory::Create(rom, config);
   if (memory == NULL) {
     fprintf(stderr, "Error: Failed to create emulated memory for rom.\n");
     delete window;
@@ -59,7 +59,7 @@ Emulation *Emulation::Create(FILE *rom, Config *config) {
 
   // Create the NES APU, CPU, and PPU.
   Cpu *cpu = new Cpu();
-  Ppu *ppu = new Ppu(config);
+  Ppu *ppu = new Ppu();
   Apu *apu = new Apu();
 
   // Connect all of the emulated NES systems together.

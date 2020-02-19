@@ -17,6 +17,7 @@
 
 #include "../util/util.h"
 #include "../util/data.h"
+#include "../config/config.h"
 #include "../io/controller.h"
 #include "../cpu/cpu.h"
 #include "../ppu/ppu.h"
@@ -46,7 +47,8 @@
  * Assumes the provided rom file is non-null and points to a valid NES rom.
  * Assumes the provided header was created from the rom and is valid.
  */
-Uxrom::Uxrom(FILE *rom_file, RomHeader *header) : Memory(header) {
+Uxrom::Uxrom(FILE *rom_file, RomHeader *header, Config *config)
+     : Memory(header, config) {
   // Setup the ram space.
   ram_ = RandNew(RAM_SIZE);
   bat_ = RandNew(BAT_SIZE);
@@ -234,10 +236,8 @@ DataWord Uxrom::VramRead(DoubleWord addr) {
     DataWord table = (addr & NAMETABLE_SELECT_MASK) >> 10U;
     return nametable_[table][addr & NAMETABLE_ADDR_MASK];
   } else {
-    // Convert the address into an access to the palette data array.
-    addr = (addr & PALETTE_BG_ACCESS_MASK) ? (addr & PALETTE_ADDR_MASK)
-                                           : (addr & PALETTE_BG_MASK);
-    return palette_data_[addr] >> PALETTE_NES_PIXEL_SHIFT;
+    // Palette is being accessed.
+    return PaletteRead(addr);
   }
 }
 

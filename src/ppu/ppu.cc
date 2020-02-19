@@ -288,19 +288,16 @@ void Ppu::DrawBackground(void) {
   // Get the universal background color address and the screen position.
   size_t screen_x = current_cycle_ - 1;
   size_t screen_y = current_scanline_;
-  DoubleWord color_addr = PALETTE_BASE_ADDR;
+  DoubleWord color_addr = 0;
 
   // The universal background color can be changed using the current vram
   // address.
   if ((vram_addr_ & VRAM_BUS_MASK) > PALETTE_BASE_ADDR) {
-    color_addr = vram_addr_ & VRAM_BUS_MASK;
+    color_addr = vram_addr_ & PALETTE_ADDR_MASK;
   }
 
-  // Get the background color pixel.
-  uint32_t pixel = pixel_data_[color_addr & PALETTE_ADDR_MASK];
-
   // Render the pixel.
-  renderer_->Pixel(screen_y, screen_x, pixel);
+  renderer_->Pixel(screen_y, screen_x, pixel_data_[color_addr]);
 
   return;
 }
@@ -414,13 +411,13 @@ void Ppu::RenderDrawPixel(void) {
   DataWord bg_pattern = 0;
 
   // Holds the address of the pixel to be drawn.
-  DoubleWord pixel_addr = PALETTE_BASE_ADDR;
+  DoubleWord pixel_addr = 0;
 
   // Get the background tile data.
   if ((mask_ & FLAG_RENDER_BG) && ((screen_x >= 8)
                                || (mask_ & FLAG_LEFT_BG))) {
     bg_pattern = RenderGetTilePattern();
-    pixel_addr = PALETTE_BASE_ADDR | bg_pattern | RenderGetTilePalette();
+    pixel_addr = bg_pattern | RenderGetTilePalette();
   }
 
   // Pull the sprite from the buffer and check if it should be rendered.
@@ -443,12 +440,11 @@ void Ppu::RenderDrawPixel(void) {
   // Check if the pixel should be rendered on top of the background.
   if (render_sprites && ((bg_pattern == 0)
                      || !(sprite_buf & FLAG_SOAM_BUFFER_PRIORITY))) {
-    pixel_addr = PALETTE_BASE_ADDR | (sprite_buf & FLAG_SOAM_BUFFER_PALETTE);
+    pixel_addr = sprite_buf & FLAG_SOAM_BUFFER_PALETTE;
   }
 
   // Get and render the pixel.
-  Pixel pixel = pixel_data_[pixel_addr & PALETTE_ADDR_MASK];
-  renderer_->Pixel(screen_y, screen_x, pixel);
+  renderer_->Pixel(screen_y, screen_x, pixel_data_[pixel_addr]);
 
   return;
 }

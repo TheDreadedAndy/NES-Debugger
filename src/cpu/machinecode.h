@@ -10,6 +10,9 @@
  * at this time.
  */
 
+// The number of instructions defined in this file.
+#define NUM_DEFINED_INSTRUCTION 258
+
 /* ####################### */
 /* # Type 1 instructions # */
 /* ####################### */
@@ -267,5 +270,13 @@
 #define INST_CLD       0xD8
 #define INST_INX       0xE8
 #define INST_SED       0xF8
+
+/* ####################### */
+/* ## Emu instructions ### */
+/* ####################### */
+
+// These are used by the decoder to add IRQ/NMI to the microcode table.
+#define EINST_IRQ      0x100U
+#define EINST_NMI      0x101U
 
 #endif

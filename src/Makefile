@@ -2,8 +2,11 @@
 # A corresponding .cc file must exist for each entry.
 MAINS = ndb
 
+# The names of all .cc files to be excluded.
+EXCLUDE = $(patsubst %.cc,%.o,$(wildcard bins/*.cc)) $(addsuffix .0, $(MAINS))
+
 # The names of all non-main objects.
-OBJECTS = $(addprefix build/,$(filter-out $(addsuffix .o,$(MAINS)),$(patsubst %.cc,%.o,$(wildcard */*.cc))))
+OBJECTS = $(addprefix build/,$(filter-out $(EXCLUDE),$(patsubst %.cc,%.o,$(wildcard */*.cc))))
 
 # The objects to be compiled from .cc source files and the dependency
 # files corresponding to these objects.
@@ -11,7 +14,9 @@ SRC = $(OBJECTS) $(addprefix build/,$(addsuffix .o,$(MAINS)))
 DEPS = $(patsubst %.o,%.d,$(SRC))
 
 # The binary files to be linked to the executable binary.
-BINS = $(addprefix build/,$(patsubst %.bin,%.o,$(wildcard bins/*.bin)))
+# Since some binaries are generated at compile time, they are listed manually.
+BINS = bins/inst_table.bin
+BINS_OBJS = build/bins/nes_palette.o build/bins/inst_table.o
 
 # The directories to be made before building.
 DIRS = $(sort $(dir $(BINS) $(SRC)))
@@ -49,13 +54,22 @@ $(DEPS):;
 # This ensures that files will be rebuilt when the headers they depend on change.
 -include $(DEPS)
 
+# Generate the instruction table.
+bins/inst_table.bin: bins/decode.cc bins/decode.h bins/decode_state.cc\
+                     bins/decode_state.h bins/gen_inst_table.cc\
+										 cpu/cpu_operation.h cpu/machinecode.h\
+										 util/data.h util/data.cc
+	g++ bins/gen_inst_table.cc bins/decode.cc bins/decode_state.cc util/data.cc -o bins/gen_inst_table
+	./bins/gen_inst_table
+	rm ./bins/gen_inst_table
+
 # Setup a binary file to be linked.
-$(BINS): build/%.o : %.bin | $(DIRS)
+$(BINS_OBJS): build/%.o : %.bin | $(DIRS)
 	ld -r -b binary $(patsubst build/%.o,%.bin,$@) -o $@
 
 # General format for building a main file.
-$(MAINS): % : build/%.o $(OBJECTS) $(BINS) | $(DIRS)
-	$(CXX) $(OBJECTS) $(BINS) build/$@.o -o $@ $(LIBS)
+$(MAINS): % : build/%.o $(OBJECTS) $(BINS_OBJS) | $(DIRS)
+	$(CXX) $(OBJECTS) $(BINS_OBJS) build/$@.o -o $@ $(LIBS)
 
 $(DIRS):
 	mkdir -p $@
@@ -87,6 +101,6 @@ endif
 
 # Removes built files.
 clean:
-	-rm -f $(SRC) $(BINS)
+	-rm -f $(SRC) $(BINS_OBJS)
 	-rm -f $(DEPS)
 	-rm -f $(MAINS)

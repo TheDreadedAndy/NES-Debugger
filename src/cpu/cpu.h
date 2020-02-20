@@ -7,7 +7,6 @@
 
 #include "../memory/memory.h"
 #include "../util/data.h"
-#include "./cpu_state.h"
 #include "./cpu_operation.h"
 
 // The CPU has a memory mapped register to start a DMA to OAM at this address.
@@ -20,10 +19,13 @@
  */
 class Cpu {
   private:
+    // The size of each microcode sequence in the code table.
+    static const size_t kInstSequenceSize_ = 8;
+
     /*
      * This structure represents the register file for the 6502 CPU, and
      * is used in the CPU emulation. The order of the fields in this file
-     * must be consistent with the definitions defined in the operation header.
+     * must be consistent with the definitions in the operation header.
      *
      * Note that some of these fields are abstractions to make emulation more
      * efficient, and did not exist within the 6502.
@@ -66,41 +68,30 @@ class Cpu {
     // memory during the emulation.
     Memory *memory_;
 
-    // Used to manage the current state of the CPU emulation.
-    CpuState *state_;
-
     // Holds the registers inside the current CPU emulation.
     CpuRegFile *regs_;
 
+    // Holds the table of microcode, which is indexed by instructions.
+    CpuOperation *code_table_;
+
+    // Used to buffer instructions which can have variable endings.
+    CpuOperation inst_buffer_[kInstSequenceSize_];
+
+    // Holds the microcode currently being executed, and the pointer to the
+    // current instruction in it.
+    CpuOperation *current_sequence_;
+    CpuOperation current_operation_;
+    size_t inst_pointer_ = 0;
+
     /* Helper functions for the CPU emulation */
+    CpuOperation *LoadCodeTable(void);
     bool CheckNextCycle(void);
     void ExecuteDma(void);
     bool CanPoll(void);
-    void RunOperation(CpuOperation op);
+    void RunOperation(void);
     void RunMemoryOperation(CpuOperation &op);
     void RunDataOperation(CpuOperation &op);
     void Fetch(CpuOperation &op);
-    void DecodeInst(void);
-    void DecodeIzpx(CpuOperation op);
-    void DecodeZp(CpuOperation op);
-    void DecodeImm(CpuOperation op);
-    void DecodeAbs(CpuOperation op);
-    void DecodeIzpY(CpuOperation op);
-    void DecodeZpR(CpuOperation op, CpuReg reg);
-    void DecodeAbR(CpuOperation op, CpuReg reg);
-    void DecodeNomem(CpuOperation op);
-    void DecodeRwZp(CpuOperation op);
-    void DecodeRwAbs(CpuOperation op);
-    void DecodeRwZpx(CpuOperation op);
-    void DecodeRwAbx(CpuOperation op);
-    void DecodeWIzpx(CpuOperation op);
-    void DecodeWZp(CpuOperation op);
-    void DecodeWAbs(CpuOperation op);
-    void DecodeWIzpY(CpuOperation op);
-    void DecodeWZpR(CpuOperation op, CpuReg reg);
-    void DecodeWAbR(CpuOperation op, CpuReg reg);
-    void DecodePush(CpuOperation op);
-    void DecodePull(CpuOperation op);
     void PollNmiLine(void);
     void PollIrqLine(void);
 

@@ -1,4 +1,6 @@
 /*
+ * FIXME: This description is extremely out of date.
+ *
  * This file contains the interpreter for the emulation of the NES's 6502
  * CPU. The interpreter is emulated one cycle at a time by calling the
  * function RunCycle() on a cpu object.
@@ -38,7 +40,6 @@
 #include "../memory/header.h"
 #include "../util/util.h"
 #include "./machinecode.h"
-#include "./cpu_state.h"
 #include "./cpu_operation.h"
 
 // DMA transfers take at least 513 cycles.
@@ -74,9 +75,24 @@
  */
 Cpu::Cpu(void) {
   // Prepares the CPU's internal structures.
-  state_ = new CpuState();
+  code_table_ = LoadCodeTable();
   regs_ = new CpuRegFile();
   return;
+}
+
+/*
+ * Loads the microcode table from the linked binary into ram, and
+ * returns it to the CPU.
+ */
+CpuOperation *Cpu::LoadCodeTable(void) {
+  extern const CpuOperation _binary_bins_inst_table_bin_start[];
+  const size_t table_size = NUM_DEFINED_INSTRUCTION * kInstSequenceSize_;
+
+  CpuOperation *table = new CpuOperation[table_size];
+  for (size_t i = 0; i < table_size; i++) {
+    table[i] = _binary_bins_inst_table_bin_start[i];
+  }
+  return table;
 }
 
 /*
@@ -100,7 +116,8 @@ void Cpu::Power(void) {
   regs_->pc_hi = memory_->Read(MEMORY_RESET_ADDR + 1U);
 
   // Queues the first cycle to be emulated.
-  state_->AddCycle(MEM_FETCH | PC_INC);
+  inst_buffer_[0] = MEM_FETCH | PC_INC;
+  current_sequence_ = inst_buffer_;
   return;
 }
 
@@ -133,7 +150,7 @@ size_t Cpu::RunSchedule(size_t cycles, size_t *syncs) {
  */
 bool Cpu::CheckNextCycle(void) {
   // Decodes the information necessary to complete the memory operation.
-  CpuOperation op = state_->PeekCycle();
+  CpuOperation op = current_sequence_[inst_pointer_];
   CpuReg mem_addr = GET_MEM_ADDR(op);
   DoubleWord mem_offset = GET_MEM_OFST(op);
   MemoryOpcode mem_op = GET_MEM_OP(op);
@@ -174,7 +191,7 @@ void Cpu::RunCycle(void) {
   }
 
   // Fetch and run the next micro instructions for the cycle.
-  RunOperation(state_->NextCycle());
+  RunOperation();
 
   // Poll the interrupt lines and update the detectors.
   PollNmiLine();
@@ -228,22 +245,35 @@ void Cpu::ExecuteDma(void) {
 bool Cpu::CanPoll(void) {
   // Interrupt polling (internal) happens when the cpu is about
   // to finish an instruction and said instruction is not an interrupt.
-  return (state_->GetSize() == 2) && (regs_->inst != INST_BRK);
+  return ((current_sequence_[inst_pointer_]
+       & MEMORY_OPERATION_MASK) != MEM_FETCH)
+      && ((current_sequence_[inst_pointer_]
+       & MEMORY_OPERATION_MASK) != MEM_BRANCH)
+      && (inst_pointer_ + 1 < kInstSequenceSize_)
+      && (((current_sequence_[inst_pointer_ + 1]
+       & MEMORY_OPERATION_MASK) == MEM_FETCH)
+      || ((current_sequence_[inst_pointer_ + 1]
+       & MEMORY_OPERATION_MASK) == MEM_BRANCH))
+      && (regs_->inst != INST_BRK);
 }
 
 /*
  * Runs the Memory, Data, and PC action specified by the given operation.
  */
-void Cpu::RunOperation(CpuOperation op) {
+void Cpu::RunOperation(void) {
+  // Pulls the next operation from the microcode sequence.
+  current_operation_ = current_sequence_[inst_pointer_];
+  inst_pointer_++;
+
   // Performs the memory operation.
-  RunMemoryOperation(op);
+  RunMemoryOperation(current_operation_);
 
   // Performs the encoded data operation.
-  RunDataOperation(op);
+  RunDataOperation(current_operation_);
 
   // Increments the PC by the given value.
   DoubleWord pc_update = GET_DOUBLE_WORD(regs_->pc_lo, regs_->pc_hi)
-                       + GET_PC_INC(op);
+                       + GET_PC_INC(current_operation_);
   regs_->pc_lo = GET_WORD_LO(pc_update);
   regs_->pc_hi = GET_WORD_HI(pc_update);
 
@@ -312,17 +342,21 @@ void Cpu::RunMemoryOperation(CpuOperation &op) {
 
       // Allows an NMI to hijack the instruction.
       if (nmi_edge_) {
-        state_->AddCycle(MEM_READ | MEM_ADDR(REG_VEC) | MEM_OP1(REG_PCL)
-                       | MEM_OFST(0) | DAT_SET | DAT_MASK(P_FLAG_I));
-        state_->AddCycle(MEM_READ | MEM_ADDR(REG_VEC) | MEM_OP1(REG_PCH)
-                       | MEM_OFST(1));
-        state_->AddCycle(MEM_FETCH | PC_INC);
+        inst_buffer_[0] = MEM_READ | MEM_ADDR(REG_VEC) | MEM_OP1(REG_PCL)
+                        | MEM_OFST(0) | DAT_SET | DAT_MASK(P_FLAG_I);
+        inst_buffer_[1] = MEM_READ | MEM_ADDR(REG_VEC) | MEM_OP1(REG_PCH)
+                        | MEM_OFST(1);
+        inst_buffer_[2] = MEM_FETCH | PC_INC;
+        current_sequence_ = inst_buffer_;
+        inst_pointer_ = 0;
       } else {
-        state_->AddCycle(MEM_READ | MEM_ADDR(REG_VEC) | MEM_OP1(REG_PCL)
-                       | MEM_OFST(4) | DAT_SET | DAT_MASK(P_FLAG_I));
-        state_->AddCycle(MEM_READ | MEM_ADDR(REG_VEC) | MEM_OP1(REG_PCH)
-                       | MEM_OFST(5));
-        state_->AddCycle(MEM_FETCH | PC_INC);
+        inst_buffer_[0] = MEM_READ | MEM_ADDR(REG_VEC) | MEM_OP1(REG_PCL)
+                        | MEM_OFST(4) | DAT_SET | DAT_MASK(P_FLAG_I);
+        inst_buffer_[1] = MEM_READ | MEM_ADDR(REG_VEC) | MEM_OP1(REG_PCH)
+                        | MEM_OFST(5);
+        inst_buffer_[2] = MEM_FETCH | PC_INC;
+        current_sequence_ = inst_buffer_;
+        inst_pointer_ = 0;
       }
 
       regs_->p &= P_MASK;
@@ -387,12 +421,16 @@ void Cpu::RunMemoryOperation(CpuOperation &op) {
       } else if (regs_->temp2) {
         // Case 2.
         regs_->pc_lo = GET_WORD_LO(res);
-        state_->AddCycle(DAT_ADD | DAT_SRC(REG_TMP2) | DAT_DST(REG_PCH));
-        state_->AddCycle(MEM_FETCH | PC_INC);
+        inst_buffer_[0] = DAT_ADD | DAT_SRC(REG_TMP2) | DAT_DST(REG_PCH);
+        inst_buffer_[1] = MEM_FETCH | PC_INC;
+        current_sequence_ = inst_buffer_;
+        inst_pointer_ = 0;
       } else {
         // Case 1.
         regs_->pc_lo = GET_WORD_LO(res);
-        state_->AddCycle(MEM_FETCH | PC_INC);
+        inst_buffer_[0] = MEM_FETCH | PC_INC;
+        current_sequence_ = inst_buffer_;
+        inst_pointer_ = 0;
       }
       break;
     }
@@ -642,7 +680,10 @@ void Cpu::RunDataOperation(CpuOperation &op) {
     case DAT_VFIX: {
       if (regfile[data_src]) {
         regfile[data_dst] += regfile[data_src];
-        state_->PushCycle(op & MEMORY_OPERATION_MASK);
+        inst_buffer_[0] = op & MEMORY_OPERATION_MASK;
+        inst_buffer_[1] = current_sequence_[inst_pointer_];
+        current_sequence_ = inst_buffer_;
+        inst_pointer_ = 0;
       }
       break;
     }
@@ -665,823 +706,37 @@ void Cpu::RunDataOperation(CpuOperation &op) {
 void Cpu::Fetch(CpuOperation &op) {
   // Fetch the next instruction to the instruction register.
   if (!nmi_edge_ && !irq_ready_) {
+    // Read the inst from the PC, then decode it using the code table.
     regs_->inst = memory_->Read(READ_ADDR_REG(REG_PCL, 0));
+    current_sequence_ = &code_table_[regs_->inst * kInstSequenceSize_];
+
+    // Ensure that the instruction loaded was not illegal.
+    // In the code table, no valid instruction begins with a NOP.
+    if (current_sequence_[0] == 0) {
+      fprintf(stderr, "Error: Fetch obtained unimplemented instruction %02x",
+              regs_->inst);
+      abort();
+    }
   } else {
     // All interrupts fill the instruction register with 0x00 (BRK).
     regs_->inst = INST_BRK;
     // Interrupts should not increment the PC.
     op &= (~PC_INC);
+
+    // Decode the interrupt from the code table.
+    if (nmi_edge_) {
+      nmi_edge_ = false;
+      irq_ready_ = false;
+      current_sequence_ = &code_table_[EINST_NMI * kInstSequenceSize_];
+    } else {
+      irq_ready_ = false;
+      current_sequence_ = &code_table_[EINST_IRQ * kInstSequenceSize_];
+    }
   }
 
-  // Decode the instruction.
-  DecodeInst();
+  // Reset the index in the microcode sequence.
+  inst_pointer_ = 0;
 
-  return;
-}
-
-/*
- * Decodes the next instruction (or interrupt) into micro instructions and
- * adds them to the state queue. Resets the interrupt flags if one is
- * processed.
- */
-void Cpu::DecodeInst(void) {
-  // We only decode the instruction if there are no interrupts.
-  if (nmi_edge_) {
-    // An nmi signal has priority over an irq, and resets the ready flag for it.
-    nmi_edge_ = false;
-    irq_ready_ = false;
-
-    // Since an nmi was detected, we queue its cycles and return.
-    state_->AddCycle(MEM_READ | MEM_ADDR(REG_PCL) | MEM_OP1(REG_TMP2));
-    state_->AddCycle(MEM_WRITE | MEM_ADDR(REG_S) | MEM_OP1(REG_PCH)
-                   | DAT_DECNF | DAT_DST(REG_S));
-    state_->AddCycle(MEM_WRITE | MEM_ADDR(REG_S) | MEM_OP1(REG_PCL)
-                   | DAT_DECNF | DAT_DST(REG_S));
-    state_->AddCycle(MEM_WRITE | MEM_ADDR(REG_S) | MEM_OP1(REG_P)
-                   | DAT_DECNF | DAT_DST(REG_S));
-    state_->AddCycle(MEM_READ | MEM_ADDR(REG_VEC) | MEM_OP1(REG_PCL)
-                                                  | MEM_OFST(OFFSET_NMIL)
-                   | DAT_SET | DAT_MASK(P_FLAG_I));
-    state_->AddCycle(MEM_READ | MEM_ADDR(REG_VEC) | MEM_OP1(REG_PCH)
-                                                  | MEM_OFST(OFFSET_NMIH));
-    state_->AddCycle(MEM_FETCH | PC_INC);
-    return;
-  } else if (irq_ready_) {
-    // The irq has been handled, so we reset the flag.
-    irq_ready_ = false;
-
-    // Since an irq was detected, we queue its cycles and return.
-    state_->AddCycle(MEM_READ | MEM_ADDR(REG_PCL) | MEM_OP1(REG_TMP2));
-    state_->AddCycle(MEM_WRITE | MEM_ADDR(REG_S) | MEM_OP1(REG_PCH)
-                   | DAT_DECNF | DAT_DST(REG_S));
-    state_->AddCycle(MEM_WRITE | MEM_ADDR(REG_S) | MEM_OP1(REG_PCL)
-                   | DAT_DECNF | DAT_DST(REG_S));
-    state_->AddCycle(MEM_IRQ | DAT_DECNF | DAT_DST(REG_S));
-    return;
-  }
-
-  /*
-   * Since there were no interrupts, we case on the instruction and decode it.
-   *
-   * The 6502 has serveral different addressing modes an instruction can use,
-   * and so most instructions will simply call a helper function to decode that
-   * addressing mode (with one micro op being changed to perform the desired
-   * instruction).
-   */
-  switch (regs_->inst) {
-    case INST_ORA_IZPX:
-      DecodeIzpx(DAT_OR | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
-      break;
-    case INST_ORA_ZP:
-      DecodeZp(DAT_OR | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
-      break;
-    case INST_ORA_IMM:
-      DecodeImm(DAT_OR | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
-      break;
-    case INST_ORA_ABS:
-      DecodeAbs(DAT_OR | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
-      break;
-    case INST_ORA_IZP_Y:
-      DecodeIzpY(DAT_OR | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
-      break;
-    case INST_ORA_ZPX:
-      DecodeZpR(DAT_OR | DAT_DST(REG_A) | DAT_SRC(REG_TMP1), REG_X);
-      break;
-    case INST_ORA_ABY:
-      DecodeAbR(DAT_OR | DAT_DST(REG_A) | DAT_SRC(REG_TMP1), REG_Y);
-      break;
-    case INST_ORA_ABX:
-      DecodeAbR(DAT_OR | DAT_DST(REG_A) | DAT_SRC(REG_TMP1), REG_X);
-      break;
-    case INST_AND_IZPX:
-      DecodeIzpx(DAT_AND | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
-      break;
-    case INST_AND_ZP:
-      DecodeZp(DAT_AND | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
-      break;
-    case INST_AND_IMM:
-      DecodeImm(DAT_AND | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
-      break;
-    case INST_AND_ABS:
-      DecodeAbs(DAT_AND | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
-      break;
-    case INST_AND_IZP_Y:
-      DecodeIzpY(DAT_AND | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
-      break;
-    case INST_AND_ZPX:
-      DecodeZpR(DAT_AND | DAT_DST(REG_A) | DAT_SRC(REG_TMP1), REG_X);
-      break;
-    case INST_AND_ABY:
-      DecodeAbR(DAT_AND | DAT_DST(REG_A) | DAT_SRC(REG_TMP1), REG_Y);
-      break;
-    case INST_AND_ABX:
-      DecodeAbR(DAT_AND | DAT_DST(REG_A) | DAT_SRC(REG_TMP1), REG_X);
-      break;
-    case INST_EOR_IZPX:
-      DecodeIzpx(DAT_XOR | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
-      break;
-    case INST_EOR_ZP:
-      DecodeZp(DAT_XOR | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
-      break;
-    case INST_EOR_IMM:
-      DecodeImm(DAT_XOR | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
-      break;
-    case INST_EOR_ABS:
-      DecodeAbs(DAT_XOR | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
-      break;
-    case INST_EOR_IZP_Y:
-      DecodeIzpY(DAT_XOR | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
-      break;
-    case INST_EOR_ZPX:
-      DecodeZpR(DAT_XOR | DAT_DST(REG_A) | DAT_SRC(REG_TMP1), REG_X);
-      break;
-    case INST_EOR_ABY:
-      DecodeAbR(DAT_XOR | DAT_DST(REG_A) | DAT_SRC(REG_TMP1), REG_Y);
-      break;
-    case INST_EOR_ABX:
-      DecodeAbR(DAT_XOR | DAT_DST(REG_A) | DAT_SRC(REG_TMP1), REG_X);
-      break;
-    case INST_ADC_IZPX:
-      DecodeIzpx(DAT_ADC | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
-      break;
-    case INST_ADC_ZP:
-      DecodeZp(DAT_ADC | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
-      break;
-    case INST_ADC_IMM:
-      DecodeImm(DAT_ADC | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
-      break;
-    case INST_ADC_ABS:
-      DecodeAbs(DAT_ADC | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
-      break;
-    case INST_ADC_IZP_Y:
-      DecodeIzpY(DAT_ADC | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
-      break;
-    case INST_ADC_ZPX:
-      DecodeZpR(DAT_ADC | DAT_DST(REG_A) | DAT_SRC(REG_TMP1), REG_X);
-      break;
-    case INST_ADC_ABY:
-      DecodeAbR(DAT_ADC | DAT_DST(REG_A) | DAT_SRC(REG_TMP1), REG_Y);
-      break;
-    case INST_ADC_ABX:
-      DecodeAbR(DAT_ADC | DAT_DST(REG_A) | DAT_SRC(REG_TMP1), REG_X);
-      break;
-    case INST_STA_IZPX:
-      DecodeWIzpx(MEM_WRITE | MEM_OP1(REG_A) | MEM_ADDR(REG_ADDRL));
-      break;
-    case INST_STA_ZP:
-      DecodeWZp(MEM_WRITE | MEM_OP1(REG_A) | MEM_ADDR(REG_ADDRL));
-      break;
-    case INST_STA_ABS:
-      DecodeWAbs(MEM_WRITE | MEM_OP1(REG_A) | MEM_ADDR(REG_ADDRL));
-      break;
-    case INST_STA_IZP_Y:
-      DecodeWIzpY(MEM_WRITE | MEM_OP1(REG_A) | MEM_ADDR(REG_ADDRL));
-      break;
-    case INST_STA_ZPX:
-      DecodeWZpR(MEM_WRITE | MEM_OP1(REG_A) | MEM_ADDR(REG_ADDRL), REG_X);
-      break;
-    case INST_STA_ABY:
-      DecodeWAbR(MEM_WRITE | MEM_OP1(REG_A) | MEM_ADDR(REG_ADDRL), REG_Y);
-      break;
-    case INST_STA_ABX:
-      DecodeWAbR(MEM_WRITE | MEM_OP1(REG_A) | MEM_ADDR(REG_ADDRL), REG_X);
-      break;
-    case INST_LDA_IZPX:
-      DecodeIzpx(DAT_MOV | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
-      break;
-    case INST_LDA_ZP:
-      DecodeZp(DAT_MOV | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
-      break;
-    case INST_LDA_IMM:
-      DecodeImm(DAT_MOV | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
-      break;
-    case INST_LDA_ABS:
-      DecodeAbs(DAT_MOV | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
-      break;
-    case INST_LDA_IZP_Y:
-      DecodeIzpY(DAT_MOV | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
-      break;
-    case INST_LDA_ZPX:
-      DecodeZpR(DAT_MOV | DAT_DST(REG_A) | DAT_SRC(REG_TMP1), REG_X);
-      break;
-    case INST_LDA_ABY:
-      DecodeAbR(DAT_MOV | DAT_DST(REG_A) | DAT_SRC(REG_TMP1), REG_Y);
-      break;
-    case INST_LDA_ABX:
-      DecodeAbR(DAT_MOV | DAT_DST(REG_A) | DAT_SRC(REG_TMP1), REG_X);
-      break;
-    case INST_CMP_IZPX:
-      DecodeIzpx(DAT_CMP | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
-      break;
-    case INST_CMP_ZP:
-      DecodeZp(DAT_CMP | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
-      break;
-    case INST_CMP_IMM:
-      DecodeImm(DAT_CMP | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
-      break;
-    case INST_CMP_ABS:
-      DecodeAbs(DAT_CMP | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
-      break;
-    case INST_CMP_IZP_Y:
-      DecodeIzpY(DAT_CMP | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
-      break;
-    case INST_CMP_ZPX:
-      DecodeZpR(DAT_CMP | DAT_DST(REG_A) | DAT_SRC(REG_TMP1), REG_X);
-      break;
-    case INST_CMP_ABY:
-      DecodeAbR(DAT_CMP | DAT_DST(REG_A) | DAT_SRC(REG_TMP1), REG_Y);
-      break;
-    case INST_CMP_ABX:
-      DecodeAbR(DAT_CMP | DAT_DST(REG_A) | DAT_SRC(REG_TMP1), REG_X);
-      break;
-    case INST_SBC_IZPX:
-      DecodeIzpx(DAT_SBC | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
-      break;
-    case INST_SBC_ZP:
-      DecodeZp(DAT_SBC | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
-      break;
-    case INST_SBC_IMM:
-      DecodeImm(DAT_SBC | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
-      break;
-    case INST_SBC_ABS:
-      DecodeAbs(DAT_SBC | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
-      break;
-    case INST_SBC_IZP_Y:
-      DecodeIzpY(DAT_SBC | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
-      break;
-    case INST_SBC_ZPX:
-      DecodeZpR(DAT_SBC | DAT_DST(REG_A) | DAT_SRC(REG_TMP1), REG_X);
-      break;
-    case INST_SBC_ABY:
-      DecodeAbR(DAT_SBC | DAT_DST(REG_A) | DAT_SRC(REG_TMP1), REG_Y);
-      break;
-    case INST_SBC_ABX:
-      DecodeAbR(DAT_SBC | DAT_DST(REG_A) | DAT_SRC(REG_TMP1), REG_X);
-      break;
-    case INST_ASL_ZP:
-      DecodeRwZp(DAT_ASL | DAT_DST(REG_TMP1));
-      break;
-    case INST_ASL_ACC:
-      DecodeNomem(DAT_ASL | DAT_DST(REG_A));
-      break;
-    case INST_ASL_ABS:
-      DecodeRwAbs(DAT_ASL | DAT_DST(REG_TMP1));
-      break;
-    case INST_ASL_ZPX:
-      DecodeRwZpx(DAT_ASL | DAT_DST(REG_TMP1));
-      break;
-    case INST_ASL_ABX:
-      DecodeRwAbx(DAT_ASL | DAT_DST(REG_TMP1));
-      break;
-    case INST_ROL_ZP:
-      DecodeRwZp(DAT_ROL | DAT_DST(REG_TMP1));
-      break;
-    case INST_ROL_ACC:
-      DecodeNomem(DAT_ROL | DAT_DST(REG_A));
-      break;
-    case INST_ROL_ABS:
-      DecodeRwAbs(DAT_ROL | DAT_DST(REG_TMP1));
-      break;
-    case INST_ROL_ZPX:
-      DecodeRwZpx(DAT_ROL | DAT_DST(REG_TMP1));
-      break;
-    case INST_ROL_ABX:
-      DecodeRwAbx(DAT_ROL | DAT_DST(REG_TMP1));
-      break;
-    case INST_LSR_ZP:
-      DecodeRwZp(DAT_LSR | DAT_DST(REG_TMP1));
-      break;
-    case INST_LSR_ACC:
-      DecodeNomem(DAT_LSR | DAT_DST(REG_A));
-      break;
-    case INST_LSR_ABS:
-      DecodeRwAbs(DAT_LSR | DAT_DST(REG_TMP1));
-      break;
-    case INST_LSR_ZPX:
-      DecodeRwZpx(DAT_LSR | DAT_DST(REG_TMP1));
-      break;
-    case INST_LSR_ABX:
-      DecodeRwAbx(DAT_LSR | DAT_DST(REG_TMP1));
-      break;
-    case INST_ROR_ZP:
-      DecodeRwZp(DAT_ROR | DAT_DST(REG_TMP1));
-      break;
-    case INST_ROR_ACC:
-      DecodeNomem(DAT_ROR | DAT_DST(REG_A));
-      break;
-    case INST_ROR_ABS:
-      DecodeRwAbs(DAT_ROR | DAT_DST(REG_TMP1));
-      break;
-    case INST_ROR_ZPX:
-      DecodeRwZpx(DAT_ROR | DAT_DST(REG_TMP1));
-      break;
-    case INST_ROR_ABX:
-      DecodeRwAbx(DAT_ROR | DAT_DST(REG_TMP1));
-      break;
-    case INST_STX_ZP:
-      DecodeWZp(MEM_WRITE | MEM_OP1(REG_X) | MEM_ADDR(REG_ADDRL));
-      break;
-    case INST_STX_ABS:
-      DecodeWAbs(MEM_WRITE | MEM_OP1(REG_X) | MEM_ADDR(REG_ADDRL));
-      break;
-    case INST_STX_ZPY:
-      DecodeWZpR(MEM_WRITE | MEM_OP1(REG_X) | MEM_ADDR(REG_ADDRL), REG_Y);
-      break;
-    case INST_LDX_IMM:
-      DecodeImm(DAT_MOV | DAT_DST(REG_X) | DAT_SRC(REG_TMP1));
-      break;
-    case INST_LDX_ZP:
-      DecodeZp(DAT_MOV | DAT_DST(REG_X) | DAT_SRC(REG_TMP1));
-      break;
-    case INST_LDX_ABS:
-      DecodeAbs(DAT_MOV | DAT_DST(REG_X) | DAT_SRC(REG_TMP1));
-      break;
-    case INST_LDX_ZPY:
-      DecodeZpR(DAT_MOV | DAT_DST(REG_X) | DAT_SRC(REG_TMP1), REG_Y);
-      break;
-    case INST_LDX_ABY:
-      DecodeAbR(DAT_MOV | DAT_DST(REG_X) | DAT_SRC(REG_TMP1), REG_Y);
-      break;
-    case INST_DEC_ZP:
-      DecodeRwZp(DAT_DEC | DAT_DST(REG_TMP1));
-      break;
-    case INST_DEC_ABS:
-      DecodeRwAbs(DAT_DEC | DAT_DST(REG_TMP1));
-      break;
-    case INST_DEC_ZPX:
-      DecodeRwZpx(DAT_DEC | DAT_DST(REG_TMP1));
-      break;
-    case INST_DEC_ABX:
-      DecodeRwAbx(DAT_DEC | DAT_DST(REG_TMP1));
-      break;
-    case INST_INC_ZP:
-      DecodeRwZp(DAT_INC | DAT_DST(REG_TMP1));
-      break;
-    case INST_INC_ABS:
-      DecodeRwAbs(DAT_INC | DAT_DST(REG_TMP1));
-      break;
-    case INST_INC_ZPX:
-      DecodeRwZpx(DAT_INC | DAT_DST(REG_TMP1));
-      break;
-    case INST_INC_ABX:
-      DecodeRwAbx(DAT_INC | DAT_DST(REG_TMP1));
-      break;
-    case INST_BIT_ZP:
-      DecodeZp(DAT_BIT | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
-      break;
-    case INST_BIT_ABS:
-      DecodeAbs(DAT_BIT | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
-      break;
-    case INST_JMP:
-      state_->AddCycle(MEM_READ | MEM_OP1(REG_TMP1) | MEM_ADDR(REG_PCL)
-                     | PC_INC);
-      state_->AddCycle(MEM_READ | MEM_OP1(REG_PCH) | MEM_ADDR(REG_PCL) |
-                       DAT_MOVNF | DAT_DST(REG_PCL) | DAT_SRC(REG_TMP1));
-      state_->AddCycle(MEM_FETCH | PC_INC);
-      break;
-    case INST_JMPI:
-      state_->AddCycle(MEM_READ | MEM_OP1(REG_TMP1) | MEM_ADDR(REG_PCL)
-                     | PC_INC);
-      state_->AddCycle(MEM_READ | MEM_OP1(REG_TMP2) | MEM_ADDR(REG_PCL)
-                     | PC_INC);
-      state_->AddCycle(MEM_READ | MEM_OP1(REG_PCL) | MEM_ADDR(REG_TMP1));
-      state_->AddCycle(MEM_READ | MEM_OP1(REG_PCH) | MEM_ADDR(REG_TMP1)
-                                                   | MEM_OFST(1));
-      state_->AddCycle(MEM_FETCH | PC_INC);
-      break;
-    case INST_STY_ZP:
-      DecodeWZp(MEM_WRITE | MEM_OP1(REG_Y) | MEM_ADDR(REG_ADDRL));
-      break;
-    case INST_STY_ABS:
-      DecodeWAbs(MEM_WRITE | MEM_OP1(REG_Y) | MEM_ADDR(REG_ADDRL));
-      break;
-    case INST_STY_ZPX:
-      DecodeWZpR(MEM_WRITE | MEM_OP1(REG_Y) | MEM_ADDR(REG_ADDRL), REG_X);
-      break;
-    case INST_LDY_IMM:
-      DecodeImm(DAT_MOV | DAT_DST(REG_Y) | DAT_SRC(REG_TMP1));
-      break;
-    case INST_LDY_ZP:
-      DecodeZp(DAT_MOV | DAT_DST(REG_Y) | DAT_SRC(REG_TMP1));
-      break;
-    case INST_LDY_ABS:
-      DecodeAbs(DAT_MOV | DAT_DST(REG_Y) | DAT_SRC(REG_TMP1));
-      break;
-    case INST_LDY_ZPX:
-      DecodeZpR(DAT_MOV | DAT_DST(REG_Y) | DAT_SRC(REG_TMP1), REG_X);
-      break;
-    case INST_LDY_ABX:
-      DecodeAbR(DAT_MOV | DAT_DST(REG_Y) | DAT_SRC(REG_TMP1), REG_X);
-      break;
-    case INST_CPY_IMM:
-      DecodeImm(DAT_CMP | DAT_DST(REG_Y) | DAT_SRC(REG_TMP1));
-      break;
-    case INST_CPY_ZP:
-      DecodeZp(DAT_CMP | DAT_DST(REG_Y) | DAT_SRC(REG_TMP1));
-      break;
-    case INST_CPY_ABS:
-      DecodeAbs(DAT_CMP | DAT_DST(REG_Y) | DAT_SRC(REG_TMP1));
-      break;
-    case INST_CPX_IMM:
-      DecodeImm(DAT_CMP | DAT_DST(REG_X) | DAT_SRC(REG_TMP1));
-      break;
-    case INST_CPX_ZP:
-      DecodeZp(DAT_CMP | DAT_DST(REG_X) | DAT_SRC(REG_TMP1));
-      break;
-    case INST_CPX_ABS:
-      DecodeAbs(DAT_CMP | DAT_DST(REG_X) | DAT_SRC(REG_TMP1));
-      break;
-    case INST_BPL:
-    case INST_BMI:
-    case INST_BVC:
-    case INST_BVS:
-    case INST_BCC:
-    case INST_BCS:
-    case INST_BNE:
-    case INST_BEQ:
-      // The branch micro instruction handles all branches.
-      state_->AddCycle(MEM_READ | MEM_OP1(REG_TMP1) | MEM_ADDR(REG_PCL)
-                     | PC_INC);
-      state_->AddCycle(MEM_BRANCH);
-      break;
-    case INST_BRK:
-      state_->AddCycle(MEM_READ | MEM_OP1(REG_TMP2) | MEM_ADDR(REG_PCL)
-                     | PC_INC);
-      state_->AddCycle(MEM_WRITE | MEM_OP1(REG_PCH) | MEM_ADDR(REG_S)
-                     | DAT_DECNF | DAT_DST(REG_S));
-      state_->AddCycle(MEM_WRITE | MEM_OP1(REG_PCL) | MEM_ADDR(REG_S)
-                     | DAT_DECNF | DAT_DST(REG_S));
-      state_->AddCycle(MEM_BRK | DAT_DECNF | DAT_DST(REG_S));
-      break;
-    case INST_JSR:
-      state_->AddCycle(MEM_READ | MEM_OP1(REG_TMP1) | MEM_ADDR(REG_PCL)
-                     | PC_INC);
-      state_->AddCycle(MEM_NOP | DAT_NOP);
-      state_->AddCycle(MEM_WRITE | MEM_OP1(REG_PCH) | MEM_ADDR(REG_S)
-                     | DAT_DECNF | DAT_DST(REG_S));
-      state_->AddCycle(MEM_WRITE | MEM_OP1(REG_PCL) | MEM_ADDR(REG_S)
-                     | DAT_DECNF | DAT_DST(REG_S));
-      state_->AddCycle(MEM_READ | MEM_OP1(REG_PCH) | MEM_ADDR(REG_PCL)
-                     | DAT_MOVNF | DAT_DST(REG_PCL) | DAT_SRC(REG_TMP1));
-      state_->AddCycle(MEM_FETCH | PC_INC);
-      break;
-    case INST_RTI:
-      state_->AddCycle(MEM_READ | MEM_OP1(REG_TMP2) | MEM_ADDR(REG_PCL));
-      state_->AddCycle(DAT_INCNF | DAT_DST(REG_S));
-      state_->AddCycle(MEM_PLP | DAT_INCNF | DAT_DST(REG_S));
-      state_->AddCycle(MEM_READ | MEM_OP1(REG_PCL) | MEM_ADDR(REG_S)
-                     | DAT_INCNF | DAT_DST(REG_S));
-      state_->AddCycle(MEM_READ | MEM_OP1(REG_PCH) | MEM_ADDR(REG_S));
-      state_->AddCycle(MEM_FETCH | PC_INC);
-      break;
-    case INST_RTS:
-      state_->AddCycle(MEM_READ | MEM_OP1(REG_TMP2) | MEM_ADDR(REG_PCL));
-      state_->AddCycle(DAT_INCNF | DAT_DST(REG_S));
-      state_->AddCycle(MEM_READ | MEM_OP1(REG_PCL) | MEM_ADDR(REG_S)
-                     | DAT_INCNF | DAT_DST(REG_S));
-      state_->AddCycle(MEM_READ | MEM_OP1(REG_PCH) | MEM_ADDR(REG_S));
-      state_->AddCycle(PC_INC);
-      state_->AddCycle(MEM_FETCH | PC_INC);
-      break;
-    case INST_PHP:
-      DecodePush(MEM_PHP);
-      break;
-    case INST_PHA:
-      DecodePush(MEM_WRITE | MEM_OP1(REG_A) | MEM_ADDR(REG_S));
-      break;
-    case INST_PLP:
-      DecodePull(MEM_PLP);
-      break;
-    case INST_PLA:
-      DecodePull(MEM_READ | MEM_OP1(REG_TMP1) | MEM_ADDR(REG_S)
-               | DAT_MOV | DAT_DST(REG_A) | DAT_SRC(REG_TMP1));
-      break;
-    case INST_SEC:
-      DecodeNomem(DAT_SET | DAT_MASK(P_FLAG_C));
-      break;
-    case INST_SEI:
-      DecodeNomem(DAT_SET | DAT_MASK(P_FLAG_I));
-      break;
-    case INST_SED:
-      DecodeNomem(DAT_SET | DAT_MASK(P_FLAG_D));
-      break;
-    case INST_CLI:
-      DecodeNomem(DAT_CLS | DAT_MASK(P_FLAG_I));
-      break;
-    case INST_CLC:
-      DecodeNomem(DAT_CLS | DAT_MASK(P_FLAG_C));
-      break;
-    case INST_CLD:
-      DecodeNomem(DAT_CLS | DAT_MASK(P_FLAG_D));
-      break;
-    case INST_CLV:
-      DecodeNomem(DAT_CLS | DAT_MASK(P_FLAG_V));
-      break;
-    case INST_DEY:
-      DecodeNomem(DAT_DEC | DAT_DST(REG_Y));
-      break;
-    case INST_DEX:
-      DecodeNomem(DAT_DEC | DAT_DST(REG_X));
-      break;
-    case INST_INY:
-      DecodeNomem(DAT_INC | DAT_DST(REG_Y));
-      break;
-    case INST_INX:
-      DecodeNomem(DAT_INC | DAT_DST(REG_X));
-      break;
-    case INST_TAY:
-      DecodeNomem(DAT_MOV | DAT_DST(REG_Y) | DAT_SRC(REG_A));
-      break;
-    case INST_TYA:
-      DecodeNomem(DAT_MOV | DAT_DST(REG_A) | DAT_SRC(REG_Y));
-      break;
-    case INST_TXA:
-      DecodeNomem(DAT_MOV | DAT_DST(REG_A) | DAT_SRC(REG_X));
-      break;
-    case INST_TXS:
-      DecodeNomem(DAT_MOVNF | DAT_DST(REG_S) | DAT_SRC(REG_X));
-      break;
-    case INST_TAX:
-      DecodeNomem(DAT_MOV | DAT_DST(REG_X) | DAT_SRC(REG_A));
-      break;
-    case INST_TSX:
-      DecodeNomem(DAT_MOV | DAT_DST(REG_X) | DAT_SRC(REG_S));
-      break;
-    case INST_NOP:
-      DecodeNomem(MEM_NOP | DAT_NOP);
-      break;
-    default:
-      printf("Instruction %x is not implemented\n", regs_->inst);
-      abort();
-  }
-  return;
-}
-
-/*
- * Queues an indexed indirect zero page read instruction using the given
- * micro operation.
- */
-void Cpu::DecodeIzpx(CpuOperation op) {
-  state_->AddCycle(MEM_READZP | MEM_OP1(REG_TMP1) | MEM_ADDR(REG_PCL) | PC_INC);
-  state_->AddCycle(MEM_READ | MEM_OP1(REG_ADDRL) | MEM_ADDR(REG_TMP1)
-                 | DAT_ADD | DAT_DST(REG_TMP1) | DAT_SRC(REG_X));
-  state_->AddCycle(MEM_READ | MEM_OP1(REG_ADDRL) | MEM_ADDR(REG_TMP1));
-  state_->AddCycle(MEM_READ | MEM_OP1(REG_ADDRH) | MEM_ADDR(REG_TMP1)
-                                                 | MEM_OFST(1));
-  state_->AddCycle(MEM_READ | MEM_OP1(REG_TMP1) | MEM_ADDR(REG_ADDRL));
-  state_->AddCycle(MEM_FETCH | op | PC_INC);
-  return;
-}
-
-/*
- * Queues a zero page read instruction using the given micro operation.
- */
-void Cpu::DecodeZp(CpuOperation op) {
-  state_->AddCycle(MEM_READZP | MEM_OP1(REG_ADDRL) | MEM_ADDR(REG_PCL)
-                 | PC_INC);
-  state_->AddCycle(MEM_READ | MEM_OP1(REG_TMP1) | MEM_ADDR(REG_ADDRL));
-  state_->AddCycle(MEM_FETCH | op | PC_INC);
-  return;
-}
-
-/*
- * Queues a read immediate instruction using the given micro operation.
- */
-void Cpu::DecodeImm(CpuOperation op) {
-  state_->AddCycle(MEM_READ | MEM_OP1(REG_TMP1) | MEM_ADDR(REG_PCL) | PC_INC);
-  state_->AddCycle(MEM_FETCH | op | PC_INC);
-  return;
-}
-
-/*
- * Queues an absolute addressed read instruction using the given micro
- * operation.
- */
-void Cpu::DecodeAbs(CpuOperation op) {
-  state_->AddCycle(MEM_READ | MEM_OP1(REG_ADDRL) | MEM_ADDR(REG_PCL) | PC_INC);
-  state_->AddCycle(MEM_READ | MEM_OP1(REG_ADDRH) | MEM_ADDR(REG_PCL) | PC_INC);
-  state_->AddCycle(MEM_READ | MEM_OP1(REG_TMP1) | MEM_ADDR(REG_ADDRL));
-  state_->AddCycle(MEM_FETCH | op | PC_INC);
-  return;
-}
-
-/*
- * Queues an indirect indexed zero page read instruction using the given micro
- * operation.
- */
-void Cpu::DecodeIzpY(CpuOperation op) {
-  state_->AddCycle(MEM_READZP | MEM_OP1(REG_TMP1) | MEM_ADDR(REG_PCL) | PC_INC);
-  state_->AddCycle(MEM_READ | MEM_OP1(REG_ADDRL) | MEM_ADDR(REG_TMP1));
-  state_->AddCycle(MEM_READ | MEM_OP1(REG_ADDRH) | MEM_ADDR(REG_TMP1)
-                                                 | MEM_OFST(1)
-                 | DAT_ADD | DAT_DST(REG_ADDRL) | DAT_SRC(REG_Y));
-  state_->AddCycle(MEM_READ | MEM_OP1(REG_TMP1) | MEM_ADDR(REG_ADDRL)
-                 | DAT_VFIX | DAT_DST(REG_ADDRH) | DAT_SRC(REG_TMP2));
-  state_->AddCycle(MEM_FETCH | op | PC_INC);
-  return;
-}
-
-/*
- * Queues a zero page reg indexed read instruction using the given micro
- * operation.
- */
-void Cpu::DecodeZpR(CpuOperation op, CpuReg reg) {
-  state_->AddCycle(MEM_READZP | MEM_OP1(REG_ADDRL) | MEM_ADDR(REG_PCL)
-                 | PC_INC);
-  state_->AddCycle(MEM_READ | MEM_OP1(REG_TMP1) | MEM_ADDR(REG_ADDRL)
-                 | DAT_ADD | DAT_DST(REG_ADDRL) | DAT_SRC(reg));
-  state_->AddCycle(MEM_READ | MEM_OP1(REG_TMP1) | MEM_ADDR(REG_ADDRL));
-  state_->AddCycle(MEM_FETCH | op | PC_INC);
-  return;
-}
-
-/*
- * Queues an absolute addressed reg indexed read instruction using the given
- * micro operation.
- */
-void Cpu::DecodeAbR(CpuOperation op, CpuReg reg) {
-  state_->AddCycle(MEM_READ | MEM_OP1(REG_ADDRL) | MEM_ADDR(REG_PCL) | PC_INC);
-  state_->AddCycle(MEM_READ | MEM_OP1(REG_ADDRH) | MEM_ADDR(REG_PCL)
-                 | DAT_ADD | DAT_DST(REG_ADDRL) | DAT_SRC(reg) | PC_INC);
-  state_->AddCycle(MEM_READ | MEM_OP1(REG_TMP1) | MEM_ADDR(REG_ADDRL)
-                 | DAT_VFIX | DAT_DST(REG_ADDRH) | DAT_SRC(REG_TMP2));
-  state_->AddCycle(MEM_FETCH | op | PC_INC);
-  return;
-}
-
-/*
- * Queues an implied (no memory access) read instruction using the given
- * micro operation.
- */
-void Cpu::DecodeNomem(CpuOperation op) {
-  state_->AddCycle(MEM_READ | MEM_OP1(REG_TMP2) | MEM_ADDR(REG_PCL));
-  state_->AddCycle(MEM_FETCH | op | PC_INC);
-  return;
-}
-
-/*
- * Queues a zero page read-write instruction using the given micro operation.
- */
-void Cpu::DecodeRwZp(CpuOperation op) {
-  state_->AddCycle(MEM_READZP | MEM_OP1(REG_ADDRL) | MEM_ADDR(REG_PCL)
-                 | PC_INC);
-  state_->AddCycle(MEM_READ | MEM_OP1(REG_TMP1) | MEM_ADDR(REG_ADDRL));
-  state_->AddCycle(MEM_WRITE | MEM_OP1(REG_TMP1) | MEM_ADDR(REG_ADDRL) | op);
-  state_->AddCycle(MEM_WRITE | MEM_OP1(REG_TMP1) | MEM_ADDR(REG_ADDRL));
-  state_->AddCycle(MEM_FETCH | PC_INC);
-  return;
-}
-
-/*
- * Queues an absolute addressed read-write instruction using the given micro
- * operation.
- */
-void Cpu::DecodeRwAbs(CpuOperation op) {
-  state_->AddCycle(MEM_READ | MEM_OP1(REG_ADDRL) | MEM_ADDR(REG_PCL) | PC_INC);
-  state_->AddCycle(MEM_READ | MEM_OP1(REG_ADDRH) | MEM_ADDR(REG_PCL) | PC_INC);
-  state_->AddCycle(MEM_READ | MEM_OP1(REG_TMP1) | MEM_ADDR(REG_ADDRL));
-  state_->AddCycle(MEM_WRITE | MEM_OP1(REG_TMP1) | MEM_ADDR(REG_ADDRL) | op);
-  state_->AddCycle(MEM_WRITE | MEM_OP1(REG_TMP1) | MEM_ADDR(REG_ADDRL));
-  state_->AddCycle(MEM_FETCH | PC_INC);
-  return;
-}
-
-/*
- * Queues a zero page X indexed read-write instruction using the given micro
- * operation.
- */
-void Cpu::DecodeRwZpx(CpuOperation op) {
-  state_->AddCycle(MEM_READZP | MEM_OP1(REG_ADDRL) | MEM_ADDR(REG_PCL)
-                 | PC_INC);
-  state_->AddCycle(MEM_READ | MEM_OP1(REG_TMP1) | MEM_ADDR(REG_ADDRL)
-                 | DAT_ADD | DAT_DST(REG_ADDRL) | DAT_SRC(REG_X));
-  state_->AddCycle(MEM_READ | MEM_OP1(REG_TMP1) | MEM_ADDR(REG_ADDRL));
-  state_->AddCycle(MEM_WRITE | MEM_OP1(REG_TMP1) | MEM_ADDR(REG_ADDRL) | op);
-  state_->AddCycle(MEM_WRITE | MEM_OP1(REG_TMP1) | MEM_ADDR(REG_ADDRL));
-  state_->AddCycle(MEM_FETCH | PC_INC);
-  return;
-}
-
-/*
- * Queues an absolute addressed X indexed read-write instruction using the
- * given micro operation.
- */
-void Cpu::DecodeRwAbx(CpuOperation op) {
-  state_->AddCycle(MEM_READ | MEM_OP1(REG_ADDRL) | MEM_ADDR(REG_PCL) | PC_INC);
-  state_->AddCycle(MEM_READ | MEM_OP1(REG_ADDRH) | MEM_ADDR(REG_PCL)
-                 | DAT_ADD | DAT_DST(REG_ADDRL) | DAT_SRC(REG_X) | PC_INC);
-  state_->AddCycle(MEM_READ | MEM_OP1(REG_TMP1) | MEM_ADDR(REG_ADDRL)
-                 | DAT_ADD | DAT_DST(REG_ADDRH) | DAT_SRC(REG_TMP2));
-  state_->AddCycle(MEM_READ | MEM_OP1(REG_TMP1) | MEM_ADDR(REG_ADDRL));
-  state_->AddCycle(MEM_WRITE | MEM_OP1(REG_TMP1) | MEM_ADDR(REG_ADDRL) | op);
-  state_->AddCycle(MEM_WRITE | MEM_OP1(REG_TMP1) | MEM_ADDR(REG_ADDRL));
-  state_->AddCycle(MEM_FETCH | PC_INC);
-  return;
-}
-
-/*
- * Queues an X indexed indirect zero page write instruction using the given
- * micro operation.
- */
-void Cpu::DecodeWIzpx(CpuOperation op) {
-  state_->AddCycle(MEM_READZP | MEM_OP1(REG_TMP1) | MEM_ADDR(REG_PCL) | PC_INC);
-  state_->AddCycle(MEM_READ | MEM_OP1(REG_ADDRL) | MEM_ADDR(REG_TMP1)
-                 | DAT_ADD | DAT_DST(REG_TMP1) | DAT_SRC(REG_X));
-  state_->AddCycle(MEM_READ | MEM_OP1(REG_ADDRL) | MEM_ADDR(REG_TMP1));
-  state_->AddCycle(MEM_READ | MEM_OP1(REG_ADDRH) | MEM_ADDR(REG_TMP1)
-                                                 | MEM_OFST(1));
-  state_->AddCycle(op);
-  state_->AddCycle(MEM_FETCH | PC_INC);
-  return;
-}
-
-/*
- * Queues a zero page write instruction using the given micro operation.
- */
-void Cpu::DecodeWZp(CpuOperation op) {
-  state_->AddCycle(MEM_READZP | MEM_OP1(REG_ADDRL) | MEM_ADDR(REG_PCL)
-                 | PC_INC);
-  state_->AddCycle(op);
-  state_->AddCycle(MEM_FETCH | PC_INC);
-  return;
-}
-
-/*
- * Queues an absolute addressed write instruction using the given micro
- * operation.
- */
-void Cpu::DecodeWAbs(CpuOperation op) {
-  state_->AddCycle(MEM_READ | MEM_OP1(REG_ADDRL) | MEM_ADDR(REG_PCL) | PC_INC);
-  state_->AddCycle(MEM_READ | MEM_OP1(REG_ADDRH) | MEM_ADDR(REG_PCL) | PC_INC);
-  state_->AddCycle(op);
-  state_->AddCycle(MEM_FETCH | PC_INC);
-  return;
-}
-
-/*
- * Queues an indirect addressed Y indexed zero page write instruction using the
- * given micro operation.
- */
-void Cpu::DecodeWIzpY(CpuOperation op) {
-  state_->AddCycle(MEM_READZP | MEM_OP1(REG_TMP1) | MEM_ADDR(REG_PCL) | PC_INC);
-  state_->AddCycle(MEM_READ | MEM_OP1(REG_ADDRL) | MEM_ADDR(REG_TMP1));
-  state_->AddCycle(MEM_READ | MEM_OP1(REG_ADDRH) | MEM_ADDR(REG_TMP1)
-                                                 | MEM_OFST(1)
-                 | DAT_ADD | DAT_DST(REG_ADDRL) | DAT_SRC(REG_Y));
-  state_->AddCycle(MEM_READ | MEM_OP1(REG_TMP1) | MEM_ADDR(REG_ADDRL)
-                 | DAT_ADD | DAT_DST(REG_ADDRH) | DAT_SRC(REG_TMP2));
-  state_->AddCycle(op);
-  state_->AddCycle(MEM_FETCH | PC_INC);
-  return;
-}
-
-/*
- * Queues a reg indexed zero page write instruction using the given micro
- * operation.
- */
-void Cpu::DecodeWZpR(CpuOperation op, CpuReg reg) {
-  state_->AddCycle(MEM_READZP | MEM_OP1(REG_ADDRL) | MEM_ADDR(REG_PCL)
-                 | PC_INC);
-  state_->AddCycle(MEM_READ | MEM_OP1(REG_TMP1) | MEM_ADDR(REG_ADDRL)
-                 | DAT_ADD | DAT_DST(REG_ADDRL) | DAT_SRC(reg));
-  state_->AddCycle(op);
-  state_->AddCycle(MEM_FETCH | PC_INC);
-  return;
-}
-
-/*
- * Queues an absolute addressed reg indexed write instruction using the given
- * micro operation.
- */
-void Cpu::DecodeWAbR(CpuOperation op, CpuReg reg) {
-  state_->AddCycle(MEM_READ | MEM_OP1(REG_ADDRL) | MEM_ADDR(REG_PCL) | PC_INC);
-  state_->AddCycle(MEM_READ | MEM_OP1(REG_ADDRH) | MEM_ADDR(REG_PCL)
-                 | DAT_ADD | DAT_DST(REG_ADDRL) | DAT_SRC(reg) | PC_INC);
-  state_->AddCycle(MEM_READ | MEM_OP1(REG_TMP1) | MEM_ADDR(REG_ADDRL)
-                 | DAT_ADD | DAT_DST(REG_ADDRH) | DAT_SRC(REG_TMP2));
-  state_->AddCycle(op);
-  state_->AddCycle(MEM_FETCH | PC_INC);
-  return;
-}
-
-/*
- * Queues a stack push instruction using the given micro operation.
- */
-void Cpu::DecodePush(CpuOperation op) {
-  state_->AddCycle(MEM_READ | MEM_OP1(REG_TMP2) | MEM_ADDR(REG_PCL));
-  state_->AddCycle(op | DAT_DECNF | DAT_DST(REG_S));
-  state_->AddCycle(MEM_FETCH | PC_INC);
-  return;
-}
-
-/*
- * Queues a stack pull instruction using the given micro operation.
- */
-void Cpu::DecodePull(CpuOperation op) {
-  state_->AddCycle(MEM_READ | MEM_OP1(REG_TMP2) | MEM_ADDR(REG_PCL));
-  state_->AddCycle(DAT_INCNF | DAT_DST(REG_S));
-  state_->AddCycle(op);
-  state_->AddCycle(MEM_FETCH | PC_INC);
   return;
 }
 
@@ -1513,5 +768,5 @@ void Cpu::PollIrqLine(void) {
  */
 Cpu::~Cpu(void) {
   delete regs_;
-  delete state_;
+  delete code_table_;
 }

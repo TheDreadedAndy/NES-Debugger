@@ -132,10 +132,15 @@ void Emulation::SyncFrameRate(void) {
   if (TimeGt(&wait_spec, &current_time)) {
     TimeDiff(&wait_spec, &current_time, &diff);
     nanosleep(&diff, NULL);
-  }
 
-  // Update the last call time.
-  TimeGet(&last_sync_time_);
+    // Update the last call time with the target of the wait spec.
+    last_sync_time_.tv_sec = wait_spec.tv_sec;
+    last_sync_time_.tv_nsec = wait_spec.tv_nsec;
+  } else {
+    // If we didn't meet timing, we just update the time and return.
+    last_sync_time_.tv_sec = current_time.tv_sec;
+    last_sync_time_.tv_nsec = current_time.tv_nsec;
+  }
 
   return;
 }

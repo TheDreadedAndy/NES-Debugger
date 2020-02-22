@@ -8,18 +8,20 @@
 #include "../memory/memory.h"
 #include "../sdl/renderer.h"
 
-// The number of secondary sprite buffers used during rendering.
-#define NUM_SOAM_BUFFERS 2U
-
-// The number of bit planes per PPU tile data.
-#define PPU_BIT_PLANES 2U
-
 /*
  * Emulates the graphics chip of the NES, executing a clock cycle whenever
  * RunCycle is called.
  */
 class Ppu {
   private:
+    // Constants for the SOAM buffer.
+    static const size_t kNumSoamBuffers_ = 2;
+
+    // Constants for the tile buffer.
+    static const size_t kTileBufferSize_ = 16;
+    static const size_t kTileBufferMask_ = 0xF;
+    static const size_t kTilePlanes_ = 2;
+
     // Internal PPU registers.
     DoubleWord vram_addr_ = 0;
     DoubleWord temp_vram_addr_ = 0;
@@ -39,15 +41,14 @@ class Ppu {
     DataWord *primary_oam_;
     DataWord soam_eval_buf_ = 1;
     DataWord soam_render_buf_ = 0;
-    DataWord *soam_buffer_[NUM_SOAM_BUFFERS];
+    DataWord *soam_buffer_[kNumSoamBuffers_];
     DataWord *oam_buffer_;
 
     // Temporary storage used in rendering.
-    MultiWord tile_scroll_[PPU_BIT_PLANES];
-    DataWord next_tile_[PPU_BIT_PLANES];
-    DataWord palette_scroll_[PPU_BIT_PLANES];
-    DataWord palette_latch_[PPU_BIT_PLANES];
-    DataWord next_palette_[PPU_BIT_PLANES];
+    DataWord tile_buffer_[kTileBufferSize_];
+    DataWord tile_buffer_pos_ = 0;
+    DataWord next_tile_[kTilePlanes_];
+    DataWord next_palette_;
 
     // MDR and write toggle, used for 2-cycle r/w system.
     DataWord mdr_ = 0;
@@ -78,10 +79,9 @@ class Ppu {
     void RenderVisible(void);
     void RenderUpdateFrame(bool output);
     void RenderDrawPixel(void);
-    DataWord RenderGetTilePattern(void);
-    DataWord RenderGetTilePalette(void);
     void RenderUpdateRegisters(void);
-    void RenderGetAttribute(void);
+    void RenderUpdateTileBuffer(void);
+    DataWord RenderGetAttribute(void);
     DataWord RenderGetTile(DataWord index, bool plane_high);
     void RenderUpdateHori(void);
     void RenderDummyNametableAccess(void);

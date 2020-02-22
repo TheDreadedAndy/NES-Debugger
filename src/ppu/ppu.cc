@@ -87,6 +87,7 @@
 // Used, during rendering, to determine which piece of the tile should be
 // loaded on a given cycle.
 #define REG_UPDATE_MASK 0x07U
+#define REG_APPLY_UPDATES 0U
 #define REG_FETCH_NT 1U
 #define REG_FETCH_AT 3U
 #define REG_FETCH_TILE_LOW 5U
@@ -407,17 +408,16 @@ void Ppu::RenderDrawPixel(void) {
   size_t screen_x = current_cycle_ - 1;
   size_t screen_y = current_scanline_;
 
-  // Holds the background color index.
-  DataWord bg_pattern = 0;
-
   // Holds the address of the pixel to be drawn.
   DoubleWord pixel_addr = 0;
 
   // Get the background tile data.
+  bool bg_transparent = true;
   if ((mask_ & FLAG_RENDER_BG) && ((screen_x >= 8)
                                || (mask_ & FLAG_LEFT_BG))) {
-    bg_pattern = RenderGetTilePattern();
-    pixel_addr = (bg_pattern) ? bg_pattern | RenderGetTilePalette() : 0;
+    pixel_addr = tile_buffer_[(tile_buffer_pos_ + fine_x_) & kTileBufferMask_];
+    bg_transparent = !(pixel_addr & 0x03);
+    pixel_addr = (bg_transparent) ? 0 : pixel_addr;
   }
 
   // Pull the sprite from the buffer and check if it should be rendered.
@@ -428,7 +428,7 @@ void Ppu::RenderDrawPixel(void) {
 
   // Check if this counts as a sprite 0 hit.
   if (render_sprites && (sprite_buf & FLAG_SOAM_BUFFER_ZERO)
-                     && (bg_pattern != 0) && (screen_x != 255)) {
+                     && !bg_transparent && (screen_x != 255)) {
     status_ |= FLAG_HIT;
   }
 
@@ -438,7 +438,7 @@ void Ppu::RenderDrawPixel(void) {
   if ((current_scanline_ < 8) || (current_scanline_ >= 232)) { return; }
 
   // Check if the pixel should be rendered on top of the background.
-  if (render_sprites && ((bg_pattern == 0)
+  if (render_sprites && (bg_transparent
                      || !(sprite_buf & FLAG_SOAM_BUFFER_PRIORITY))) {
     pixel_addr = sprite_buf & FLAG_SOAM_BUFFER_PALETTE;
   }
@@ -450,57 +450,24 @@ void Ppu::RenderDrawPixel(void) {
 }
 
 /*
- * Pulls the next background tile pattern from the shift registers.
- */
-DataWord Ppu::RenderGetTilePattern(void) {
-  // Get the pattern of the background tile.
-  DataWord pattern = (((tile_scroll_[0].w[WORD_HI] << fine_x_) >> 7U) & 1U)
-                   | (((tile_scroll_[1].w[WORD_HI] << fine_x_) >> 6U) & 2U);
-  return pattern;
-}
-
-/*
- * Gets the palette index of the current background tile from the shift
- * registers.
- *
- * Assumes the current tile pattern is non-zero.
- */
-DataWord Ppu::RenderGetTilePalette(void) {
-  // Get the palette of the background tile.
-  DataWord palette = (((palette_scroll_[0] << fine_x_) >> 7U) & 1U)
-                   | (((palette_scroll_[1] << fine_x_) >> 6U) & 2U);
-  return palette << 2U;
-}
-
-/*
  * Updates the background tile data shift registers based on the current cycle.
  * It takes 8 cycles to fully load in an 8x1 region for 1 tile.
  */
 void Ppu::RenderUpdateRegisters(void) {
-  // Shift the tile registers.
-  tile_scroll_[0].dw = tile_scroll_[0].dw << 1;
-  tile_scroll_[1].dw = tile_scroll_[1].dw << 1;
-
-  // Shift the pattern registers.
-  palette_scroll_[0] = (palette_scroll_[0] << 1) | (palette_latch_[0]);
-  palette_scroll_[1] = (palette_scroll_[1] << 1) | (palette_latch_[1]);
-
-  // Reload the queued bits if the queue should now be empty.
-  if ((current_cycle_ & 0x7) == 0) {
-    tile_scroll_[0].w[WORD_LO] = next_tile_[0];
-    tile_scroll_[1].w[WORD_LO] = next_tile_[1];
-    palette_latch_[0] = next_palette_[0];
-    palette_latch_[1] = next_palette_[1];
-  }
+  // Update the tile buffer position.
+  tile_buffer_pos_ = (tile_buffer_pos_ + 1) & kTileBufferMask_;
 
   // Determine which of the 8 cycles is being executed.
   switch (current_cycle_ & REG_UPDATE_MASK) {
+    case REG_APPLY_UPDATES:
+      RenderUpdateTileBuffer();
+      break;
     case REG_FETCH_NT:
       mdr_ = memory_->VramRead((vram_addr_ & VRAM_NT_ADDR_MASK)
                                            | PPU_NT_OFFSET);
       break;
     case REG_FETCH_AT:
-      RenderGetAttribute();
+      next_palette_ = RenderGetAttribute();
       break;
     case REG_FETCH_TILE_LOW:
       next_tile_[0] = RenderGetTile(mdr_, false);
@@ -516,10 +483,40 @@ void Ppu::RenderUpdateRegisters(void) {
 }
 
 /*
- * Uses the current vram address and cycle/scanline position to load
- * attribute palette bits from the nametable into the next_palette variable.
+ * Updates the tile buffer with the next 8 pixels of palette and tile data.
  */
-void Ppu::RenderGetAttribute(void) {
+void Ppu::RenderUpdateTileBuffer(void) {
+  // Weaves the two planes of tile data into one variable.
+  DataWord odd_tile_data = ((next_tile_[0] & 0xAA) >> 1)
+                         | (next_tile_[1] & 0xAA);
+  DataWord even_tile_data = (next_tile_[0] & 0x55)
+                          | ((next_tile_[1] & 0x55) << 1);
+
+  // Prepare the palette data to be buffered and get the buffer position.
+  DataWord palette_latch = next_palette_ << 2;
+  DataWord buffer_pos = (tile_buffer_pos_ - 1) & kTileBufferMask_;
+
+  // Add the tile data to the buffer. Each tile index is two bits.
+  for (int i = 0; i < 4; i++) {
+    // Add the even tile to the buffer.
+    tile_buffer_[buffer_pos] = (even_tile_data & 0x3U) | palette_latch;
+    even_tile_data >>= 2;
+    buffer_pos = (buffer_pos - 1) & kTileBufferMask_;
+
+    // Add the odd tile to the buffer.
+    tile_buffer_[buffer_pos] = (odd_tile_data & 0x3U) | palette_latch;
+    odd_tile_data >>= 2;
+    buffer_pos = (buffer_pos - 1) & kTileBufferMask_;
+  }
+
+  return;
+}
+
+/*
+ * Uses the current vram address and cycle/scanline position to load
+ * attribute palette bits from the nametable.
+ */
+DataWord Ppu::RenderGetAttribute(void) {
   // Get the coarse x and y from vram.
   DoubleWord coarse_x = vram_addr_ & COARSE_X_MASK;
   DoubleWord coarse_y = (vram_addr_ & COARSE_Y_MASK) >> 5;
@@ -535,13 +532,7 @@ void Ppu::RenderGetAttribute(void) {
   // Isolate the color bits for the current quadrent the screen is drawing to.
   DataWord attribute_x_shift = coarse_x & 2U;
   DataWord attribute_y_shift = (coarse_y & 2U) << 1;
-  attribute = attribute >> (attribute_x_shift | attribute_y_shift);
-
-  // Update the color palette bits using the attribute.
-  next_palette_[0] = attribute & 1U;
-  next_palette_[1] = (attribute >> 1U) & 1U;
-
-  return;
+  return (attribute >> (attribute_x_shift | attribute_y_shift)) & 3U;
 }
 
 /*

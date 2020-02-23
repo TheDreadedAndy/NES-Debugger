@@ -8,3 +8,4 @@ ndb.cfg
 build
 .directory
 perf.*
+inst_table.bin

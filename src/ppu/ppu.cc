@@ -1035,11 +1035,10 @@ DataWord Ppu::Read(DoubleWord reg_addr) {
       }
       MmioVramAddrInc();
       break;
-    case OAM_DATA_ACCESS:
-      fprintf(stderr, "OAM DATA READ\n");
     case PPU_CTRL_ACCESS:
     case PPU_MASK_ACCESS:
     case OAM_ADDR_ACCESS:
+    case OAM_DATA_ACCESS:
     case PPU_SCROLL_ACCESS:
     case PPU_ADDR_ACCESS:
     default:

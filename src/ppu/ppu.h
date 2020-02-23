@@ -37,12 +37,10 @@ class Ppu {
     DataWord oam_addr_ = 0;
 
     // Working memory for the PPU.
-    DataWord oam_mask_ = 0;
     DataWord *primary_oam_;
     DataWord soam_eval_buf_ = 1;
     DataWord soam_render_buf_ = 0;
     DataWord *soam_buffer_[kNumSoamBuffers_];
-    DataWord *oam_buffer_;
 
     // Temporary storage used in rendering.
     DataWord tile_buffer_[kTileBufferSize_];
@@ -92,7 +90,6 @@ class Ppu {
     void RenderUpdateVert(void);
     void EvalClearSoam(void);
     void EvalSprites(void);
-    DataWord OamRead(void);
     bool EvalInRange(DataWord sprite_y);
     void EvalFillSoamBuffer(DataWord *sprite_data, bool is_zero);
     void EvalGetSprite(DataWord *sprite_data, DataWord *pat_lo,

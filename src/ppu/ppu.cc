@@ -170,7 +170,6 @@ Ppu::Ppu(void) {
   primary_oam_ = new DataWord[PRIMARY_OAM_SIZE]();
   soam_buffer_[0] = new DataWord[SOAM_BUFFER_SIZE]();
   soam_buffer_[1] = new DataWord[SOAM_BUFFER_SIZE]();
-  oam_buffer_ = new DataWord[OAM_BUFFER_SIZE]();
 
   return;
 }
@@ -262,9 +261,6 @@ bool Ppu::IsDisabled(void) {
  * Performs any PPU actions which cannot be disabled.
  */
 void Ppu::Disabled(void) {
-  // The OAM mask should not be active when rendering is disabled.
-  oam_mask_ = 0;
-
   // Determine which action should be performed.
   if ((current_scanline_ >= 8) && (current_scanline_ < 232)) {
     // Draws the background color to the screen when rendering is disabled.
@@ -324,11 +320,6 @@ void Ppu::Render(void) {
  * Performs the current cycles action for a rendering scanline.
  */
 void Ppu::RenderVisible(void) {
-  // Sprite evaluation can raise an internal signal that forces OAM reads
-  // to return 0xFF. In the emulation, this signal is reset each cycle and
-  // set by ppu_eval_clear_soam() when it needs to be raised.
-  oam_mask_ = 0x00;
-
   /*
    * Determine which phase of rendering the scanline is in.
    * The first cycle may finish a read, when coming from a pre-render scanline
@@ -494,19 +485,19 @@ void Ppu::RenderUpdateTileBuffer(void) {
 
   // Prepare the palette data to be buffered and get the buffer position.
   DataWord palette_latch = next_palette_ << 2;
-  DataWord buffer_pos = (tile_buffer_pos_ - 1) & kTileBufferMask_;
+  DataWord buffer_pos = tile_buffer_pos_ ^ 0x8U;
 
   // Add the tile data to the buffer. Each tile index is two bits.
   for (int i = 0; i < 4; i++) {
-    // Add the even tile to the buffer.
-    tile_buffer_[buffer_pos] = (even_tile_data & 0x3U) | palette_latch;
-    even_tile_data >>= 2;
-    buffer_pos = (buffer_pos - 1) & kTileBufferMask_;
-
     // Add the odd tile to the buffer.
-    tile_buffer_[buffer_pos] = (odd_tile_data & 0x3U) | palette_latch;
-    odd_tile_data >>= 2;
-    buffer_pos = (buffer_pos - 1) & kTileBufferMask_;
+    tile_buffer_[buffer_pos++] = ((odd_tile_data >> 6) & 0x3U) | palette_latch;
+    odd_tile_data <<= 2;
+    buffer_pos &= kTileBufferMask_;
+
+    // Add the even tile to the buffer.
+    tile_buffer_[buffer_pos++] = ((even_tile_data >> 6) & 0x3U) | palette_latch;
+    even_tile_data <<= 2;
+    buffer_pos &= kTileBufferMask_;
   }
 
   return;
@@ -685,10 +676,6 @@ void Ppu::RenderUpdateVert(void) {
  * Sets every value in secondary OAM to 0xFF. Used in sprite evaluation.
  */
 void Ppu::EvalClearSoam(void) {
-  // An internal signal which makes all primary OAM reads return 0xFF should
-  // be raised during this phase of sprite evaluation.
-  oam_mask_ = 0xFF;
-
   // In the real PPU, SOAM is cleared by writing 0xFF every even cycle.
   // It is more cache efficient, however, to do it all at once here.
   if (current_cycle_ == 1) {
@@ -711,45 +698,31 @@ void Ppu::EvalSprites(void) {
   // As an optimization, sprite evaluation is run only once per scanline.
   if (current_cycle_ != 65) { return; }
 
-  // Run sprite evaluation. This loop fills both the OAM read buffer,
-  // which returns the correct values read from OAM each cycle on request
-  // from the CPU. Additionally, this loop fills the SOAM scanline buffer,
+  // Run sprite evaluation. This loop fills the SOAM scanline buffer,
   // which contains one byte of sprite data for each pixel to be rendered.
   size_t i = oam_addr_;
-  size_t sim_cycle = 0;
   size_t sprites_found = 0;
   while (i < PRIMARY_OAM_SIZE) {
     // Read in the sprite and check if it was in range.
-    oam_buffer_[sim_cycle] = primary_oam_[i];
     if (sprites_found >= 8) {
       // More than 8 sprites have been found, so spirte overflow begins.
-      if (EvalInRange(oam_buffer_[sim_cycle])) {
-        // Flag that overflow occured, and fill the rest of the OAM buffer.
+      if (EvalInRange(primary_oam_[i])) {
+        // Flag that overflow occured.
         // FIXME: Should not be set immediately.
         status_ |= FLAG_OVERFLOW;
-        for (; sim_cycle < OAM_BUFFER_SIZE; sim_cycle++) {
-          oam_buffer_[sim_cycle] = primary_oam_[i];
-        }
         break;
       } else {
         // Sprite overflow is bugged, and does not increment correctly.
-        sim_cycle++;
         i += 5;
       }
-    } else if (EvalInRange(oam_buffer_[sim_cycle])) {
-      // If it was, read it into the OAM buffer and add it to the scanline
-      // buffer.
+    } else if (EvalInRange(primary_oam_[i])) {
+      // If it was, read it into the scanline buffer.
       sprites_found++;
-      for (int j = 0; j < 4; j++) {
-        oam_buffer_[sim_cycle] = primary_oam_[i];
-        i++;
-      }
-      EvalFillSoamBuffer(&(primary_oam_[i - 4]),
-                        (i - 4) == oam_addr_);
+      EvalFillSoamBuffer(&(primary_oam_[i]), i == oam_addr_);
+      i += 4;
     } else {
       // Otherwise, the sprite was out of range, so we move on.
       i += 4;
-      sim_cycle++;
     }
   }
   oam_addr_ = i;
@@ -874,10 +847,9 @@ void Ppu::EvalGetSprite(DataWord *sprite_data, DataWord *pat_lo,
  */
 void Ppu::EvalFetchSprites(void) {
   if (current_cycle_ == 257) {
-    // In place switch.
-    soam_eval_buf_ ^= soam_render_buf_;
-    soam_render_buf_ ^= soam_eval_buf_;
-    soam_eval_buf_ ^= soam_render_buf_;
+    // Switch the soam buffers.
+    soam_eval_buf_ = !soam_eval_buf_;
+    soam_render_buf_ = !soam_render_buf_;
   }
 
   return;
@@ -1050,9 +1022,6 @@ DataWord Ppu::Read(DoubleWord reg_addr) {
       status_ &= ~FLAG_VBLANK;
       write_toggle_ = false;
       break;
-    case OAM_DATA_ACCESS:
-      bus_ = OamRead();
-      break;
     case PPU_DATA_ACCESS:
       // Reading from mappable VRAM (not the palette) returns the value to an
       // internal bus.
@@ -1066,6 +1035,8 @@ DataWord Ppu::Read(DoubleWord reg_addr) {
       }
       MmioVramAddrInc();
       break;
+    case OAM_DATA_ACCESS:
+      fprintf(stderr, "OAM DATA READ\n");
     case PPU_CTRL_ACCESS:
     case PPU_MASK_ACCESS:
     case OAM_ADDR_ACCESS:
@@ -1097,22 +1068,6 @@ void Ppu::OamDma(DataWord val) {
 }
 
 /*
- * Reads a byte from primary OAM, accounting for the internal signal which may
- * force the value to 0xFF.
- */
-DataWord Ppu::OamRead(void) {
-  // If the PPU is in the middle of sprite rendering, we return the buffered
-  // value that would of been read on this cycle.
-  if ((current_scanline_ < 240) && (current_cycle_ > 64)
-                                && (current_cycle_ <= 256)) {
-    return oam_buffer_[(current_cycle_ - 1) >> 1];
-  } else {
-    // Otherwise, we return the value in OAM at the current address.
-    return primary_oam_[oam_addr_] | oam_mask_;
-  }
-}
-
-/*
  * Deletes the given PPU class.
  */
 Ppu::~Ppu() {
@@ -1120,7 +1075,6 @@ Ppu::~Ppu() {
   delete[] primary_oam_;
   delete[] soam_buffer_[0];
   delete[] soam_buffer_[1];
-  delete[] oam_buffer_;
 
   return;
 }

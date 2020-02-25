@@ -47,14 +47,10 @@
 #define PPU_STATUS_MASK 0xE0U
 
 // Flag masks for the PPU mask register.
-#define FLAG_FOCUS_BLUE 0x80U
-#define FLAG_FOCUS_GREEN 0x40U
-#define FLAG_FOCUS_RED 0x20U
 #define FLAG_RENDER_SPRITES 0x10U
 #define FLAG_RENDER_BG 0x08U
 #define FLAG_LEFT_SPRITES 0x04U
 #define FLAG_LEFT_BG 0x02U
-#define FLAG_GREYSCALE 0x01U
 
 // Flag masks for the PPU control register.
 #define FLAG_ENABLE_VBLANK 0x80U
@@ -166,7 +162,8 @@ Ppu::Ppu(void) {
   current_cycle_ = 0;
   frame_odd_ = false;
 
-  // Allocate the sprite renderering buffers.
+  // Allocate the renderering buffers.
+  render_buffer_ = new Pixel[kScreenWidth_]();
   primary_oam_ = new DataWord[PRIMARY_OAM_SIZE]();
   soam_buffer_[0] = new DataWord[SOAM_BUFFER_SIZE]();
   soam_buffer_[1] = new DataWord[SOAM_BUFFER_SIZE]();
@@ -232,20 +229,24 @@ size_t Ppu::Schedule(void) {
  *
  * Assumes Connect() has already been called.
  */
-void Ppu::RunCycle(void) {
+void Ppu::RunSchedule(size_t cycles) {
   // Check if rendering has been disabled by the software.
+  size_t delta = 0;
   if (IsDisabled()) {
-    Disabled();
+    while (cycles > 0) {
+      delta = UpdateCounters(cycles);
+      Disabled(delta);
+    }
   } else {
-    // Render video using the current scanline/cycle.
-    Render();
+    // Otherwise, render video normally.
+    while (cycles > 0) {
+      delta = UpdateCounters(cycles);
+      Render(delta);
+    }
   }
 
   // Pull the NMI line high if one should be generated.
   Signal();
-
-  // Increment the cycle/scanline counters.
-  Inc();
 
   return;
 }
@@ -258,17 +259,52 @@ bool Ppu::IsDisabled(void) {
 }
 
 /*
+ * Takes in a number of cycles which must be run, and uses them to return
+ * how many cycles should be completed to either reach that number or finish
+ * the current scanline. Updates the number of cycles which should be executed.
+ */
+size_t Ppu::UpdateCounters(size_t &cycles) {
+  // FIXME: Where is current_cycle_ being updated?
+  // Determine if we are on a scanline which will terminate early.
+  size_t exec = 0;
+  size_t cycle_max;
+  if (!frame_odd_ && (current_scanline >= 261) && !IsDisabled()) {
+    cycle_max = 340;
+  } else {
+    // Otherwise, we perform the normal calculation.
+    cycle_max = 341;
+  }
+
+  // Calculate how many cycles the user should run to finish this scanline.
+  exec = MIN(cycle_max - current_cycle_, cycles);
+
+  // Update the scanline counter and user cycles remaining.
+  cycles -= exec;
+  current_scanline_ += ((exec + current_cycle_) == cycle_max);
+
+  // Wrap the scanline and toggle the frame if it is time to do so.
+  if (current_scanline_ > 261) {
+    current_scanline_ = 0;
+    frame_odd_ = !frame_odd_;
+  }
+
+  return;
+}
+
+/*
  * Performs any PPU actions which cannot be disabled.
  */
-void Ppu::Disabled(void) {
+void Ppu::Disabled(size_t delta) {
   // Determine which action should be performed.
-  if ((current_scanline_ >= 8) && (current_scanline_ < 232)) {
+  if ((current_scanline_ >= 8) && (current_scanline_ < 232)
+       && (current_cycle_ > 0) && (current_cycle_ <= 256)) {
     // Draws the background color to the screen when rendering is disabled.
-    if ((current_cycle_ > 0) && (current_cycle_ < 257)) { DrawBackground(); }
+    DrawBackground(delta);
   } else if ((current_scanline_ >= 240) && (current_scanline_ < 261)) {
     // Signals the start of vblanks.
-    RenderBlank();
-  } else if ((current_scanline_ >= 261) && (current_cycle_ == 1)) {
+    RenderBlank(delta);
+  } else if ((current_scanline_ >= 261) && (current_cycle_ <= 1)
+         && ((current_cycle_ + delta) > 1)) {
     // Resets the status register during the pre-render scanline.
     status_ = 0;
   }
@@ -281,11 +317,14 @@ void Ppu::Disabled(void) {
  *
  * Assumes PPU rendering is disabled.
  */
-void Ppu::DrawBackground(void) {
+void Ppu::DrawBackground(size_t delta) {
   // Get the universal background color address and the screen position.
   size_t screen_x = current_cycle_ - 1;
   size_t screen_y = current_scanline_;
   DoubleWord color_addr = 0;
+
+  // Determine how many pixels should be rendered
+  size_t num_pixels = MIN(256 - screen_x, delta);
 
   // The universal background color can be changed using the current vram
   // address.
@@ -293,8 +332,10 @@ void Ppu::DrawBackground(void) {
     color_addr = vram_addr_ & PALETTE_ADDR_MASK;
   }
 
-  // Render the pixel.
-  renderer_->Pixel(screen_y, screen_x, pixel_data_[color_addr]);
+  // Render the background.
+  Pixel bg_color = pixel_data[color_addr];
+  for (int i = 0; i < num_pixels; i++) { pixel_buffer_[i] = bg_color; }
+  renderer_->Pixel(screen_y, screen_x, pixel_buffer_, num_pixels);
 
   return;
 }
@@ -303,57 +344,70 @@ void Ppu::DrawBackground(void) {
 /*
  * Runs the rendering action for the given cycle/scanline.
  */
-void Ppu::Render(void) {
+void Ppu::Render(size_t delta) {
   // Determine which scanline we're on and render accordingly.
   if (current_scanline_ < 240) {
-    RenderVisible();
+    RenderVisible(delta);
   } else if (current_scanline_ < 261) {
-    RenderBlank();
+    RenderBlank(delta);
   } else {
-    RenderPre();
+    RenderPre(delta);
   }
 
   return;
 }
 
 /*
- * Performs the current cycles action for a rendering scanline.
+ * Performs the requested number of cycles for a visible scanline.
  */
-void Ppu::RenderVisible(void) {
-  /*
-   * Determine which phase of rendering the scanline is in.
-   * The first cycle may finish a read, when coming from a pre-render scanline
-   * on an odd frame.
-   */
-  if (current_cycle_ == 0) {
-    // Finish the garbage nametable write that got skipped.
-    if (mdr_write_) { RenderDummyNametableAccess(); }
-  } else if (current_cycle_ <= 64) {
-    // Draw a pixel in the frame.
-    RenderUpdateFrame(true);
-    // Clear SOAM for sprite evaluation.
+void Ppu::RenderVisible(size_t delta) {
+  // Finish the garbage nametable write that got skipped.
+  if ((current_cycle_ == 0) && (delta > 0)) { mdr_write = false; }
+
+  // Check if this delta should clear the SOAM buffer.
+  if ((current_cycle_ <= 1) && ((current_cycle_ + delta) > 1)) {
     EvalClearSoam();
-  } else if (current_cycle_ <= 256) {
-    // Draw a pixel in the frame.
-    RenderUpdateFrame(true);
-    // Evaluate the sprites on the next scanline.
-    EvalSprites();
-  } else if (current_cycle_ <= 320) {
+  }
+
+  // Update sprite evaluation for this scanline.
+  if ((((current_cycle_ > 64) && (current_cycle_ <= 256))
+    || (((current_cycle_ + delta) > 64) && ((current_cyle_ + delta) <= 256)))
+    && (delta > 0)) {
+    EvalSprites(delta);
+  }
+
+  // Draw the pixels for this scanline.
+  if ((((current_cycle_ >= 1) && (current_cycle_ <= 256))
+    || (((current_cycle_ + delta) >= 1) && ((current_cycle_ + delta) <= 256)))
+    && (delta > 0)) {
+    RenderUpdateFrame(delta, true);
+  }
+
+  // Updates the vram address and sprite buffers at the correct time.
+  if ((((current_cycle_ > 256) && (current_cycle_ <= 320))
+    || (((current_cycle_ + delta) > 256) && ((current_cycle_ + delta) <= 320)))
+    && (delta > 0)) {
     // On cycle 257, the horizontal vram position is loaded from the temp vram
     // address register. As an optmization, sprite fetching is run only on this
     // cycle.
-    if (current_cycle_ == 257) {
+    if (current_cycle_ <= 257) {
       RenderUpdateHori();
       EvalFetchSprites();
     }
     // The OAM addr is reset to zero during sprite prep, which has been
     // optimized out.
     oam_addr_ = 0;
-  } else if (current_cycle_ <= 336) {
+  }
+
+  // TODO
+  if (current_cycle_ <= 336) {
     // Fetch the background tile data for the next cycle.
     RenderUpdateRegisters();
     if ((current_cycle_ & 0x7) == 0) { RenderXinc(); }
-  } else if (current_cycle_ > 336 && current_cycle_ <= 340) {
+  }
+
+  // TODO
+  if (current_cycle_ > 336 && current_cycle_ <= 340) {
     // Unused NT byte fetches, mappers may clock this.
     RenderDummyNametableAccess();
   }
@@ -620,8 +674,9 @@ void Ppu::RenderYinc(void) {
  * Performs the rendering action during vertical blank, which consists only
  * of signaling an NMI on (1,241).
  */
-void Ppu::RenderBlank(void) {
-  if (current_scanline_ == 241 && current_cycle_ == 1) {
+void Ppu::RenderBlank(size_t delta) {
+  if ((current_scanline_ == 241) && (current_cycle_ <= 1)
+                                 && ((current_cycle_ + delta) > 1)) {
     // TODO: Implement special case timing.
     status_ |= FLAG_VBLANK;
     renderer_->Frame();
@@ -678,10 +733,8 @@ void Ppu::RenderUpdateVert(void) {
 void Ppu::EvalClearSoam(void) {
   // In the real PPU, SOAM is cleared by writing 0xFF every even cycle.
   // It is more cache efficient, however, to do it all at once here.
-  if (current_cycle_ == 1) {
-    for (size_t i = 0; i < SOAM_BUFFER_SIZE; i++) {
-      soam_buffer_[soam_eval_buf_][i] = 0xFF;
-    }
+  for (size_t i = 0; i < SOAM_BUFFER_SIZE; i++) {
+    soam_buffer_[soam_eval_buf_][i] = 0xFF;
   }
 
   return;
@@ -862,32 +915,6 @@ void Ppu::Signal(void) {
   // NMIs should be generated when they are enabled in ppuctrl and
   // the ppu is in vblank.
   *nmi_line_ = (ctrl_ & FLAG_ENABLE_VBLANK) && (status_ & FLAG_VBLANK);
-  return;
-}
-
-/*
- * Increments the scanline, cycle, and frame type and correctly wraps them.
- * Each ppu frame has 341 cycles and 262 scanlines.
- */
-void Ppu::Inc(void) {
-  // Increment the cycle.
-  current_cycle_++;
-
-  // Increment the scanline if it is time to wrap the cycle.
-  if ((current_cycle_ > 340) || (!frame_odd_
-          && (current_cycle_ > 339) && (current_scanline_ >= 261)
-          && ((mask_ & FLAG_RENDER_BG)
-          || (mask_ & FLAG_RENDER_SPRITES)))) {
-    current_scanline_++;
-    current_cycle_ = 0;
-
-    // Wrap the scanline and toggle the frame if it is time to do so.
-    if (current_scanline_ > 261) {
-      current_scanline_ = 0;
-      frame_odd_ = !frame_odd_;
-    }
-  }
-
   return;
 }
 

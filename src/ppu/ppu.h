@@ -17,7 +17,8 @@ class Ppu {
     // Constants for the SOAM buffer.
     static const size_t kNumSoamBuffers_ = 2;
 
-    // Constants for the tile buffer.
+    // Constants for rendering.
+    static const size_t kScreenWidth_ = 256;
     static const size_t kTileBufferSize_ = 16;
     static const size_t kTileBufferMask_ = 0xF;
     static const size_t kTilePlanes_ = 2;
@@ -43,6 +44,7 @@ class Ppu {
     DataWord *soam_buffer_[kNumSoamBuffers_];
 
     // Temporary storage used in rendering.
+    Pixel *render_buffer_;
     DataWord tile_buffer_[kTileBufferSize_];
     DataWord tile_buffer_pos_ = 0;
     DataWord next_tile_[kTilePlanes_];
@@ -71,10 +73,11 @@ class Ppu {
 
     // Helper functions for the PPU emulation.
     bool IsDisabled(void);
-    void Disabled(void);
-    void DrawBackground(void);
-    void Render(void);
-    void RenderVisible(void);
+    size_t UpdateCounters(size_t &cycles);
+    void Disabled(size_t delta);
+    void DrawBackground(size_t delta);
+    void Render(size_t delta);
+    void RenderVisible(size_t delta);
     void RenderUpdateFrame(bool output);
     void RenderDrawPixel(void);
     void RenderUpdateRegisters(void);
@@ -85,8 +88,8 @@ class Ppu {
     void RenderDummyNametableAccess(void);
     void RenderXinc(void);
     void RenderYinc(void);
-    void RenderBlank(void);
-    void RenderPre(void);
+    void RenderBlank(size_t delta);
+    void RenderPre(size_t delta);
     void RenderUpdateVert(void);
     void EvalClearSoam(void);
     void EvalSprites(void);
@@ -96,7 +99,6 @@ class Ppu {
                                               DataWord *pat_hi);
     void EvalFetchSprites(void);
     void Signal(void);
-    void Inc(void);
     void MmioScrollWrite(DataWord val);
     void MmioAddrWrite(DataWord val);
     void MmioVramAddrInc(void);
@@ -112,9 +114,9 @@ class Ppu {
     // update the state of another chip. Used to schedule emulator execution.
     size_t Schedule(void);
 
-    // Runs the next emulated PPU cycle.
+    // Emulates the specified number of PPU cycles.
     // Connect() must be called before this function can be used.
-    void RunCycle(void);
+    void RunSchedule(size_t cycles);
 
     // Reads from a memory mapped PPU register.
     DataWord Read(DoubleWord reg_addr);

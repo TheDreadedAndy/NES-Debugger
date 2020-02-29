@@ -19,8 +19,7 @@ class Ppu {
 
     // Constants for rendering.
     static const size_t kScreenWidth_ = 256;
-    static const size_t kTileBufferSize_ = 16;
-    static const size_t kTileBufferMask_ = 0xF;
+    static const size_t kTileBufferSize_ = 264;
     static const size_t kTilePlanes_ = 2;
 
     // Internal PPU registers.
@@ -39,14 +38,12 @@ class Ppu {
 
     // Working memory for the PPU.
     DataWord *primary_oam_;
-    DataWord soam_eval_buf_ = 1;
     DataWord soam_render_buf_ = 0;
     DataWord *soam_buffer_[kNumSoamBuffers_];
 
     // Temporary storage used in rendering.
     Pixel *render_buffer_;
-    DataWord tile_buffer_[kTileBufferSize_];
-    DataWord tile_buffer_pos_ = 0;
+    DataWord *tile_buffer_;
     DataWord next_tile_[kTilePlanes_];
     DataWord next_palette_;
 
@@ -79,11 +76,11 @@ class Ppu {
     void Render(size_t delta);
     void RenderVisible(size_t delta);
     void RenderUpdateFrame(bool output);
-    void RenderDrawPixel(void);
-    void RenderUpdateRegisters(void);
+    void RenderFetchTiles(size_t delta, bool alt_buffer);
     void RenderUpdateTileBuffer(void);
     DataWord RenderGetAttribute(void);
     DataWord RenderGetTile(DataWord index, bool plane_high);
+    void RenderDrawPixels(size_t delta);
     void RenderUpdateHori(void);
     void RenderDummyNametableAccess(void);
     void RenderXinc(void);

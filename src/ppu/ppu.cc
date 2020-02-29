@@ -157,7 +157,6 @@
  */
 Ppu::Ppu(void) {
   // Prepare the ppu structure.
-  soam_eval_buf_ = 1;
   current_scanline_ = 261;
   current_cycle_ = 0;
   frame_odd_ = false;
@@ -392,136 +391,99 @@ void Ppu::RenderVisible(size_t delta) {
     // cycle.
     if (current_cycle_ <= 257) {
       RenderUpdateHori();
-      EvalFetchSprites();
+      soam_render_buf_ != soam_render_buf_;
     }
     // The OAM addr is reset to zero during sprite prep, which has been
     // optimized out.
     oam_addr_ = 0;
   }
 
-  // TODO
-  if (current_cycle_ <= 336) {
-    // Fetch the background tile data for the next cycle.
-    RenderUpdateRegisters();
-    if ((current_cycle_ & 0x7) == 0) { RenderXinc(); }
+  // Fetch the background tile data for the next scanline.
+  if ((((current_cycle > 320) && (current_cycle_ <= 336))
+    || (((current_cycle + delta) > 320) && ((current_cycle_ + delta) <= 336)))
+    && (delta > 0)) {
+    RenderUpdateRegisters(delta, true);
   }
 
-  // TODO
+  // Perform the unused nametable byte fetches. Some mappers may clock this.
   if (current_cycle_ > 336 && current_cycle_ <= 340) {
     // Unused NT byte fetches, mappers may clock this.
-    RenderDummyNametableAccess();
+    RenderDummyNametableAccess(delta);
   }
 
   return;
 }
 
 /*
- * Runs a PPU cycle during the drawing phase of a visible scanline.
- * This includes drawing a pixel to the screen, updating the shift registers,
- * and possibly incrementing the vram address.
+ * Executes the specified number of cycles in the drawing phase of the current
+ * scanline. No more than 257 - current_cycle_ cycles will be executed.
+ * The execution of these cycles includes filling the tile buffer, drawing
+ * pixels to the screen, and possibly incrementing the Y-coord of VRAM.
+ */
+void Ppu::RenderUpdateFrame(size_t delta, bool output) {
+  // Update the tile buffer.
+  RenderFetchTiles(delta, false);
+
+  // Render the pixels to the screen.
+  if (output) { RenderDrawPixels(delta); }
+
+  // On cycle 256, the vertical vram position is incremented.
+  if ((current_cycle_ <= 256) && ((current_cycle_ + delta) > 256)) {
+    RenderYinc();
+  }
+
+  return;
+}
+
+/*
+ * Fills the tile buffer for the given number of cycles.
+ * If alt_buffer is true, the tiles are placed at the beginning of the
+ * buffer for use with the next scanline.
  *
- * Assumes the PPU is currently between cycles 1 and 256 (inclusive) of a
- * visible scanline.
+ * Assumes the current cycle is either between (320, 336] or [1, 256].
  */
-void Ppu::RenderUpdateFrame(bool output) {
-  // Render the pixel.
-  if (output) { RenderDrawPixel(); }
-
-  // Update the background registers.
-  RenderUpdateRegisters();
-
-  // Update the vram address.
-  if ((current_cycle_ & 0x7) == 0) {
-    // Every 8 cycles, the horizontal vram position is incremented.
-    RenderXinc();
-    // On cycle 256, the vertical vram position is incremented.
-    if (current_cycle_ == 256) { RenderYinc(); }
+void Ppu::RenderFetchTiles(size_t delta, bool alt_buffer) {
+  // Determine if we are fetching tiles for the current or next scanline.
+  size_t phase_delta, buffer_pos;
+  if (alt_buffer) {
+    // Fetching for the next scanline.
+    phase_delta = MIN(337 - current_cycle_, delta);
+    buffer_pos = current_cycle - 320;
+  } else if (current_cycle <= 248) {
+    // Fetching for this scanline.
+    phase_delta = MIN(249 - current_cycle_, delta);
+    buffer_pos = current_cycle + 15; //FIXME: Think about this.
+  } else {
+    // Out of range for tile fetching.
+    return;
   }
 
-  return;
-}
-
-/*
- * Uses the shift registers and sprite memory to draw the current cycles
- * pixel to the screen
- *
- * Assumes the PPU is currently running a cycle between 1 and 256 (inclusive)
- * of a visible scanline.
- */
-void Ppu::RenderDrawPixel(void) {
-  // Get the screen position.
-  size_t screen_x = current_cycle_ - 1;
-  size_t screen_y = current_scanline_;
-
-  // Holds the address of the pixel to be drawn.
-  DoubleWord pixel_addr = 0;
-
-  // Get the background tile data.
-  bool bg_transparent = true;
-  if ((mask_ & FLAG_RENDER_BG) && ((screen_x >= 8)
-                               || (mask_ & FLAG_LEFT_BG))) {
-    pixel_addr = tile_buffer_[(tile_buffer_pos_ + fine_x_) & kTileBufferMask_];
-    bg_transparent = !(pixel_addr & 0x03);
-    pixel_addr = (bg_transparent) ? 0 : pixel_addr;
-  }
-
-  // Pull the sprite from the buffer and check if it should be rendered.
-  DataWord sprite_buf = soam_buffer_[soam_render_buf_][screen_x];
-  bool render_sprites = ((sprite_buf != 0xFF) && (mask_ & FLAG_RENDER_SPRITES)
-                      && ((screen_x >= 8) || (mask_ & FLAG_LEFT_SPRITES))
-                      && (sprite_buf & FLAG_SOAM_BUFFER_PATTERN));
-
-  // Check if this counts as a sprite 0 hit.
-  if (render_sprites && (sprite_buf & FLAG_SOAM_BUFFER_ZERO)
-                     && !bg_transparent && (screen_x != 255)) {
-    status_ |= FLAG_HIT;
-  }
-
-  // Check if the pixel is on a scanline that is displayed.
-  // We run this check now because flags can still be set on a line that isn't
-  // displayed.
-  if ((current_scanline_ < 8) || (current_scanline_ >= 232)) { return; }
-
-  // Check if the pixel should be rendered on top of the background.
-  if (render_sprites && (bg_transparent
-                     || !(sprite_buf & FLAG_SOAM_BUFFER_PRIORITY))) {
-    pixel_addr = sprite_buf & FLAG_SOAM_BUFFER_PALETTE;
-  }
-
-  // Get and render the pixel.
-  renderer_->Pixel(screen_y, screen_x, pixel_data_[pixel_addr]);
-
-  return;
-}
-
-/*
- * Updates the background tile data shift registers based on the current cycle.
- * It takes 8 cycles to fully load in an 8x1 region for 1 tile.
- */
-void Ppu::RenderUpdateRegisters(void) {
-  // Update the tile buffer position.
-  tile_buffer_pos_ = (tile_buffer_pos_ + 1) & kTileBufferMask_;
-
-  // Determine which of the 8 cycles is being executed.
-  switch (current_cycle_ & REG_UPDATE_MASK) {
-    case REG_APPLY_UPDATES:
-      RenderUpdateTileBuffer();
-      break;
-    case REG_FETCH_NT:
-      mdr_ = memory_->VramRead((vram_addr_ & VRAM_NT_ADDR_MASK)
-                                           | PPU_NT_OFFSET);
-      break;
-    case REG_FETCH_AT:
-      next_palette_ = RenderGetAttribute();
-      break;
-    case REG_FETCH_TILE_LOW:
-      next_tile_[0] = RenderGetTile(mdr_, false);
-      break;
-    case REG_FETCH_TILE_HIGH:
-      next_tile_[1] = RenderGetTile(mdr_, true);
-      break;
-    default:
-      break;
+  // Execute the requested cycles.
+  for (size_t i = buffer_pos; i < buffer_pos + phase_delta; i++) {
+    // The PPU loads in a tile over the course of 8 cycles.
+    switch (i & REG_UPDATE_MASK) {
+      case REG_APPLY_UPDATES:
+        // We need to align the address before we can use it to update
+        // the tile buffer.
+        RenderUpdateTileBuffer(i & ~(0x7UL));
+        RenderXinc();
+        break;
+      case REG_FETCH_NT:
+        mdr_ = memory_->VramRead((vram_addr_ & VRAM_NT_ADDR_MASK)
+                                             | PPU_NT_OFFSET);
+        break;
+      case REG_FETCH_AT:
+        next_palette_ = RenderGetAttribute();
+        break;
+      case REG_FETCH_TILE_LOW:
+        next_tile_[0] = RenderGetTile(mdr_, false);
+        break;
+      case REG_FETCH_TILE_HIGH:
+        next_tile_[1] = RenderGetTile(mdr_, true);
+        break;
+      default:
+        break;
+    }
   }
 
   return;
@@ -530,28 +492,25 @@ void Ppu::RenderUpdateRegisters(void) {
 /*
  * Updates the tile buffer with the next 8 pixels of palette and tile data.
  */
-void Ppu::RenderUpdateTileBuffer(void) {
+void Ppu::RenderUpdateTileBuffer(size_t buffer_pos) {
   // Weaves the two planes of tile data into one variable.
   DataWord odd_tile_data = ((next_tile_[0] & 0xAA) >> 1)
                          | (next_tile_[1] & 0xAA);
   DataWord even_tile_data = (next_tile_[0] & 0x55)
                           | ((next_tile_[1] & 0x55) << 1);
 
-  // Prepare the palette data to be buffered and get the buffer position.
+  // Prepare the palette data to be buffered.
   DataWord palette_latch = next_palette_ << 2;
-  DataWord buffer_pos = tile_buffer_pos_ ^ 0x8U;
 
   // Add the tile data to the buffer. Each tile index is two bits.
   for (int i = 0; i < 4; i++) {
     // Add the odd tile to the buffer.
     tile_buffer_[buffer_pos++] = ((odd_tile_data >> 6) & 0x3U) | palette_latch;
     odd_tile_data <<= 2;
-    buffer_pos &= kTileBufferMask_;
 
     // Add the even tile to the buffer.
     tile_buffer_[buffer_pos++] = ((even_tile_data >> 6) & 0x3U) | palette_latch;
     even_tile_data <<= 2;
-    buffer_pos &= kTileBufferMask_;
   }
 
   return;
@@ -602,6 +561,59 @@ DataWord Ppu::RenderGetTile(DataWord index, bool plane_high) {
   // Calculate the vram address of the tile byte and return the tile byte.
   DoubleWord tile_address = tile_table | tile_index | tile_plane | tile_offset;
   return memory_->VramRead(tile_address);
+}
+
+/*
+ * Uses the shift registers and sprite memory to draw the current cycles
+ * pixel to the screen
+ *
+ * Assumes the PPU is currently running a cycle between 1 and 256 (inclusive)
+ * of a visible scanline.
+ */
+void Ppu::RenderDrawPixels(size_t delta) {
+  // Get the screen position.
+  size_t screen_x = current_cycle_ - 1;
+  size_t screen_y = current_scanline_;
+
+  // Holds the address of the pixel to be drawn.
+  DoubleWord pixel_addr = 0;
+
+  // Get the background tile data.
+  bool bg_transparent = true;
+  if ((mask_ & FLAG_RENDER_BG) && ((screen_x >= 8)
+                               || (mask_ & FLAG_LEFT_BG))) {
+    pixel_addr = tile_buffer_[(tile_buffer_pos_ + fine_x_) & kTileBufferMask_];
+    bg_transparent = !(pixel_addr & 0x03);
+    pixel_addr = (bg_transparent) ? 0 : pixel_addr;
+  }
+
+  // Pull the sprite from the buffer and check if it should be rendered.
+  DataWord sprite_buf = soam_buffer_[soam_render_buf_][screen_x];
+  bool render_sprites = ((sprite_buf != 0xFF) && (mask_ & FLAG_RENDER_SPRITES)
+                      && ((screen_x >= 8) || (mask_ & FLAG_LEFT_SPRITES))
+                      && (sprite_buf & FLAG_SOAM_BUFFER_PATTERN));
+
+  // Check if this counts as a sprite 0 hit.
+  if (render_sprites && (sprite_buf & FLAG_SOAM_BUFFER_ZERO)
+                     && !bg_transparent && (screen_x != 255)) {
+    status_ |= FLAG_HIT;
+  }
+
+  // Check if the pixel is on a scanline that is displayed.
+  // We run this check now because flags can still be set on a line that isn't
+  // displayed.
+  if ((current_scanline_ < 8) || (current_scanline_ >= 232)) { return; }
+
+  // Check if the pixel should be rendered on top of the background.
+  if (render_sprites && (bg_transparent
+                     || !(sprite_buf & FLAG_SOAM_BUFFER_PRIORITY))) {
+    pixel_addr = sprite_buf & FLAG_SOAM_BUFFER_PALETTE;
+  }
+
+  // Get and render the pixel.
+  renderer_->Pixel(screen_y, screen_x, pixel_data_[pixel_addr]);
+
+  return;
 }
 
 /*
@@ -704,7 +716,6 @@ void Ppu::RenderPre(void) {
   } else if (current_cycle_ > 320 && current_cycle_ <= 336) {
     // Fetch the background tile data for the next cycle.
     RenderUpdateRegisters();
-    if ((current_cycle_ & 0x7) == 0) { RenderXinc(); }
   } else if (current_cycle_ > 336 && current_cycle_ <= 340) {
     // Unused NT byte fetches, mappers may clock this.
     RenderDummyNametableAccess();
@@ -734,7 +745,7 @@ void Ppu::EvalClearSoam(void) {
   // In the real PPU, SOAM is cleared by writing 0xFF every even cycle.
   // It is more cache efficient, however, to do it all at once here.
   for (size_t i = 0; i < SOAM_BUFFER_SIZE; i++) {
-    soam_buffer_[soam_eval_buf_][i] = 0xFF;
+    soam_buffer_[!soam_render_buf_][i] = 0xFF;
   }
 
   return;
@@ -824,9 +835,9 @@ void Ppu::EvalFillSoamBuffer(DataWord *sprite_data, bool is_zero) {
                          && (i < SOAM_BUFFER_SIZE); i++) {
     // The sprite pixel should only be added to the buffer if no other sprite
     // has been rendered to that pixel.
-    DataWord buf_byte = soam_buffer_[soam_eval_buf_][i];
+    DataWord buf_byte = soam_buffer_[!soam_render_buf_][i];
     if ((buf_byte == 0xFF) || !(buf_byte & FLAG_SOAM_BUFFER_PATTERN))  {
-      soam_buffer_[soam_eval_buf_][i] = base_byte
+      soam_buffer_[!soam_render_buf_][i] = base_byte
                                       | ((pat_hi >> 6U) & 2U)
                                       | ((pat_lo >> 7U) & 1U);
     }
@@ -890,19 +901,6 @@ void Ppu::EvalGetSprite(DataWord *sprite_data, DataWord *pat_lo,
   if (sprite_data[2] & FLAG_SPRITE_HFLIP) {
     *pat_lo = ReverseWord(*pat_lo);
     *pat_hi = ReverseWord(*pat_hi);
-  }
-
-  return;
-}
-
-/*
- * Switches the active sprite scanline buffers once per scanline.
- */
-void Ppu::EvalFetchSprites(void) {
-  if (current_cycle_ == 257) {
-    // Switch the soam buffers.
-    soam_eval_buf_ = !soam_eval_buf_;
-    soam_render_buf_ = !soam_render_buf_;
   }
 
   return;

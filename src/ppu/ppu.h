@@ -20,7 +20,20 @@ class Ppu {
     // Constants for rendering.
     static const size_t kScreenWidth_ = 256;
     static const size_t kTileBufferSize_ = 264;
+    static const size_t kTileWidth_ = 8
     static const size_t kTilePlanes_ = 2;
+
+    // Used to buffer the sprites for the next scanline.
+    struct SoamSprite {
+      DataWord pixel[kTileWidth_];
+      DataWord xpos;
+      bool on_top;
+    };
+    struct SoamBuffer {
+      SoamSprite sprites[kSoamSize_];
+      DataWord num_sprites;
+      bool has_zero;
+    };
 
     // Internal PPU registers.
     DoubleWord vram_addr_ = 0;

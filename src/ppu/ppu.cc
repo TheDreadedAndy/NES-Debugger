@@ -449,10 +449,11 @@ void Ppu::RenderFetchTiles(size_t delta, bool alt_buffer) {
     // Fetching for the next scanline.
     phase_delta = MIN(337 - current_cycle_, delta);
     buffer_pos = current_cycle - 320;
-  } else if (current_cycle <= 248) {
+  } else if (current_cycle <= 255) {
     // Fetching for this scanline.
-    phase_delta = MIN(249 - current_cycle_, delta);
-    buffer_pos = current_cycle + 15; //FIXME: Think about this.
+    // Cycle 256 is skipped, as that tile is unused.
+    phase_delta = MIN(256 - current_cycle_, delta);
+    buffer_pos = current_cycle + 15;
   } else {
     // Out of range for tile fetching.
     return;
@@ -465,7 +466,7 @@ void Ppu::RenderFetchTiles(size_t delta, bool alt_buffer) {
       case REG_APPLY_UPDATES:
         // We need to align the address before we can use it to update
         // the tile buffer.
-        RenderUpdateTileBuffer(i & ~(0x7UL));
+        RenderUpdateTileBuffer(i - 8);
         RenderXinc();
         break;
       case REG_FETCH_NT:
@@ -503,13 +504,19 @@ void Ppu::RenderUpdateTileBuffer(size_t buffer_pos) {
   DataWord palette_latch = next_palette_ << 2;
 
   // Add the tile data to the buffer. Each tile index is two bits.
+  // If the tile pattern is zero, the palette of that pixel is zero'd out.
+  DataWord pattern;
   for (int i = 0; i < 4; i++) {
     // Add the odd tile to the buffer.
-    tile_buffer_[buffer_pos++] = ((odd_tile_data >> 6) & 0x3U) | palette_latch;
+    pattern = ((odd_tile_data >> 6) & 0x3U);
+    pattern = (pattern) ? pattern | palette_latch : pattern;
+    tile_buffer_[buffer_pos++] = pattern;
     odd_tile_data <<= 2;
 
     // Add the even tile to the buffer.
-    tile_buffer_[buffer_pos++] = ((even_tile_data >> 6) & 0x3U) | palette_latch;
+    pattern = ((even_tile_data >> 6) & 0x3U);
+    pattern = (pattern) ? pattern | palette_latch : pattern;
+    tile_buffer_[buffer_pos++] = pattern;
     even_tile_data <<= 2;
   }
 
@@ -571,47 +578,87 @@ DataWord Ppu::RenderGetTile(DataWord index, bool plane_high) {
  * of a visible scanline.
  */
 void Ppu::RenderDrawPixels(size_t delta) {
-  // Get the screen position.
+  // Get the rendering information.
   size_t screen_x = current_cycle_ - 1;
   size_t screen_y = current_scanline_;
+  size_t num_pixels = MIN(257 - current_cycle_, delta);
+  SoamBuffer *soam_buf = &(soam_buffer_[soam_render_buf_]);
 
-  // Holds the address of the pixel to be drawn.
-  DoubleWord pixel_addr = 0;
+  // Used to find a range for sprite scanning.
+  size_t sp_lo, sp_hi;
 
-  // Get the background tile data.
-  bool bg_transparent = true;
-  if ((mask_ & FLAG_RENDER_BG) && ((screen_x >= 8)
-                               || (mask_ & FLAG_LEFT_BG))) {
-    pixel_addr = tile_buffer_[(tile_buffer_pos_ + fine_x_) & kTileBufferMask_];
-    bg_transparent = !(pixel_addr & 0x03);
-    pixel_addr = (bg_transparent) ? 0 : pixel_addr;
+  // If we're on a scanline hidden by overscan, we need only check for
+  // a sprite-zero hit.
+  if ((current_scanline_ < 8) || (current_scanline_ >= 232)) {
+    if ((soam_buf->num_sprites > 0) && soam_buf->has_zero) {
+      SoamSprite *zero = &(soam_buf->sprites[0]);
+      sp_lo = MAX(zero->xpos, screen_x);
+      sp_hi = MIN(zero->xpos + 8, MIN(screen_x + num_pixels, 255));
+      for (size_t i = 0; sp_lo + i < sp_hi; i++) {
+        if ((zero->pixel[i]) && (tile_buffer_[sp_lo + i + fine_x_])) {
+          status_ |= FLAG_HIT;
+        }
+      }
+    }
+    return;
   }
 
-  // Pull the sprite from the buffer and check if it should be rendered.
-  DataWord sprite_buf = soam_buffer_[soam_render_buf_][screen_x];
-  bool render_sprites = ((sprite_buf != 0xFF) && (mask_ & FLAG_RENDER_SPRITES)
-                      && ((screen_x >= 8) || (mask_ & FLAG_LEFT_SPRITES))
-                      && (sprite_buf & FLAG_SOAM_BUFFER_PATTERN));
+  // Prepare the buffers used to render data.
+  DataWord line_buf[kScreenWidth_];
+  Pixel pixel_buf[kScreenWidth_];
 
-  // Check if this counts as a sprite 0 hit.
-  if (render_sprites && (sprite_buf & FLAG_SOAM_BUFFER_ZERO)
-                     && !bg_transparent && (screen_x != 255)) {
-    status_ |= FLAG_HIT;
+  // Determine if rendering is enabled, and fill the tile data if it is.
+  if (mask_ & FLAG_RENDER_BG) {
+    // Clear the low pixels of the line buffer, if needed, then copy
+    // from the tile buffer.
+    size_t i = 0;
+    if ((screen_x < 8) && !(mask_ & FLAG_LEFT_BG)) {
+      for (; screen_x + i < 8; i++) { line_buf[i] = 0; }
+    }
+    for (; i < num_pixels; i++) {
+      line_buf[i] = tile_buffer_[screen_x + fine_x_ + i];
+    }
+  } else {
+    // Otherwise, we clear the line buffer.
+    for (size_t i = 0; i < num_pixels; i++) { line_buf[i] = 0; }
   }
 
-  // Check if the pixel is on a scanline that is displayed.
-  // We run this check now because flags can still be set on a line that isn't
-  // displayed.
-  if ((current_scanline_ < 8) || (current_scanline_ >= 232)) { return; }
+  // Render the sprites to the line buffer.
+  if (mask_ & FLAG_RENDER_SPRITES) {
+    // Get the range for scanning sprites.
+    sp_lo = ((screen_x < 8) && !(mask_ & FLAG_LEFT_SPRITES)) ? 8 : screen_x;
+    sp_hi = screen_x + num_pixels;
 
-  // Check if the pixel should be rendered on top of the background.
-  if (render_sprites && (bg_transparent
-                     || !(sprite_buf & FLAG_SOAM_BUFFER_PRIORITY))) {
-    pixel_addr = sprite_buf & FLAG_SOAM_BUFFER_PALETTE;
+    // Render the sprites to the line buffer.
+    size_t sprite_index = soam_buf->num_sprites - 1;
+    SoamSprite sprite;
+    for (size_t i = 0; i < soam_buf->num_sprites; i++) {
+      // Check if the sprite is in range.
+      sprite = &(soam_buf->sprites[sprite_index]);
+      if (((sprite->xpos + kTileWidth_) > sp_lo) || (sprite->xpos < sp_hi)) {
+        // Draw the sprite to the line buffer.
+        for (size_t j = 0; j < MIN(kTileWidth_, sp_hi - sprite->xpos); j++) {
+          DataWord sp_pixel = sprite->pixel[j];
+          DataWord pix_x = sprite->xpos + j;
+          // If this sprite pixel isn't chosen, we need to overwrite whatever
+          // is in the line buffer with the value in the tile buffer, as
+          // sprites with lower indexes can hide ones with higher indexes.
+          line_buf[pix_x] = (sp_pixel && (!(line_buf[pix_x]) || sprite->on_top))
+                          ? sp_pixel : tile_buffer_[pix_x + fine_x_];
+
+          // Check for a sprite zero hit.
+          if (soam->has_zero && (sprite_index == 0) && sp_pixel
+           && tile_buffer_[pix_x + fine_x_] && (pix_x != 255)) {
+            status_ |= FLAG_HIT;
+          }
+        }
+      }
+      sprite_index--;
+    }
   }
 
-  // Get and render the pixel.
-  renderer_->Pixel(screen_y, screen_x, pixel_data_[pixel_addr]);
+  // Render the pixels to the screen.
+  renderer_->Pixel(screen_y, screen_x, pixel_buf, num_pixels);
 
   return;
 }

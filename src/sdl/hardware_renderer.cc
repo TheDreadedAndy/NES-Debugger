@@ -56,16 +56,24 @@ HardwareRenderer::HardwareRenderer(SDL_Window *window, SDL_Renderer *renderer)
 }
 
 /*
- * Draws a pixel to the pixel buffer.
+ * Draws the given array of pixels to the given location in the pixel
+ * buffer.
  *
  * Assumes the row and column are in range of the buffer size.
+ * Assumes the number of pixels will fit within the bounds of the specified
+ * location.
  */
-void HardwareRenderer::Pixel(size_t row, size_t col, uint32_t pixel) {
+void HardwareRenderer::DrawPixels(size_t row, size_t col,
+                                  Pixel *pixels, size_t num) {
   CONTRACT(row < static_cast<size_t>(NES_HEIGHT));
   CONTRACT(col < static_cast<size_t>(NES_WIDTH));
+  CONTRACT((row * NES_WIDTH + col + num) < (NES_WIDTH * NES_HEIGHT));
 
-  // Write the given pixel to the given location.
-  pixel_buffer_[row * NES_WIDTH + col] = pixel;
+  // Draw the given pixels to the given location.
+  size_t index = row * NES_WIDTH + col;
+  for (size_t i = 0; i < num; i++) {
+    pixel_buffer_[index + i] = pixels[i];
+  }
 
   return;
 }
@@ -75,7 +83,7 @@ void HardwareRenderer::Pixel(size_t row, size_t col, uint32_t pixel) {
  *
  * Assumes that the window provided during initialization was valid.
  */
-void HardwareRenderer::Frame(void) {
+void HardwareRenderer::DrawFrame(void) {
   // Recalculate the window rect if the window has been resized.
   // Clear the window on resize.
   if (!window_size_valid_) {

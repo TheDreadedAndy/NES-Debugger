@@ -6,6 +6,7 @@
 #include <SDL2/SDL.h>
 
 #include "../config/config.h"
+#include "../memory/palette.h"
 
 /*
  * The NES draws a 256x240 pictures, which is padded to 280x240. Most tvs
@@ -52,10 +53,11 @@ class Renderer {
 
     // Draws a pixel to the window. The pixel will not be shown until Frame()
     // is called.
-    virtual void Pixel(size_t row, size_t col, uint32_t pixel) = 0;
+    virtual void DrawPixels(size_t row, size_t col,
+                            Pixel *pixels, size_t len) = 0;
 
     // Renders any pixel changes to the main window.
-    virtual void Frame(void) = 0;
+    virtual void DrawFrame(void) = 0;
 
     // Signals that the window surface must be obtained again.
     void InvalidateWindowSurface(void);

@@ -6,6 +6,7 @@
 #include <SDL2/SDL.h>
 
 #include "./renderer.h"
+#include "../memory/palette.h"
 
 /*
  * Hardware rendering implementation of a Render class.
@@ -26,8 +27,8 @@ class HardwareRenderer : public Renderer {
 
   public:
     // Functions implemented from the abstract class.
-    void Pixel(size_t row, size_t col, uint32_t pixel);
-    void Frame(void);
+    void DrawPixels(size_t row, size_t col, Pixel *pixels, size_t num);
+    void DrawFrame(void);
 
     // Attempts to create a HardwareRenderer object. Returns NULL on failure.
     static HardwareRenderer *Create(SDL_Window *window);

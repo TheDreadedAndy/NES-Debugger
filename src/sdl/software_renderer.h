@@ -7,6 +7,7 @@
 #include <SDL2/SDL.h>
 
 #include "./renderer.h"
+#include "../memory/palette.h"
 
 /*
  * Software rendering implementation of a Render class.
@@ -24,8 +25,8 @@ class SoftwareRenderer : public Renderer {
 
   public:
     // Functions implemented from the abstract class.
-    void Pixel(size_t row, size_t col, uint32_t pixel);
-    void Frame(void);
+    void DrawPixels(size_t row, size_t col, Pixel *pixels, size_t num);
+    void DrawFrame(void);
 
     // Attempts to create a SoftwareRenderer object. Returns NULL on failure.
     static SoftwareRenderer *Create(SDL_Window *window);

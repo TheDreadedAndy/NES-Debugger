@@ -58,13 +58,18 @@ SoftwareRenderer::SoftwareRenderer(SDL_Window *window, SDL_Surface *surface)
  * Assumes the SDL window and rendering surface are valid.
  * Assumes that the row and column are in range of the surface size.
  */
-void SoftwareRenderer::Pixel(size_t row, size_t col, uint32_t pixel) {
+void SoftwareRenderer::DrawPixels(size_t row, size_t col,
+                                  Pixel *pixels, size_t num) {
   CONTRACT(row < static_cast<size_t>(NES_HEIGHT));
   CONTRACT(col < static_cast<size_t>(NES_WIDTH));
+  CONTRACT((row * NES_WIDTH + col + num) < (NES_WIDTH * NES_HEIGHT));
 
-  // Write the given pixel to the given location in the rendering surface.
-  uint32_t *pixels = static_cast<uint32_t*>(render_surface_->pixels);
-  pixels[row * NES_WIDTH + col] = pixel;
+  // Draw the pixels to the given location in the rendering surface.
+  size_t index = row * NES_WIDTH + col;
+  uint32_t *pixel_surface = static_cast<uint32_t*>(render_surface_->pixels);
+  for (size_t i = 0; i < num; i++) {
+    pixel_surface[index + i] = pixels[i];
+  }
 
   return;
 }
@@ -74,7 +79,7 @@ void SoftwareRenderer::Pixel(size_t row, size_t col, uint32_t pixel) {
  *
  * Assumes that the SDL window is valid.
  */
-void SoftwareRenderer::Frame(void) {
+void SoftwareRenderer::DrawFrame(void) {
   // Get the window surface, and recalculate the rect, if the surface is invalid.
   if (!window_size_valid_) {
     window_surface_ = SDL_GetWindowSurface(window_);

@@ -43,7 +43,6 @@ class Ppu {
     DataWord *soam_buffer_[kNumSoamBuffers_];
 
     // Temporary storage used in rendering.
-    Pixel *render_buffer_;
     DataWord *tile_buffer_;
     DataWord next_tile_[kTilePlanes_];
     DataWord next_palette_;
@@ -56,6 +55,8 @@ class Ppu {
     size_t current_scanline_ = 261;
     size_t current_cycle_ = 0;
     bool frame_odd_ = false;
+    size_t next_current_scanline_, next_current_cycle_;
+    bool next_frame_odd_;
 
     // Holds the Memory class to be used to access VRAM.
     Memory *memory_;
@@ -71,14 +72,15 @@ class Ppu {
 
     // Helper functions for the PPU emulation.
     bool IsDisabled(void);
-    size_t UpdateCounters(size_t &cycles, size_t &next_current_cycle);
+    size_t CalculateCounters(size_t &cycles);
+    void UpdateCounters(void);
     void Disabled(size_t delta);
     void DrawBackground(size_t delta);
     void Render(size_t delta);
     void RenderVisible(size_t delta);
-    void RenderUpdateFrame(bool output);
+    void RenderUpdateFrame(size_t delta, bool output);
     void RenderFetchTiles(size_t delta, bool alt_buffer);
-    void RenderUpdateTileBuffer(void);
+    void RenderUpdateTileBuffer(size_t buffer_pos);
     DataWord RenderGetAttribute(void);
     DataWord RenderGetTile(DataWord index, bool plane_high);
     void RenderDrawPixels(size_t delta);
@@ -97,6 +99,7 @@ class Ppu {
                                               DataWord *pat_hi);
     void EvalFetchSprites(void);
     void Signal(void);
+    void MmioMaskWrite(DataWord val);
     void MmioScrollWrite(DataWord val);
     void MmioAddrWrite(DataWord val);
     void MmioVramAddrInc(void);

@@ -30,9 +30,9 @@ typedef union {
                         (static_cast<DoubleWord>(dw)) & 0xFF))
 
 // Reverses a word.
-DataWord ReverseWord(DataWord word);
+[[gnu::pure]] DataWord ReverseWord(DataWord word);
 
 // Gets the MSB of a word.
-DataWord MsbWord(DataWord word);
+[[gnu::pure]] DataWord MsbWord(DataWord word);
 
 #endif

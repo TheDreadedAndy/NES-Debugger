@@ -230,17 +230,19 @@ size_t Ppu::Schedule(void) {
  */
 void Ppu::RunSchedule(size_t cycles) {
   // Check if rendering has been disabled by the software.
-  size_t delta = 0;
+  size_t delta, next_current_cycle;
   if (IsDisabled()) {
     while (cycles > 0) {
-      delta = UpdateCounters(cycles);
+      delta = UpdateCounters(cycles, next_current_cycle);
       Disabled(delta);
+      current_cycle_ = next_current_cycle;
     }
   } else {
     // Otherwise, render video normally.
     while (cycles > 0) {
-      delta = UpdateCounters(cycles);
+      delta = UpdateCounters(cycles, next_current_cycle);
       Render(delta);
+      current_cycle_ = next_current_cycle;
     }
   }
 
@@ -262,12 +264,11 @@ bool Ppu::IsDisabled(void) {
  * how many cycles should be completed to either reach that number or finish
  * the current scanline. Updates the number of cycles which should be executed.
  */
-size_t Ppu::UpdateCounters(size_t &cycles) {
-  // FIXME: Where is current_cycle_ being updated?
+size_t Ppu::UpdateCounters(size_t &cycles, size_t &next_current_cycle) {
   // Determine if we are on a scanline which will terminate early.
   size_t exec = 0;
   size_t cycle_max;
-  if (!frame_odd_ && (current_scanline >= 261) && !IsDisabled()) {
+  if (!frame_odd_ && (current_scanline_ >= 261) && !IsDisabled()) {
     cycle_max = 340;
   } else {
     // Otherwise, we perform the normal calculation.
@@ -278,8 +279,10 @@ size_t Ppu::UpdateCounters(size_t &cycles) {
   exec = MIN(cycle_max - current_cycle_, cycles);
 
   // Update the scanline counter and user cycles remaining.
+  bool finish_scanline = ((exec + current_cycle_) >= cycle_max);
   cycles -= exec;
-  current_scanline_ += ((exec + current_cycle_) == cycle_max);
+  next_current_cycle = (finish_scanline) ? 0 : exec + current_cycle_;
+  current_scanline_ += finish_scanline;
 
   // Wrap the scanline and toggle the frame if it is time to do so.
   if (current_scanline_ > 261) {
@@ -287,7 +290,7 @@ size_t Ppu::UpdateCounters(size_t &cycles) {
     frame_odd_ = !frame_odd_;
   }
 
-  return;
+  return exec;
 }
 
 /*
@@ -333,8 +336,9 @@ void Ppu::DrawBackground(size_t delta) {
 
   // Render the background.
   Pixel bg_color = pixel_data[color_addr];
-  for (int i = 0; i < num_pixels; i++) { pixel_buffer_[i] = bg_color; }
-  renderer_->Pixel(screen_y, screen_x, pixel_buffer_, num_pixels);
+  Pixel pixel_buf[kScreenWidth_];
+  for (size_t i = 0; i < num_pixels; i++) { pixel_buf[i] = bg_color; }
+  renderer_->Pixel(screen_y, screen_x, pixel_buf, num_pixels);
 
   return;
 }
@@ -360,10 +364,8 @@ void Ppu::Render(size_t delta) {
  * Performs the requested number of cycles for a visible scanline.
  */
 void Ppu::RenderVisible(size_t delta) {
-  /*** FIXME: All these offset checks are stupid. ***/
-
   // Finish the garbage nametable write that got skipped.
-  if ((current_cycle_ == 0) && (delta > 0)) { mdr_write = false; }
+  if ((current_cycle_ == 0) && delta) { mdr_write = false; }
 
   // Check if this delta should clear the SOAM buffer.
   if ((current_cycle_ <= 1) && ((current_cycle_ + delta) > 1)) {
@@ -371,23 +373,18 @@ void Ppu::RenderVisible(size_t delta) {
   }
 
   // Update sprite evaluation for this scanline.
-  if ((((current_cycle_ > 64) && (current_cycle_ <= 256))
-    || (((current_cycle_ + delta) > 64) && ((current_cyle_ + delta) <= 256)))
-    && (delta > 0)) {
-    EvalSprites(delta);
+  // FIXME: Should run over time from (64, 256].
+  if ((current_cycle_ <= 64)) && (current_cycle_ + delta) > 64) && delta) {
+    EvalSprites();
   }
 
   // Draw the pixels for this scanline.
-  if ((((current_cycle_ >= 1) && (current_cycle_ <= 256))
-    || (((current_cycle_ + delta) >= 1) && ((current_cycle_ + delta) <= 256)))
-    && (delta > 0)) {
+  if ((current_cycle_ <= 256) && ((current_cycle_ + delta) >= 1) && delta) {
     RenderUpdateFrame(delta, true);
   }
 
   // Updates the vram address and sprite buffers at the correct time.
-  if ((((current_cycle_ > 256) && (current_cycle_ <= 320))
-    || (((current_cycle_ + delta) > 256) && ((current_cycle_ + delta) <= 320)))
-    && (delta > 0)) {
+  if ((current_cycle_ <= 320) && ((current_cycle_ + delta) > 256) && delta) {
     // On cycle 257, the horizontal vram position is loaded from the temp vram
     // address register. As an optmization, sprite fetching is run only on this
     // cycle.
@@ -401,15 +398,12 @@ void Ppu::RenderVisible(size_t delta) {
   }
 
   // Fetch the background tile data for the next scanline.
-  if ((((current_cycle > 320) && (current_cycle_ <= 336))
-    || (((current_cycle + delta) > 320) && ((current_cycle_ + delta) <= 336)))
-    && (delta > 0)) {
+  if ((current_cycle_ <= 336) && ((current_cycle_ + delta) > 320) && delta) {
     RenderUpdateRegisters(delta, true);
   }
 
   // Perform the unused nametable byte fetches. Some mappers may clock this.
-  // FIXME
-  if (current_cycle_ > 336 && current_cycle_ <= 340) {
+  if ((current_cycle_ <= 340) && ((current_cycle_ + delta) > 336) && delta) {
     // Unused NT byte fetches, mappers may clock this.
     RenderDummyNametableAccess(delta);
   }
@@ -450,12 +444,14 @@ void Ppu::RenderFetchTiles(size_t delta, bool alt_buffer) {
   size_t phase_delta, buffer_pos;
   if (alt_buffer) {
     // Fetching for the next scanline.
-    phase_delta = MIN(337 - current_cycle_, delta);
+    phase_delta = MIN(337 - current_cycle_, (current_cycle + delta)
+                                          - MAX(321, current_cycle_));
     buffer_pos = current_cycle - 320;
   } else if (current_cycle <= 255) {
     // Fetching for this scanline.
     // Cycle 256 is skipped, as that tile is unused.
-    phase_delta = MIN(256 - current_cycle_, delta);
+    phase_delta = MIN(256 - current_cycle_, (current_cycle + delta)
+                                          - MAX(1, current_cycle_));
     buffer_pos = current_cycle + 15;
   } else {
     // Out of range for tile fetching.
@@ -584,7 +580,8 @@ void Ppu::RenderDrawPixels(size_t delta) {
   // Get the rendering information.
   size_t screen_x = current_cycle_ - 1;
   size_t screen_y = current_scanline_;
-  size_t num_pixels = MIN(257 - current_cycle_, delta);
+  size_t num_pixels = MIN(257 - current_cycle_, (current_cycle_ + delta)
+                                              - MAX(1, current_cycle_));
   DataWord *soam_buf = &(soam_buffer_[soam_render_buf_][screen_x]);
   DataWord *tile_buf = &(tile_buffer_[screen_x + fine_x_]);
   DataWord tile, sprite;
@@ -680,16 +677,16 @@ void Ppu::RenderUpdateHori(void) {
 /*
  * Executes 2 dummy nametable fetches over 4 cycles.
  */
-void Ppu::RenderDummyNametableAccess(void) {
-  // Determine which cycle of the fetch we are on.
-  if (mdr_write_) {
-    // Second cycle, thrown away internally.
-    mdr_write_ = false;
-  } else {
-    // First cycle, reads from vram.
-    mdr_ = memory_->VramRead((vram_addr_ & VRAM_NT_ADDR_MASK)
-                                         | PPU_NT_OFFSET);
-    mdr_write_ = true;
+void Ppu::RenderDummyNametableAccess(size_t delta) {
+  size_t num_cycles = MIN(341 - current_cycle_, (current_cycle_ + delta)
+                                              - MAX(337, current_cycle_));
+  // Determine which cycle of the fetch we are on and execute it.
+  for (size_t i = 0; i < num_cycles; i++) {
+    if (!mdr_write_) {
+      mdr_ = memory_->VramRead((vram_addr_ & VRAM_NT_ADDR_MASK)
+                                           | PPU_NT_OFFSET);
+    }
+    mdr_write = !mdr_write;
   }
 
   return;
@@ -753,23 +750,31 @@ void Ppu::RenderBlank(size_t delta) {
  */
 void Ppu::RenderPre(void) {
   // The status flags are reset at the begining of the pre-render scanline.
-  if (current_cycle_ == 1) { status_ = 0; }
+  if ((current_cycle_ <= 1) && ((current_cycle_ + delta) > 1)) { status_ = 0; }
 
-  // Determine which phase of rendering the scanline is in.
-  if (current_cycle_ > 0 && current_cycle_ <= 256) {
-    // Accesses are made, but nothing is rendered.
-    RenderUpdateFrame(false);
-  } else if (current_cycle_ == 257) {
+  // Rendering accesses are made, but nothing is drawn.
+  if ((current_cycle_ <= 256) && ((current_cycle_ + delta) > 0) && delta) {
+    RenderUpdateFrame(delta, false);
+  }
+
+  // The horizontal address is updated on this cycle.
+  if ((current_cycle_ <= 257) && ((current_cycle_ + delta) > 257)) {
     RenderUpdateHori();
-  } else if (current_cycle_ >= 280 && current_cycle_ <= 304) {
-    // Update the vertical part of the vram address register.
+  }
+
+  // The vertical address is updated throughout these cycles.
+  if ((current_cycle_ <= 304) && ((current_cycle_ + delta) >= 280) && delta) {
     RenderUpdateVert();
-  } else if (current_cycle_ > 320 && current_cycle_ <= 336) {
-    // Fetch the background tile data for the next cycle.
-    RenderUpdateRegisters();
-  } else if (current_cycle_ > 336 && current_cycle_ <= 340) {
-    // Unused NT byte fetches, mappers may clock this.
-    RenderDummyNametableAccess();
+  }
+
+  // Fetches the background tiles for the next scanline.
+  if ((current_cycle_ <= 336) && ((current_cycle_ + delta) > 320) && delta) {
+    RenderUpdateRegisters(delta, true);
+  }
+
+  // Unused NT byte fetches, which may be clocked by mappers.
+  if ((current_cycle_ <= 340) && ((current_cycle_ + delta) > 336) && delta) {
+    RenderDummyNametableAccess(delta);
   }
 
   // The OAM addr is reset here to prepare for sprite evaluation on the next
@@ -804,12 +809,9 @@ void Ppu::EvalClearSoam(void) {
  * incorrect sprite overflow behavior (partially). This function should
  * only be called from ppu_eval().
  *
- * Assumes the first call on a scanline will happen on cycle 65.
+ * FIXME: This function should run over time, not all at once.
  */
 void Ppu::EvalSprites(void) {
-  // As an optimization, sprite evaluation is run only once per scanline.
-  if (current_cycle_ != 65) { return; }
-
   // Run sprite evaluation. This loop fills the SOAM scanline buffer,
   // which contains one byte of sprite data for each pixel to be rendered.
   size_t i = oam_addr_;

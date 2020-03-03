@@ -20,7 +20,7 @@ class Ppu {
     // Constants for rendering.
     static const size_t kScreenWidth_ = 256;
     static const size_t kTileBufferSize_ = 264;
-    static const size_t kTileWidth_ = 8
+    static const size_t kTileWidth_ = 8;
     static const size_t kTilePlanes_ = 2;
 
     // Internal PPU registers.
@@ -71,7 +71,7 @@ class Ppu {
 
     // Helper functions for the PPU emulation.
     bool IsDisabled(void);
-    size_t UpdateCounters(size_t &cycles);
+    size_t UpdateCounters(size_t &cycles, size_t &next_current_cycle);
     void Disabled(size_t delta);
     void DrawBackground(size_t delta);
     void Render(size_t delta);
@@ -83,7 +83,7 @@ class Ppu {
     DataWord RenderGetTile(DataWord index, bool plane_high);
     void RenderDrawPixels(size_t delta);
     void RenderUpdateHori(void);
-    void RenderDummyNametableAccess(void);
+    void RenderDummyNametableAccess(size_t delta);
     void RenderXinc(void);
     void RenderYinc(void);
     void RenderBlank(size_t delta);

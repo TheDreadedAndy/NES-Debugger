@@ -237,9 +237,7 @@ void Emulation::RunEmulationCycle(void) {
       // The PPU is clocked at 3x the rate of the CPU.
       cpu_->RunCycle();
       apu_->RunCycle();
-      ppu_->RunCycle();
-      ppu_->RunCycle();
-      ppu_->RunCycle();
+      ppu_->RunSchedule(3U);
     }
     cycles_remaining -= sync_cycles;
 
@@ -255,11 +253,7 @@ void Emulation::RunEmulationCycle(void) {
     cpu_cycles = cpu_->RunSchedule(MIN(scheduled_cycles, cycles_remaining),
                                    &sync_cycles);
     for (size_t i = 0; i < cpu_cycles; i++) { apu_->RunCycle(); }
-    for (size_t i = 0; i < cpu_cycles; i++) {
-      ppu_->RunCycle();
-      ppu_->RunCycle();
-      ppu_->RunCycle();
-    }
+    ppu_->RunSchedule(cpu_cycles * 3U);
     cycles_remaining -= cpu_cycles;
   }
 

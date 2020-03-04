@@ -1034,7 +1034,10 @@ void Ppu::Write(DoubleWord reg_addr, DataWord val) {
 }
 
 /*
- * TODO
+ * Updates the mask register and palette. Clears the sprite/tile buffers if
+ * rendering for either has been disabled. Doing this makes the assumption
+ * that the shift registers continued to empty when rendering was disabled
+ * in original hardware. TODO: Confirm this is the case.
  */
 void Ppu::MmioMaskWrite(DataWord val) {
   // Update the mask value and palette.
@@ -1042,10 +1045,14 @@ void Ppu::MmioMaskWrite(DataWord val) {
   memory_->PaletteUpdate(val);
 
   // Clear the tile and sprite buffers if either has now been disabled.
-  for (size_t i = 0; i < kTileBufferSize_; i++) { tile_buffer_[i] = 0U; }
-  for (size_t i = 0; i < 2; i++) {
-    for (size_t j = 0; j < SOAM_BUFFER_SIZE; j++) {
-      soam_buffer_[i][j] = 0;
+  if (!(mask_ & FLAG_RENDER_BG)) {
+    for (size_t i = 0; i < kTileBufferSize_; i++) { tile_buffer_[i] = 0U; }
+  }
+  if (!(mask_ & FLAG_RENDER_SPRITES)) {
+    for (size_t i = 0; i < 2; i++) {
+      for (size_t j = 0; j < SOAM_BUFFER_SIZE; j++) {
+        soam_buffer_[i][j] = 0;
+      }
     }
   }
 

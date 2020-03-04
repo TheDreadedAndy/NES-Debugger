@@ -768,5 +768,5 @@ void Cpu::PollIrqLine(void) {
  */
 Cpu::~Cpu(void) {
   delete regs_;
-  delete code_table_;
+  delete[] code_table_;
 }

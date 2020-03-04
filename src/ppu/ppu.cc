@@ -156,11 +156,6 @@
  * Assumes the provided configuration object is valid.
  */
 Ppu::Ppu(void) {
-  // Prepare the ppu structure.
-  current_scanline_ = 261;
-  current_cycle_ = 0;
-  frame_odd_ = false;
-
   // Allocate the renderering buffers.
   primary_oam_ = new DataWord[PRIMARY_OAM_SIZE]();
   soam_buffer_[0] = new DataWord[SOAM_BUFFER_SIZE]();
@@ -205,7 +200,7 @@ size_t Ppu::Schedule(void) {
 
   // Calculate the number of cycles until the next NMI.
   // NMI's can occur on cycle 1 of scanline 241.
-  size_t cycles;
+  size_t cycles = 0;
   if ((current_scanline_ >= 241) && (current_cycle_ > 1)) {
     // We need to account for the scanline counter wrapping and the cycle
     // skipped at the end of even frames.
@@ -230,7 +225,7 @@ size_t Ppu::Schedule(void) {
  */
 void Ppu::RunSchedule(size_t cycles) {
   // Check if rendering has been disabled by the software.
-  size_t delta;
+  size_t delta = 0;
   if (IsDisabled()) {
     while (cycles > 0) {
       delta = CalculateCounters(cycles);
@@ -268,7 +263,7 @@ bool Ppu::IsDisabled(void) {
  */
 size_t Ppu::CalculateCounters(size_t &cycles) {
   // Determine if we are on a scanline which will terminate early.
-  size_t cycle_max;
+  size_t cycle_max = 0;
   if (!frame_odd_ && (current_scanline_ >= 261) && !IsDisabled()) {
     cycle_max = 340;
   } else {
@@ -284,6 +279,7 @@ size_t Ppu::CalculateCounters(size_t &cycles) {
   cycles -= exec;
   next_current_cycle_ = (finish_scanline) ? 0 : exec + current_cycle_;
   next_current_scanline_ = current_scanline_ + finish_scanline;
+  next_frame_odd_ = frame_odd_;
 
   // Wrap the scanline and toggle the frame if it is time to do so.
   if (next_current_scanline_ > 261) {
@@ -311,7 +307,7 @@ void Ppu::UpdateCounters(void) {
 void Ppu::Disabled(size_t delta) {
   // Determine which action should be performed.
   if ((current_scanline_ >= 8) && (current_scanline_ < 232)
-       && (current_cycle_ > 0) && (current_cycle_ <= 256)) {
+       && (current_cycle_ <= 256) && ((current_cycle_ + delta) > 1)) {
     // Draws the background color to the screen when rendering is disabled.
     DrawBackground(delta);
   } else if ((current_scanline_ >= 240) && (current_scanline_ < 261)) {
@@ -388,17 +384,17 @@ void Ppu::RenderVisible(size_t delta) {
 
   // Update sprite evaluation for this scanline.
   // FIXME: Should run over time from (64, 256].
-  if ((current_cycle_ <= 64) && ((current_cycle_ + delta) > 64) && delta) {
+  if ((current_cycle_ <= 65) && ((current_cycle_ + delta) > 65) && delta) {
     EvalSprites();
   }
 
   // Draw the pixels for this scanline.
-  if ((current_cycle_ <= 256) && ((current_cycle_ + delta) >= 1) && delta) {
+  if ((current_cycle_ <= 256) && ((current_cycle_ + delta) > 1) && delta) {
     RenderUpdateFrame(delta, true);
   }
 
   // Updates the vram address and sprite buffers at the correct time.
-  if ((current_cycle_ <= 320) && ((current_cycle_ + delta) > 256) && delta) {
+  if ((current_cycle_ <= 320) && ((current_cycle_ + delta) > 257) && delta) {
     // On cycle 257, the horizontal vram position is loaded from the temp vram
     // address register. As an optmization, sprite fetching is run only on this
     // cycle.
@@ -412,12 +408,12 @@ void Ppu::RenderVisible(size_t delta) {
   }
 
   // Fetch the background tile data for the next scanline.
-  if ((current_cycle_ <= 336) && ((current_cycle_ + delta) > 320) && delta) {
+  if ((current_cycle_ <= 336) && ((current_cycle_ + delta) > 321) && delta) {
     RenderFetchTiles(delta, true);
   }
 
   // Perform the unused nametable byte fetches. Some mappers may clock this.
-  if ((current_cycle_ <= 340) && ((current_cycle_ + delta) > 336) && delta) {
+  if ((current_cycle_ <= 340) && ((current_cycle_ + delta) > 337) && delta) {
     // Unused NT byte fetches, mappers may clock this.
     RenderDummyNametableAccess(delta);
   }
@@ -526,14 +522,14 @@ void Ppu::RenderUpdateTileBuffer(size_t buffer_pos) {
     CONTRACT(buffer_pos <= kTileBufferSize_);
     // Add the odd tile to the buffer.
     pattern = ((odd_tile_data >> 6) & 0x3U);
-    pattern = (pattern) ? pattern | palette_latch : pattern;
+    pattern = (pattern) ? pattern | palette_latch : 0U;
     tile_buffer_[buffer_pos++] = pattern;
     odd_tile_data <<= 2;
 
     CONTRACT(buffer_pos <= kTileBufferSize_);
     // Add the even tile to the buffer.
     pattern = ((even_tile_data >> 6) & 0x3U);
-    pattern = (pattern) ? pattern | palette_latch : pattern;
+    pattern = (pattern) ? pattern | palette_latch : 0U;
     tile_buffer_[buffer_pos++] = pattern;
     even_tile_data <<= 2;
   }
@@ -774,10 +770,12 @@ void Ppu::RenderBlank(size_t delta) {
  */
 void Ppu::RenderPre(size_t delta) {
   // The status flags are reset at the begining of the pre-render scanline.
-  if ((current_cycle_ <= 1) && ((current_cycle_ + delta) > 1)) { status_ = 0; }
+  if ((current_cycle_ <= 1) && ((current_cycle_ + delta) > 1)) {
+    status_ = 0;
+  }
 
   // Rendering accesses are made, but nothing is drawn.
-  if ((current_cycle_ <= 256) && ((current_cycle_ + delta) > 0) && delta) {
+  if ((current_cycle_ <= 256) && ((current_cycle_ + delta) > 1) && delta) {
     RenderUpdateFrame(delta, false);
   }
 
@@ -787,17 +785,17 @@ void Ppu::RenderPre(size_t delta) {
   }
 
   // The vertical address is updated throughout these cycles.
-  if ((current_cycle_ <= 304) && ((current_cycle_ + delta) >= 280) && delta) {
+  if ((current_cycle_ <= 304) && ((current_cycle_ + delta) > 280) && delta) {
     RenderUpdateVert();
   }
 
   // Fetches the background tiles for the next scanline.
-  if ((current_cycle_ <= 336) && ((current_cycle_ + delta) > 320) && delta) {
+  if ((current_cycle_ <= 336) && ((current_cycle_ + delta) > 321) && delta) {
     RenderFetchTiles(delta, true);
   }
 
   // Unused NT byte fetches, which may be clocked by mappers.
-  if ((current_cycle_ <= 340) && ((current_cycle_ + delta) > 336) && delta) {
+  if ((current_cycle_ <= 340) && ((current_cycle_ + delta) > 337) && delta) {
     RenderDummyNametableAccess(delta);
   }
 

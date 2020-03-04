@@ -222,7 +222,10 @@ void Emulation::TimeDiff(EmuTime *time1, EmuTime *time2, EmuTime *res) {
 void Emulation::RunEmulationCycle(void) {
   size_t cycles_remaining = EMU_CYCLE_SIZE;
   size_t sync_cycles = 0;
-  size_t scheduled_cycles, cpu_cycles, apu_cycles, ppu_cycles;
+  size_t scheduled_cycles = 0;
+  size_t cpu_cycles = 0;
+  size_t apu_cycles = 0;
+  size_t ppu_cycles = 0;
 
   /*
    * In order to increase cache hits during emulation, some math is done to

@@ -44,8 +44,8 @@ class Ppu {
 
     // Temporary storage used in rendering.
     DataWord *tile_buffer_;
-    DataWord next_tile_[kTilePlanes_];
-    DataWord next_palette_;
+    DataWord next_tile_[kTilePlanes_] = { 0 };
+    DataWord next_palette_ = 0;
 
     // MDR and write toggle, used for 2-cycle r/w system.
     DataWord mdr_ = 0;
@@ -55,8 +55,9 @@ class Ppu {
     size_t current_scanline_ = 261;
     size_t current_cycle_ = 0;
     bool frame_odd_ = false;
-    size_t next_current_scanline_, next_current_cycle_;
-    bool next_frame_odd_;
+    size_t next_current_scanline_ = 0;
+    size_t next_current_cycle_ = 0;
+    bool next_frame_odd_ = 0;
 
     // Holds the Memory class to be used to access VRAM.
     Memory *memory_;

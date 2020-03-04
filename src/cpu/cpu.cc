@@ -130,7 +130,7 @@ void Cpu::Power(void) {
  * Assumes the CPU has been connected to a valid memory objected and at
  * least one cycle is in the state queue.
  */
-size_t Cpu::RunSchedule(size_t cycles, size_t *syncs) {
+size_t Cpu::RunSchedule(size_t cycles, size_t &syncs) {
   // Execute the CPU until it must be synced.
   size_t execs = 0;
   while (CheckNextCycle() && (execs < cycles)
@@ -140,7 +140,7 @@ size_t Cpu::RunSchedule(size_t cycles, size_t *syncs) {
   }
 
   // The CPU must be synced for the duration of any DMA.
-  *syncs = MAX(dma_cycles_remaining_, 1UL);
+  syncs = MAX(dma_cycles_remaining_, 1UL);
   return execs;
 }
 

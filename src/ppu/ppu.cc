@@ -13,6 +13,11 @@
  *
  * More information on the specific opperations of the PPU is available
  * on nesdev.com.
+ *
+ * This implementation of the PPU expects to receive a number of cycles
+ * to execute, and then executes them. In the overall program, it is expected
+ * that these cycles be "safe", I.E. that they not interact with the CPU
+ * if they are not being run while synchronized with the CPU.
  */
 
 #include "./ppu.h"
@@ -33,7 +38,6 @@
 // Object Attribute Memory size.
 #define PRIMARY_OAM_SIZE 256U
 #define SOAM_BUFFER_SIZE 256U
-#define OAM_BUFFER_SIZE 96U
 
 // Mask for determining which register a mmio access is trying to use.
 #define PPU_MMIO_MASK 0x0007U
@@ -150,10 +154,7 @@
 #define FLAG_SOAM_BUFFER_PATTERN 0x03U
 
 /*
- * Initializes the PPU and palette, using the palette file specified in the
- * config if it exists.
- *
- * Assumes the provided configuration object is valid.
+ * Initializes the buffers used by the PPU during rendering.
  */
 Ppu::Ppu(void) {
   // Allocate the renderering buffers.
@@ -218,8 +219,7 @@ size_t Ppu::Schedule(void) {
 }
 
 /*
- * Runs the next cycle in the ppu emulation, then increments the cycle/scanline
- * counters.
+ * Runs the PPU emulation for the specified number of cycles.
  *
  * Assumes Connect() has already been called.
  */
@@ -585,11 +585,12 @@ DataWord Ppu::RenderGetTile(DataWord index, bool plane_high) {
 }
 
 /*
- * Uses the shift registers and sprite memory to draw the current cycles
- * pixel to the screen
+ * Uses the soam buffer and tile buffer to draw to the screen for the given
+ * cycle range.
  *
  * Assumes the PPU is currently running a cycle between 1 and 256 (inclusive)
  * of a visible scanline.
+ * Assumes the PPU is enabled.
  */
 void Ppu::RenderDrawPixels(size_t delta) {
   // Get the rendering information.
@@ -765,8 +766,7 @@ void Ppu::RenderBlank(size_t delta) {
 }
 
 /*
- * Execute the pre-render scanline acording to the current cycle.
- * Resets to the status flags are performed here.
+ * Runs the PPU in the pre-render scanline state for the given number of cycles.
  */
 void Ppu::RenderPre(size_t delta) {
   // The status flags are reset at the begining of the pre-render scanline.

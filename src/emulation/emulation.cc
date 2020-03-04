@@ -254,7 +254,7 @@ void Emulation::RunEmulationCycle(void) {
 
     // Run the CPU, then catch up the APU and PPU.
     cpu_cycles = cpu_->RunSchedule(MIN(scheduled_cycles, cycles_remaining),
-                                   &sync_cycles);
+                                   sync_cycles);
     for (size_t i = 0; i < cpu_cycles; i++) { apu_->RunCycle(); }
     ppu_->RunSchedule(cpu_cycles * 3U);
     cycles_remaining -= cpu_cycles;

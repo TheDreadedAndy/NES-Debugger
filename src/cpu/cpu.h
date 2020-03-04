@@ -112,7 +112,7 @@ class Cpu {
 
     // Executes the CPU emulation until either the requested number of cycles
     // have been executed, or the CPU must sync with the APU/PPU.
-    size_t RunSchedule(size_t cycles, size_t *syncs);
+    size_t RunSchedule(size_t cycles, size_t &syncs);
 
     // Executes the next cycle of the cpu emulation.
     // Connect() and Power() must be called before this function.

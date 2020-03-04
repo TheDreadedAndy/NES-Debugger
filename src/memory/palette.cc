@@ -1,6 +1,6 @@
 /*
  * The NesPalette class provides a way for the PPU/Memory to easily
- * convert NES pixels to RGB colors. Each PPU instance has its own
+ * convert NES pixels to RGB colors. Each Memory instance has its own
  * associated NesPalette, and each NesPalette has 8 color palettes.
  * These 8 palettes represent the different color tint modes supported
  * by the NES. The PPU emulation can change the palette in use

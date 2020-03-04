@@ -17,6 +17,6 @@ Compiling on windows is untested as of now, though I've attempted not to rule
 out support for it.
 
 The current status of the project is as follows:<br/>
-Working on: Rewrite of the processor emulation.<br/>
+Working on: Misc. style cleanup.<br/>
 Compiles?: Yes.<br/>
-Next up: PPU rewrite or Memory rewrite to begin work on the disassembler.<br/>
+Next up: Memory rewrite to begin work on the disassembler.<br/>

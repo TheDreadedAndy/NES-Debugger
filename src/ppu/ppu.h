@@ -62,9 +62,6 @@ class Ppu {
     // Holds the Memory class to be used to access VRAM.
     Memory *memory_;
 
-    // Holds a pointer to the current set of palette data in the pixel format.
-    const Pixel *pixel_data_;
-
     // Holds the Renderer class to be used to draw pixels to the screen.
     Renderer *renderer_;
 

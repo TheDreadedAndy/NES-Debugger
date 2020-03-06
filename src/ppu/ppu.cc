@@ -175,10 +175,6 @@ void Ppu::Connect(Memory *memory, Renderer *render, bool *nmi_line) {
   memory_ = memory;
   renderer_ = render;
   nmi_line_ = nmi_line;
-
-  // Get a pointer to the palette data in memory.
-  pixel_data_ = memory_->PaletteExpose();
-
   return;
 }
 
@@ -345,10 +341,9 @@ void Ppu::DrawBackground(size_t delta) {
   }
 
   // Render the background.
-  Pixel bg_color = pixel_data_[color_addr];
-  Pixel pixel_buf[kScreenWidth_];
-  for (size_t i = 0; i < num_pixels; i++) { pixel_buf[i] = bg_color; }
-  renderer_->DrawPixels(screen_y, screen_x, pixel_buf, num_pixels);
+  DataWord tiles[kScreenWidth_];
+  for (size_t i = 0; i < num_pixels; i++) { tiles[i] = color_addr; }
+  renderer_->DrawPixels(screen_y, screen_x, tiles, num_pixels);
 
   return;
 }
@@ -599,7 +594,12 @@ void Ppu::RenderDrawPixels(size_t delta) {
   size_t screen_y = current_scanline_;
   size_t num_pixels = MIN(257 - start_cycle, (current_cycle_ + delta)
                                               - start_cycle);
-  CONTRACT(start_cycle + num_pixels <= 257);
+  bool bg_en = mask_ & FLAG_RENDER_BG;
+  bool bg_left = mask_ & FLAG_LEFT_BG;
+  bool sp_en = mask_ & FLAG_RENDER_SPRITES;
+  bool sp_left = mask_ & FLAG_LEFT_SPRITES;
+
+  // Prepare the buffers used in rendering.
   DataWord *soam_buf = &(soam_buffer_[soam_render_buf_][screen_x]);
   DataWord *tile_buf = &(tile_buffer_[screen_x + fine_x_]);
   DataWord tile, sprite;
@@ -607,13 +607,10 @@ void Ppu::RenderDrawPixels(size_t delta) {
   // If we're on a scanline hidden by overscan, we need only check for
   // a sprite-zero hit.
   if ((current_scanline_ < 8) || (current_scanline_ >= 232)) {
-    if ((mask_ & FLAG_RENDER_BG) && (mask_ & FLAG_RENDER_SPRITES)
-                                 && !(status_ & FLAG_HIT)) {
+    if (bg_en && sp_en && !(status_ & FLAG_HIT)) {
       for (size_t i = 0; i < num_pixels; i++) {
-        tile = ((mask_ & FLAG_LEFT_BG) || (i + screen_x >= 8))
-             ? tile_buf[i] : 0U;
-        sprite = ((mask_ & FLAG_LEFT_SPRITES) || ((i + screen_x) >= 8))
-               ? soam_buf[i] : 0U;
+        tile = (bg_left || (i + screen_x >= 8)) ? tile_buf[i] : 0U;
+        sprite = (sp_left || ((i + screen_x) >= 8)) ? soam_buf[i] : 0U;
         if ((sprite & FLAG_SOAM_BUFFER_ZERO) && tile
                     && ((i + screen_x) != 255)) {
           status_ |= FLAG_HIT;
@@ -624,62 +621,23 @@ void Ppu::RenderDrawPixels(size_t delta) {
     return;
   }
 
-  // Used to buffer the pixels to be rendered.
-  Pixel pixel_buf[kScreenWidth_];
+  // Renders the visible background tiles and sprites to a buffer.
+  DataWord *line_buf = soam_buf;
+  for (size_t i = 0; i < num_pixels; i++) {
+    tile = (bg_en && (bg_left || (i + screen_x >= 8))) ? tile_buf[i] : 0U;
+    sprite = (sp_en && (sp_left || ((i + screen_x) >= 8))) ? soam_buf[i] : 0U;
+    // Check if this pixel has a sprite that should be drawn.
+    line_buf[i] = ((sprite & FLAG_SOAM_BUFFER_PRIORITY) || !tile)
+                ? (sprite & FLAG_SOAM_BUFFER_PALETTE) : tile;
 
-  // Determine which pieces of rendering are enabled. This function is not
-  // called when rendering is disabled, so we need not check for that.
-  DataWord *line_buf;
-  if ((mask_ & FLAG_RENDER_BG) && (mask_ & FLAG_RENDER_SPRITES)) {
-    // All rendering is enabled, so we must scan tiles into the buffer.
-    line_buf = soam_buf;
-    for (size_t i = 0; i < num_pixels; i++) {
-      tile = ((mask_ & FLAG_LEFT_BG) || (i + screen_x >= 8))
-           ? tile_buf[i] : 0U;
-      sprite = ((mask_ & FLAG_LEFT_SPRITES) || ((i + screen_x) >= 8))
-             ? soam_buf[i] : 0U;
-      // Check if this pixel has a sprite that should be drawn.
-      line_buf[i] = ((sprite & FLAG_SOAM_BUFFER_PRIORITY) || !tile)
-                  ? (sprite & FLAG_SOAM_BUFFER_PALETTE) : tile;
-
-      // Check if this is a sprite zero hit.
-      if ((sprite & FLAG_SOAM_BUFFER_ZERO) && tile
-                  && ((i + screen_x) != 255)) {
-        status_ |= FLAG_HIT;
-      }
-    }
-
-    // Fill the pixel buffer with the pixels corresponding to the line buffer.
-    for (size_t i = 0; i < num_pixels; i++) {
-      pixel_buf[i] = pixel_data_[line_buf[i]];
-    }
-  } else if (mask_ & FLAG_RENDER_BG) {
-    // Sprites are disabled, so we just draw the contents of the tile buffer.
-    line_buf = tile_buf;
-
-    // Fill the pixel buffer with the data from the line buffer.
-    for (size_t i = 0; i < num_pixels; i++) {
-      // We need to check if left background have been disabled.
-      // We do this check instead of overwriting the tile buffer and having
-      // one section of code to get the pixel buffer because the tile buffer
-      // must not be changed by this function.
-      pixel_buf[i] = (((screen_x + i) >= 8) || (mask_ & FLAG_LEFT_BG))
-                   ? pixel_data_[line_buf[i]] : pixel_data_[0];
-    }
-  } else {
-    // Backgrounds are disabled, so we just draw the sprite buffer.
-    line_buf = soam_buf;
-
-    // Fill the pixel buffer with the data from the line buffer.
-    // We may need to disable left sprite rendering here.
-    for (size_t i = 0; i < num_pixels; i++) {
-      pixel_buf[i] = (((screen_x + i) >= 8) || (mask_ & FLAG_LEFT_SPRITES))
-                   ? pixel_data_[line_buf[i]] : pixel_data_[0];
+    // Check if this is a sprite zero hit.
+    if ((sprite & FLAG_SOAM_BUFFER_ZERO) && tile && ((i + screen_x) != 255)) {
+      status_ |= FLAG_HIT;
     }
   }
 
   // Render the pixels to the screen.
-  renderer_->DrawPixels(screen_y, screen_x, pixel_buf, num_pixels);
+  renderer_->DrawPixels(screen_y, screen_x, line_buf, num_pixels);
 
   return;
 }

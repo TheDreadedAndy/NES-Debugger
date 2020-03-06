@@ -91,6 +91,14 @@ void Renderer::InvalidateWindowSurface(void) {
 }
 
 /*
+ * Sets the pixel palette to the one provided.
+ */
+void Renderer::SetPalette(const PixelPalette *palette) {
+  pixels_ = palette;
+  return;
+}
+
+/*
  * Prevents issues with freeing an object of type Render.
  */
 Renderer::~Renderer(void) {

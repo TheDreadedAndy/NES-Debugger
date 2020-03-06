@@ -38,6 +38,9 @@ class Renderer {
     // Holds a pointer to the current SDL window.
     SDL_Window *window_;
 
+    // Holds a pointer to the current pixel palette.
+    const PixelPalette *pixels_;
+
     // Set by the event manager when the size of the window changes.
     bool window_size_valid_ = false;
 
@@ -54,13 +57,17 @@ class Renderer {
     // Draws a pixel to the window. The pixel will not be shown until Frame()
     // is called.
     virtual void DrawPixels(size_t row, size_t col,
-                            Pixel *pixels, size_t len) = 0;
+                            DataWord *tiles, size_t len) = 0;
 
     // Renders any pixel changes to the main window.
     virtual void DrawFrame(void) = 0;
 
     // Signals that the window surface must be obtained again.
     void InvalidateWindowSurface(void);
+
+    // Provides the renderer with a palette to use during rendering.
+    // Must be called before frames/pixels can be drawn.
+    void SetPalette(const PixelPalette *palette);
 
     // Declared as virtual to allows the derived renderers destructor to be
     // called when this object is deleted.

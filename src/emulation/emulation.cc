@@ -63,6 +63,7 @@ Emulation *Emulation::Create(FILE *rom, Config *config) {
   Apu *apu = new Apu();
 
   // Connect all of the emulated NES systems together.
+  window->GetRenderer()->SetPalette(memory->PaletteExpose());
   memory->AddController(window->GetInput());
   memory->Connect(cpu, ppu, apu);
   cpu->Connect(memory);

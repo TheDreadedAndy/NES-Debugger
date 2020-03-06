@@ -7,6 +7,7 @@
 #include "../util/data.h"
 
 // Palette format constants. Colors are stored as RGB 32-bit.
+#define ACTIVE_PALETTE_SIZE 0x20U
 #define PALETTE_DEPTH 32
 #define PALETTE_RMASK 0x00FF0000U
 #define PALETTE_GMASK 0x0000FF00U
@@ -15,6 +16,17 @@
 
 // Abstract the format of pixels away from the emulation.
 typedef uint32_t Pixel;
+
+/*
+ * Contains both the current implementation of pixels and
+ * the associated NES pixels. Used internally by rendering to
+ * manage pixels and sent to rendering to enable different
+ * implementations.
+ */
+struct PixelPalette {
+  DataWord nes[ACTIVE_PALETTE_SIZE];
+  Pixel emu[ACTIVE_PALETTE_SIZE];
+};
 
 /*
  * Uses the provided file as an NES palette, allowing colors to be decoded

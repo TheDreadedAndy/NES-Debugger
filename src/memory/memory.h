@@ -80,8 +80,7 @@ class Memory {
     // The palette array holds the NES representation of the palette, exposed
     // to the emulated software. The pixel data array mirrors the palette
     // in the pixel format of the emulator.
-    DataWord *palette_data_;
-    Pixel *pixel_data_;
+    PixelPalette *pixels_;
 
   protected:
     // Points the header structure asssociated with the loaded rom.
@@ -122,7 +121,7 @@ class Memory {
 
     // Exposes the decoded palette to the PPU.
     // The exposed data must not be modified.
-    const Pixel *PaletteExpose(void);
+    const PixelPalette *PaletteExpose(void);
 
     // Gives the memory access to its associated Ppu/Cpu classes.
     // Must be called before using r/w functions.

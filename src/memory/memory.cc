@@ -32,9 +32,6 @@
 #include "./sxrom.h"
 #include "./uxrom.h"
 
-// Size of NES palette data.
-#define PALETTE_DATA_SIZE 0x20U
-
 /*
  * Decodes the header of the provided rom file, and creates the appropriate
  * memory class for it.
@@ -78,8 +75,7 @@ Memory *Memory::Create(FILE *rom_file, Config *config) {
 Memory::Memory(RomHeader *header, Config *config) {
   // Load in the header and setup the palette data arrays.
   header_ = header;
-  palette_data_ = new DataWord[PALETTE_DATA_SIZE]();
-  pixel_data_ = new Pixel[PALETTE_DATA_SIZE]();
+  pixels_ = new PixelPalette();
 
   // Create a palette structure using the given configuration.
   palette_ = new NesPalette(config->Get(kPaletteFileKey));
@@ -92,7 +88,7 @@ Memory::Memory(RomHeader *header, Config *config) {
  */
 DataWord Memory::PaletteRead(DoubleWord addr) {
   // Convert the address into an access to the palette data array.
-  return palette_data_[addr & PALETTE_ADDR_MASK];
+  return pixels_->nes[addr & PALETTE_ADDR_MASK];
 }
 
 /*
@@ -110,15 +106,15 @@ void Memory::PaletteWrite(DoubleWord addr, DataWord val) {
   // Update the palette and pixel arrays.
   addr &= PALETTE_ADDR_MASK;
   Pixel pixel_val = palette_->Decode(val);
-  palette_data_[addr] = val;
-  pixel_data_[addr] = pixel_val;
+  pixels_->nes[addr] = val;
+  pixels_->emu[addr] = pixel_val;
 
   // Check if the address is mirrored, and update its mirror if it is.
   // Values whose low 2 bits are zero are mirrored.
   if ((addr & kPaletteMirrorAccessMask) == 0) {
     addr ^= kPaletteMirrorBit;
-    palette_data_[addr] = val;
-    pixel_data_[addr] = pixel_val;
+    pixels_->nes[addr] = val;
+    pixels_->emu[addr] = pixel_val;
   }
 
   return;
@@ -134,8 +130,8 @@ void Memory::PaletteUpdate(DataWord mask) {
   palette_->UpdateMask(mask);
 
   // Update each entry in the pixel array.
-  for (size_t i = 0; i < PALETTE_DATA_SIZE; i++) {
-    pixel_data_[i] = palette_->Decode(palette_data_[i]);
+  for (size_t i = 0; i < ACTIVE_PALETTE_SIZE; i++) {
+    pixels_->emu[i] = palette_->Decode(pixels_->nes[i]);
   }
 
   return;
@@ -146,8 +142,8 @@ void Memory::PaletteUpdate(DataWord mask) {
  *
  * Assumes the palette has been initialized.
  */
-const Pixel *Memory::PaletteExpose(void) {
-  return const_cast<const Pixel*>(pixel_data_);
+const PixelPalette *Memory::PaletteExpose(void) {
+  return const_cast<const PixelPalette*>(pixels_);
 }
 
 /*
@@ -184,8 +180,7 @@ void Memory::AddController(Input *input) {
  */
 Memory::~Memory(void) {
   delete header_;
-  delete[] palette_data_;
-  delete[] pixel_data_;
+  delete pixels_;
   delete palette_;
   if (controller_ != NULL) { delete controller_; }
   return;

@@ -64,7 +64,7 @@ HardwareRenderer::HardwareRenderer(SDL_Window *window, SDL_Renderer *renderer)
  * location.
  */
 void HardwareRenderer::DrawPixels(size_t row, size_t col,
-                                  Pixel *pixels, size_t num) {
+                                  DataWord *tiles, size_t num) {
   CONTRACT(row < static_cast<size_t>(NES_HEIGHT));
   CONTRACT(col < static_cast<size_t>(NES_WIDTH));
   CONTRACT((row * NES_WIDTH + col + num) < (NES_WIDTH * NES_HEIGHT));
@@ -72,7 +72,7 @@ void HardwareRenderer::DrawPixels(size_t row, size_t col,
   // Draw the given pixels to the given location.
   size_t index = row * NES_WIDTH + col;
   for (size_t i = 0; i < num; i++) {
-    pixel_buffer_[index + i] = pixels[i];
+    pixel_buffer_[index + i] = pixels_->emu[tiles[i]];
   }
 
   return;

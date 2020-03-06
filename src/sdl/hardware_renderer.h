@@ -27,7 +27,7 @@ class HardwareRenderer : public Renderer {
 
   public:
     // Functions implemented from the abstract class.
-    void DrawPixels(size_t row, size_t col, Pixel *pixels, size_t num);
+    void DrawPixels(size_t row, size_t col, DataWord *tiles, size_t num);
     void DrawFrame(void);
 
     // Attempts to create a HardwareRenderer object. Returns NULL on failure.

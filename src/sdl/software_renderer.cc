@@ -59,7 +59,7 @@ SoftwareRenderer::SoftwareRenderer(SDL_Window *window, SDL_Surface *surface)
  * Assumes that the row and column are in range of the surface size.
  */
 void SoftwareRenderer::DrawPixels(size_t row, size_t col,
-                                  Pixel *pixels, size_t num) {
+                                  DataWord *tiles, size_t num) {
   CONTRACT(row < static_cast<size_t>(NES_HEIGHT));
   CONTRACT(col < static_cast<size_t>(NES_WIDTH));
   CONTRACT((row * NES_WIDTH + col + num) < (NES_WIDTH * NES_HEIGHT));
@@ -68,7 +68,7 @@ void SoftwareRenderer::DrawPixels(size_t row, size_t col,
   size_t index = row * NES_WIDTH + col;
   uint32_t *pixel_surface = static_cast<uint32_t*>(render_surface_->pixels);
   for (size_t i = 0; i < num; i++) {
-    pixel_surface[index + i] = pixels[i];
+    pixel_surface[index + i] = pixels_->emu[tiles[i]];
   }
 
   return;

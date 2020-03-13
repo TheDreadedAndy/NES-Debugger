@@ -45,6 +45,10 @@ bool StrEq(const char *str1, const char *str2);
 // Copies a null terminated string into a newly allocated string.
 char *StrCpy(const char *str);
 
+// Concatenates two strings together.
+// The resulting string must be deleted after use.
+char *StrCat(const char *str1, size_t len1, const char *str2, size_t len2);
+
 // Gets the extreme of two numbers.
 #define MIN(a, b) ((a < b) ? a : b)
 #define MAX(a, b) ((a > b) ? a : b)

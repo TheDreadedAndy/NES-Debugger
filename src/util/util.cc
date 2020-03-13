@@ -283,3 +283,17 @@ char *StrCpy(const char *str) {
   for (size_t i = 0; i <= len; i++) { copy[i] = str[i]; }
   return copy;
 }
+
+/*
+ * Concatenates two strings together. The input strings need not be
+ * null-terminated so long as their lengths are in bounds.
+ *
+ * Returns the result in a newly allocated, null-terminated, string.
+ */
+char *StrCat(const char *str1, size_t len1, const char *str2, size_t len2) {
+  char *res = new char[len1 + len2 + 1];
+  for (size_t i = 0; i < len1; i++) { res[i] = str1[i]; }
+  for (size_t i = 0; i < len2; i++) { res[len1 + i] = str2[i]; }
+  res[len1 + len2] = '\0';
+  return res;
+}

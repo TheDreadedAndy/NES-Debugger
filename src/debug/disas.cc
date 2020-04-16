@@ -16,7 +16,10 @@ struct DisasMemory {
   Memory *memory;
   size_t bank;
   DoubleWord pc;
-}
+};
+
+/* Helper Functions */
+size_t DisassembleInstruction(DisasMemory *ref, char *buf, size_t buf_len);
 
 /*
  * Uses the given memory object, pc, and bank to disassemble the given number
@@ -72,4 +75,14 @@ char *Disassemble(Memory *mem, DoubleWord pc, size_t bank, size_t num_inst) {
   }
 
   return disas;
+}
+
+/*
+ * TODO
+ */
+size_t DisassembleInstruction(DisasMemory *ref, char *buf, size_t buf_len) {
+  (void)ref;
+  (void)buf;
+  (void)buf_len;
+  return 0;
 }

@@ -28,9 +28,8 @@
 #include "../apu/apu.h"
 #include "./header.h"
 #include "./palette.h"
-#include "./nrom.h"
-#include "./sxrom.h"
-#include "./uxrom.h"
+#include "./mappers/std_banked.h"
+#include "./mappers/sxrom.h"
 
 /*
  * Decodes the header of the provided rom file, and creates the appropriate
@@ -49,14 +48,12 @@ Memory *Memory::Create(FILE *rom_file, Config *config) {
   // Use the decoded header to decide which memory structure should be created.
   Memory *mem = NULL;
   switch(header->mapper) {
-    case NROM_MAPPER:
-      mem = new Nrom(rom_file, header, config);
+    case NROM:
+    case UXROM:
+      mem = new StdBanked(rom_file, header, config);
       break;
-    case SXROM_MAPPER:
+    case SXROM:
       mem = new Sxrom(rom_file, header, config);
-      break;
-    case UXROM_MAPPER:
-      mem = new Uxrom(rom_file, header, config);
       break;
     default:
       fprintf(stderr, "Error: Rom requires unimplemented mapper: %d\n",

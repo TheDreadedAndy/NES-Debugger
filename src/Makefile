@@ -3,10 +3,10 @@
 MAINS = ndb
 
 # The names of all .cc files to be excluded.
-EXCLUDE = $(patsubst %.cc,%.o,$(wildcard bins/*.cc)) $(addsuffix .0, $(MAINS))
+EXCLUDE = $(patsubst %.cc,%.o,$(wildcard bins/*.cc)) $(addsuffix .o, $(MAINS))
 
 # The names of all non-main objects.
-OBJECTS = $(addprefix build/,$(filter-out $(EXCLUDE),$(patsubst %.cc,%.o,$(wildcard */*.cc))))
+OBJECTS = $(addprefix build/,$(filter-out $(EXCLUDE),$(patsubst ./%.cc,%.o,$(shell find . -name '*.cc'))))
 
 # The objects to be compiled from .cc source files and the dependency
 # files corresponding to these objects.
@@ -19,7 +19,7 @@ BINS = bins/inst_table.bin
 BINS_OBJS = build/bins/nes_palette.o build/bins/inst_table.o
 
 # The directories to be made before building.
-DIRS = $(sort $(dir $(BINS) $(SRC)))
+DIRS = $(sort $(dir $(BINS_OBJS) $(SRC)))
 
 # The compiler to be used and its flags.
 CXX = g++

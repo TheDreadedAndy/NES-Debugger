@@ -16,15 +16,15 @@
 #include <cstdint>
 #include <cstdio>
 
-#include "../util/util.h"
-#include "../util/data.h"
-#include "../config/config.h"
-#include "../cpu/cpu.h"
-#include "../ppu/ppu.h"
-#include "../apu/apu.h"
-#include "../io/controller.h"
-#include "./memory.h"
-#include "./header.h"
+#include "../../util/util.h"
+#include "../../util/data.h"
+#include "../../config/config.h"
+#include "../../cpu/cpu.h"
+#include "../../ppu/ppu.h"
+#include "../../apu/apu.h"
+#include "../../io/controller.h"
+#include "../memory.h"
+#include "../header.h"
 
 // Constants used to size and access memory.
 #define ROM_BANK_SIZE 0x4000U
@@ -277,6 +277,15 @@ DataWord Sxrom::Read(DoubleWord addr) {
   }
 
   return bus_;
+}
+
+/*
+ * TODO
+ */
+DataWord Sxrom::Inspect(DoubleWord addr, int sel) {
+  (void)addr;
+  (void)sel;
+  return 0;
 }
 
 /*

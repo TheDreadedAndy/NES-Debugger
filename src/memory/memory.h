@@ -112,6 +112,9 @@ class Memory {
     virtual bool CheckRead(DoubleWord addr) = 0;
     virtual bool CheckWrite(DoubleWord addr) = 0;
 
+    // Provides a way to read from CPU memory without side effects.
+    virtual DataWord Inspect(DoubleWord addr, int sel = -1) = 0;
+
     // Provides access to PPU memory.
     virtual DataWord VramRead(DoubleWord addr) = 0;
     virtual void VramWrite(DoubleWord addr, DataWord val) = 0;

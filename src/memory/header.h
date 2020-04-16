@@ -9,6 +9,9 @@
 // Encodes the type of header which the structure was created from.
 typedef enum {INES, ARCHAIC_INES, NES2} NesHeaderType;
 
+// The mapper which should be used by the memory system.
+typedef enum {NROM = 0, SXROM = 1, UXROM = 2} NesMapperType;
+
 // Encodes the console we need to emulate.
 typedef enum {NES, VS, PC10, EXT} NesConsoleType;
 
@@ -43,7 +46,7 @@ typedef struct {
   size_t chr_nvram_size;
 
   // The id of the memory mapper expected by the cart.
-  size_t mapper;
+  NesMapperType mapper;
   size_t submapper;
 
   // Cart information.

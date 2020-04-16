@@ -68,7 +68,7 @@ static size_t GetInesPrgRomSize(char *file_header);
 static size_t GetInesChrRomSize(char *file_header);
 static void DecodeFlag6(RomHeader *header, char *file_header);
 static void DecodeInes(RomHeader *header, char *file_header);
-static size_t GetInesMapper(char *file_header);
+static NesMapperType GetInesMapper(char *file_header);
 static size_t GetInesPrgRamSize(char *file_header);
 static void DecodeInesBools(RomHeader *header, char *file_header);
 static void DecodeNes2(RomHeader *header, char *file_header);
@@ -181,7 +181,7 @@ static void DecodeArchaicInes(RomHeader *header, char *file_header) {
 
   // The archaic ines format supported only 16 mappers, which were
   // determined by the upper four bits of flag 6.
-  header->mapper = ((static_cast<DataWord>(file_header[FLAG_6])) >> 4);
+  header->mapper = static_cast<NesMapperType>((file_header[FLAG_6] >> 4) & 0xF);
 
   // All three formats use the same flags in byte 6.
   DecodeFlag6(header, file_header);
@@ -260,9 +260,9 @@ static void DecodeInes(RomHeader *header, char *file_header) {
  *
  * Assumes the file header is non-null, 16 bytes long, and in the INES format.
  */
-static size_t GetInesMapper(char *file_header) {
-  return (file_header[FLAG_7] & 0xf0U)
-       | ((static_cast<DataWord>(file_header[FLAG_6])) >> 4);
+static NesMapperType GetInesMapper(char *file_header) {
+  return static_cast<NesMapperType>((file_header[FLAG_7] & 0xf0U)
+           | ((static_cast<DataWord>(file_header[FLAG_6])) >> 4));
 }
 
 /*

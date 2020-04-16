@@ -4,13 +4,10 @@
 #include <cstdlib>
 #include <cstdint>
 
-#include "../util/data.h"
-#include "../config/config.h"
-#include "./memory.h"
-#include "./header.h"
-
-// The defined mapper number that this memory system belongs to.
-#define SXROM_MAPPER 1
+#include "../../util/data.h"
+#include "../../config/config.h"
+#include "../memory.h"
+#include "../header.h"
 
 // The maximum number of banks for each memory field.
 #define SXROM_MAX_ROM_BANKS 32U
@@ -78,6 +75,7 @@ class Sxrom : public Memory {
   public:
     // Functions implemented for the abstract class Memory.
     DataWord Read(DoubleWord addr);
+    DataWord Inspect(DoubleWord addr, int sel = -1);
     void Write(DoubleWord addr, DataWord val);
     bool CheckRead(DoubleWord addr);
     bool CheckWrite(DoubleWord addr);

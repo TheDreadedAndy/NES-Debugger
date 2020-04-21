@@ -297,3 +297,21 @@ char *StrCat(const char *str1, size_t len1, const char *str2, size_t len2) {
   res[len1 + len2] = '\0';
   return res;
 }
+
+/*
+ * Appends the second string to the first string, if the first strings buffer
+ * can contain the second.
+ *
+ * Returns the new length of the string in the buffer.
+ * Returns 0 on failure.
+ */
+size_t StrAppend(char *buf, size_t buf_size, const char *str) {
+  // Get the string sizes and determine if the string can be appended.
+  size_t str_len = strlen(str);
+  size_t buf_len = strlen(buf);
+  if ((buf_size - buf_len) <= str_len) { return 0; }
+
+  // Append the string.
+  for (size_t i = 0; i <= str_len; i++) { buf[buf_len + i] = str[i]; }
+  return buf_len + str_len;
+}

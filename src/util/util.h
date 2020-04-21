@@ -49,6 +49,9 @@ char *StrCpy(const char *str);
 // The resulting string must be deleted after use.
 char *StrCat(const char *str1, size_t len1, const char *str2, size_t len2);
 
+// Appends the second string to the buffer, if possible.
+size_t StrAppend(char *buf, size_t buf_size, const char *str);
+
 // Gets the extreme of two numbers.
 #define MIN(a, b) ((a < b) ? a : b)
 #define MAX(a, b) ((a > b) ? a : b)

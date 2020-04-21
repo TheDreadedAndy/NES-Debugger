@@ -101,6 +101,6 @@ endif
 
 # Removes built files.
 clean:
-	-rm -f $(SRC) $(BINS_OBJS)
+	-rm -f $(SRC) $(BINS_OBJS) $(BINS)
 	-rm -f $(DEPS)
 	-rm -f $(MAINS)

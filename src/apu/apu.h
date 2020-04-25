@@ -40,6 +40,7 @@ class Apu {
       DataWord output;
       DataWord env_clock;
       DataWord env_volume;
+      bool env_reset;
     };
 
     // Contains the data related to the operation of the APU triangle channel.
@@ -71,6 +72,7 @@ class Apu {
       DataWord env_clock;
       DataWord env_volume;
       DataWord output;
+      bool env_reset;
     };
 
     // Contains the data related to the operation of the APU DMC channel.
@@ -123,6 +125,13 @@ class Apu {
     // Tracks when the next sample should be sent to the audio device buffer.
     float sample_clock_ = 0;
 
+    // Sound output is run through two high pass filters and a low pass
+    // filter, which are managed using these variables.
+    float last_normal_sample_ = 0;
+    float last_hpf1_sample_ = 0;
+    float last_hpf2_sample_ = 0;
+    float last_lpf_sample_ = 0;
+
     /* Helper functions */
     void RunFrameStep(void);
     void UpdateSweep(ApuPulse *pulse);
@@ -139,6 +148,9 @@ class Apu {
     void UpdateDmc(void);
     void StatusWrite(DataWord val);
     void PlaySample(void);
+    float GetPulseOutput(void);
+    float GetTndOutput(void);
+    float FilterNextSample(float sample);
 
   public:
     // Creates a new APU.

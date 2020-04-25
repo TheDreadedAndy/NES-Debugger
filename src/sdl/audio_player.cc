@@ -31,13 +31,6 @@
 // Must be a power of 2.
 #define BUFFER_SIZE 1024U
 
-// The NES has 3 filters, which must be applied to the samples in the buffer
-// to correctly output audio. These smoothing factors are calculated using a
-// sampling rate of 48000.
-#define HPF1_SMOOTH 0.988356
-#define HPF2_SMOOTH 0.945541
-#define LPF_SMOOTH 0.646967
-
 /*
  * Creates an AudioPlayer by opening an audio device and using it to
  * construct an AudioPlayer.
@@ -87,24 +80,8 @@ AudioPlayer::AudioPlayer(SDL_AudioDeviceID device) {
  * If this sample fills the buffer, the buffer is queued to the audio device.
  */
 void AudioPlayer::AddSample(float sample) {
-  // Apply the first high pass filter (90Hz).
-  float sample_temp = HPF1_SMOOTH * (last_hpf1_sample_ + sample
-                                  - last_normal_sample_);
-  last_normal_sample_ = sample;
-
-  // Apply the second high pass filter (440Hz).
-  sample = HPF2_SMOOTH * (last_hpf2_sample_ + sample_temp
-                       - last_hpf1_sample_);
-  last_hpf1_sample_ = sample_temp;
-  last_hpf2_sample_ = sample;
-
-  // Apply the low pass filter (14KHz).
-  sample_temp = (LPF_SMOOTH * sample)
-              + ((1.0 - LPF_SMOOTH) * last_lpf_sample_);
-  last_lpf_sample_ = sample_temp;
-
-  // Finally, we add the sample to the buffer.
-  audio_buffer_[buffer_slot_] = sample_temp;
+  // Add the sample to the buffer.
+  audio_buffer_[buffer_slot_] = sample;
   buffer_slot_++;
 
   // If the buffer has filled, we queue it to the device.

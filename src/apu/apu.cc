@@ -114,20 +114,15 @@
 #define DMC_CURRENT_ADDR_BASE 0x8000U
 #define DMC_LEVEL_MAX 127U
 
-// These constants are used to calculate the taylor series approximation
-// of the APU output.
-#define PULSE_TAYLOR_CENTER 15.0f
-#define PULSE_TAYLOR_TERM0 0.149377f
-#define PULSE_TAYLOR_TERM1 0.00840697f
-#define PULSE_TAYLOR_TERM2 (-0.000087318f)
-#define TND_TRIANGLE_COEF 0.000121551f
-#define TND_NOISE_COEF 0.0000816927f
-#define TND_DMC_COEF 0.0000441735f
-#define TND_TAYLOR_CENTER 0.00432935f
-#define TND_TAYLOR_TERM0 0.482776f
-#define TND_TAYLOR_TERM1 77.821f
-#define TND_TAYLOR_TERM2 (-5430.9f)
-#define TND_TAYLOR_TERM3 379005.0f
+// The NES has 3 filters, which must be applied to the samples in the buffer
+// to correctly output audio. These smoothing factors are calculated using a
+// sampling rate of 48000.
+//
+// FIXME: It would be better to calculate the smoothing factors after getting
+// a sampling rate back from SDL.
+#define HPF1_SMOOTH 0.988356
+#define HPF2_SMOOTH 0.945541
+#define LPF_SMOOTH 0.646967
 
 /*
  * The rate value in the DMC channel maps to a number of APU cycles to wait
@@ -302,12 +297,14 @@ void Apu::RunFrameStep(void) {
  */
 void Apu::UpdatePulseEnvelope(ApuPulse *pulse) {
   // Check if it is time to update the envelope.
-  if (pulse->env_clock == 0) {
+  if ((pulse->env_clock == 0) || pulse->env_reset) {
     // Reset the envelope clock.
     pulse->env_clock = pulse->control & VOLUME_MASK;
     // If the envelope has ended and should be looped, reset the volume.
-    if ((pulse->env_volume == 0) && (pulse->control & FLAG_ENV_LOOP)) {
+    if (((pulse->env_volume == 0) && (pulse->control & FLAG_ENV_LOOP))
+                                  || pulse->env_reset) {
       pulse->env_volume = ENV_DECAY_START;
+      pulse->env_reset = false;
     } else if (pulse->env_volume > 0) {
       // Otherwise, decay the volume.
       pulse->env_volume--;
@@ -324,12 +321,14 @@ void Apu::UpdatePulseEnvelope(ApuPulse *pulse) {
  */
 void Apu::UpdateNoiseEnvelope(void) {
   // Check if it is time to update the envelope.
-  if (noise_->env_clock == 0) {
+  if ((noise_->env_clock == 0) || noise_->env_reset) {
     // Reset the envelope clock.
     noise_->env_clock = noise_->control & VOLUME_MASK;
     // If the envelope has ended and should be looped, reset the volume.
-    if ((noise_->env_volume == 0) && (noise_->control & FLAG_ENV_LOOP)) {
+    if (((noise_->env_volume == 0) && (noise_->control & FLAG_ENV_LOOP))
+                                   || noise_->env_reset) {
       noise_->env_volume = ENV_DECAY_START;
+      noise_->env_reset = false;
     } else if (noise_->env_volume > 0) {
       // Otherwise, decay the volume.
       noise_->env_volume--;
@@ -619,29 +618,85 @@ void Apu::PlaySample(void) {
     return;
   }
 
-  // Use a taylor series to approximate the output of the pulse waves.
-  float xp = static_cast<float>(pulse_a_->output + pulse_b_->output)
-           - PULSE_TAYLOR_CENTER;
-  float pulse_output = PULSE_TAYLOR_TERM0 + (PULSE_TAYLOR_TERM1 * xp)
-                     + (PULSE_TAYLOR_TERM2 * xp * xp);
+  // Calculate the outputs of the audio channels from their current levels.
+  float pulse_output = GetPulseOutput();
+  float tnd_output = GetTndOutput();
 
-  // Use a taylor series to approximate the output of the triangle, noise
-  // and DMC waves.
-  float xtnd = (TND_TRIANGLE_COEF * static_cast<float>(triangle_->output))
-             + (TND_NOISE_COEF * static_cast<float>(noise_->output))
-             + (TND_DMC_COEF * static_cast<float>(dmc_->level))
-             - TND_TAYLOR_CENTER;
-  float tnd_output = TND_TAYLOR_TERM0 + (TND_TAYLOR_TERM1 * xtnd)
-                   + (TND_TAYLOR_TERM2 * xtnd * xtnd)
-                   + (TND_TAYLOR_TERM3 * xtnd * xtnd * xtnd);
+  // Apply the NES's audio filters to the sample.
+  float sample = FilterNextSample(pulse_output + tnd_output);
 
   // Add the output to the sample buffer.
-  audio_->AddSample(tnd_output + pulse_output);
+  audio_->AddSample(sample);
 
   // Reset the sample clock.
   sample_clock_ -= 36.2869375;
 
   return;
+}
+
+/*
+ * Gets the pulse channel output sample.
+ */
+float Apu::GetPulseOutput(void) {
+  /*
+   * The output of the pulse channels,
+   * f(p1 + p2) = 95.88 / ((8128 / (p1 + p2)) + 100),
+   * is approximated as
+   * f(p1 + p2) ~ (96 * (p1 + p2)) / (8128 + (100 * (p1 + p2))).
+   * This introduces a very small linear error, but is much faster.
+   */
+  uint32_t p = pulse_a_->output + pulse_b_->output;
+  return static_cast<float>(96 * p)
+       * Inverse(static_cast<float>(8128 + 100 * p));
+}
+
+/*
+ * Gets the TND channel output sample.
+ */
+float Apu::GetTndOutput(void) {
+  /*
+   * The output of the triangle/noise/dmc channels, which can be expressed as
+   * f(t, n, d) = 159.79 / ((1 / ((t / 8227) + (n / 12241) + (d / 22638))) + 100)
+   * is approximated with
+   * xtnd = (100 * (t / 8128)) + (n / 128) + (10 * (d / 2048)) + 1.0
+   * as f(xtnd) = (1.5979 * xtnd) / (1 + xtnd).
+   *
+   * This approximation introduces an error of up to 10%, but allows many of the
+   * floating point operations to be replaced by shift operations (by manually
+   * constructing the floating point representation of xtnd).
+   */
+  uint32_t t = triangle_->output;
+  uint32_t n = noise_->output;
+  uint32_t d = dmc_->level;
+  uint32_t xtnd_mantissa = ((n + t) << 16) + ((t + d) << 15)
+                         + (d << 13) + (t << 12);
+  union { float f; uint32_t i; } xtnd;
+  xtnd.i = (xtnd_mantissa | 0x3F800000U);
+  return (1.5979f * (xtnd.f - 1.0f)) * Inverse(xtnd.f);
+}
+
+/*
+ * Applys the NES's audio filters to the sample. These consist of a 90Hz
+ * High pass filter, a 440Hz High pass filter, and a 14KHz low pass filter.
+ */
+float Apu::FilterNextSample(float sample) {
+  // Apply the first high pass filter (90Hz).
+  float sample_temp = HPF1_SMOOTH * (last_hpf1_sample_ + sample
+                                  - last_normal_sample_);
+  last_normal_sample_ = sample;
+
+  // Apply the second high pass filter (440Hz).
+  sample = HPF2_SMOOTH * (last_hpf2_sample_ + sample_temp
+                       - last_hpf1_sample_);
+  last_hpf1_sample_ = sample_temp;
+  last_hpf2_sample_ = sample;
+
+  // Apply the low pass filter (14KHz).
+  sample_temp = (LPF_SMOOTH * sample)
+              + ((1.0 - LPF_SMOOTH) * last_lpf_sample_);
+  last_lpf_sample_ = sample_temp;
+
+  return sample_temp;
 }
 
 /*
@@ -685,8 +740,7 @@ void Apu::Write(DoubleWord reg_addr, DataWord val) {
 
       // Reset the sequencer position and envelope.
       pulse->pos = 0;
-      pulse->env_clock = pulse->control & VOLUME_MASK;
-      pulse->env_volume = ENV_DECAY_START;
+      pulse->env_reset = true;
       break;
     case TRI_CONTROL_ADDR:
       // Update the linear control register.
@@ -723,8 +777,7 @@ void Apu::Write(DoubleWord reg_addr, DataWord val) {
       if (channel_status_ & FLAG_NOISE_ACTIVE) {
         noise_->length = length_table[(val & LENGTH_MASK) >> LENGTH_SHIFT];
       }
-      noise_->env_clock = noise_->control & VOLUME_MASK;
-      noise_->env_volume = ENV_DECAY_START;
+      noise_->env_reset = true;
       break;
     case DMC_CONTROL_ADDR:
       // Update the control bits and rate of the DMC channel.

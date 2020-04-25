@@ -22,13 +22,6 @@ class AudioPlayer {
     // during construction.
     SDL_AudioDeviceID audio_device_;
 
-    // Sound output is run through two high pass filters and a low pass
-    // filter, which are managed using these variables.
-    float last_normal_sample_ = 0;
-    float last_hpf1_sample_ = 0;
-    float last_hpf2_sample_ = 0;
-    float last_lpf_sample_ = 0;
-
     // Allocates the audio buffer and initializes the audio filters.
     AudioPlayer(SDL_AudioDeviceID device);
 

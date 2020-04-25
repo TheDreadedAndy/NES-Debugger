@@ -28,6 +28,11 @@ override CXXFLAGS += -std=c++17 -Wall -Wshadow -Wextra -Wold-style-cast -Werror 
 # Libraries to be linked to the binary.
 LIBS = $(shell sdl2-config --libs)
 
+# Determine what architecture is being compiled for.
+ifeq ($(shell uname -m), $(filter $(shell uname -m),x86_64 i686))
+    override CXXFLAGS += -D_NES_HOST_X86
+endif
+
 # Determine which OS is being compiled for.
 ifeq ($(OS),Windows_NT)
     override CXXFLAGS += -D_NES_OSWIN

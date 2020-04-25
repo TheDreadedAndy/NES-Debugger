@@ -32,3 +32,29 @@
   DataWord rev = ReverseWord(word);
   return ReverseWord((rev) & (-rev));
 }
+
+/*
+ * Gets an approximation for the inverse of a floating point number.
+ */
+[[gnu::pure]] float Inverse(float x) {
+#ifdef _NES_HOST_X86
+  // If the host is X86, then we can use rcpss for a quick approximation.
+  asm("movd %1, %%xmm0\n"
+      "rcpss %%xmm0, %%xmm0\n"
+      "movd %%xmm0, %0" : "=r" (x) : "r" (x));
+  return x;
+#else
+  /*
+   * If our target architecture is not known to be x86, we approximate
+   * the result using the "Fast Inverse Square Root" method.
+   * Details of this method are available on wikipedia.
+   *
+   * Since we are looking for the inverse, our magic number is 3/2 that
+   * of the original, and our newton-method approximation was calculated
+   * using f(y) = (1/y) - x = 0.
+   */
+  union { float f; uint32_t i; } conv = { .f = x };
+  conv.i = 0x7EF4FB9D - conv.i;
+  return conv.f * (2.0f - conv.f * x);
+#endif
+}

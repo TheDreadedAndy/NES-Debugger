@@ -35,4 +35,7 @@ typedef union {
 // Gets the MSB of a word.
 [[gnu::pure]] DataWord MsbWord(DataWord word);
 
+// Gets an approximation for the inverse of a float.
+[[gnu::pure]] float Inverse(float x);
+
 #endif

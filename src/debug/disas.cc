@@ -17,6 +17,7 @@ struct DisasMemory {
   Memory *memory;
   size_t bank;
   DoubleWord pc;
+  DoubleWord offset;
 };
 
 // Instructions are classified under several different types to aid in
@@ -24,9 +25,12 @@ struct DisasMemory {
 enum InstType { UNKNOWN, TYPE_0, TYPE_1, TYPE_2, TYPE_8, BRANCH };
 
 /* Helper Functions */
-size_t DisassembleInstruction(DisasMemory *ref, char *buf, size_t buf_len);
-InstType GetInstructionType(DataWord inst);
-size_t DisassembleType8(DataWord inst, char *inst_buf, size_t inst_buf_len);
+static size_t DisassembleInstruction(DisasMemory *ref, char *buf,
+                                     size_t buf_len);
+static size_t InsertAddrPreamble(DisasMemory *ref, char *buf, size_t buf_len);
+static InstType GetInstructionType(DataWord inst);
+static size_t DisassembleType8(DataWord inst, char *inst_buf, size_t
+                               inst_buf_len);
 
 /*
  * Uses the given memory object, pc, and bank to disassemble the given number
@@ -37,7 +41,7 @@ size_t DisassembleType8(DataWord inst, char *inst_buf, size_t inst_buf_len);
  */
 char *Disassemble(Memory *mem, DoubleWord pc, size_t bank, size_t num_inst) {
   // Store the given information to make tracking it easier.
-  DisasMemory ref = { mem, bank, pc };
+  DisasMemory ref = { mem, bank, pc, 0 };
 
   // Disassemble the program into a fixed size buffer.
   const size_t buf_max = 256;
@@ -92,18 +96,20 @@ char *Disassemble(Memory *mem, DoubleWord pc, size_t bank, size_t num_inst) {
  */
 size_t DisassembleInstruction(DisasMemory *ref, char *buf, size_t buf_len) {
   // Read the instruction and prepare the buffer.
-  const size_t inst_buf_len = 32U;
-  char inst_buf[inst_buf_len];
+  const size_t line_buf_len = 256U;
+  char line_buf[line_buf_len];
   DataWord inst = ref->memory->Inspect(ref->pc, ref->bank);
 
-  // TODO: Information about the instruction should be printed here.
-  // Address, Bank number, Disas offset.
+  // Add the address and function information to the disassembly line.
+  size_t preamble_size = InsertAddrPreamble(ref, line_buf, line_buf_len);
 
   // Determine the instruction type, and disassemble the instruction.
   size_t mnemonic_len = 0;
+  size_t mnemonic_buf_len = line_buf_len - preamble_size;
+  char *mnemonic_buf = &(line_buf[preamble_size]);
   switch(GetInstructionType(inst)) {
     case TYPE_8:
-      mnemonic_len = DisassembleType8(inst, inst_buf, inst_buf_len);
+      mnemonic_len = DisassembleType8(inst, mnemonic_buf, mnemonic_buf_len);
       break;
     case TYPE_1:
     case TYPE_2:
@@ -114,7 +120,7 @@ size_t DisassembleInstruction(DisasMemory *ref, char *buf, size_t buf_len) {
       return 0;
   }
 
-  // TODO: Instruction address mode should be appended here.
+  // TODO: Append current PC indication, write line buffer to returned buffer.
   (void)buf;
   (void)buf_len;
   (void)mnemonic_len;
@@ -123,9 +129,33 @@ size_t DisassembleInstruction(DisasMemory *ref, char *buf, size_t buf_len) {
 }
 
 /*
+ * Inserts the address preamble for a disassembly line in the given buffer.
+ * Returns the size of the preamble.
+ *
+ * Assumes the buffer is large enough to hold the preamble.
+ */
+static size_t InsertAddrPreamble(DisasMemory *ref, char *buf, size_t buf_len) {
+  // The string format for the address preamble.
+  const char* const preamble = "   0x%02x%02x,%d <+%d>: ";
+  const size_t min_preamble_size = 24U;
+
+  // Get the address of the instruction from the reference, and create
+  // the preamble string.
+  DoubleWord addr = ref->pc + ref->offset;
+  DataWord addr_hi = GET_WORD_HI(addr);
+  DataWord addr_lo = GET_WORD_LO(addr);
+  size_t preamble_size = snprintf(buf, buf_len, preamble, addr_hi, addr_lo,
+                                  static_cast<int>(ref->bank), ref->offset);
+
+  // Pad the preamble with spaces, if it did not reach the minimum size.
+  for (size_t i = preamble_size; i < min_preamble_size; i++) { buf[i] = ' '; }
+  return MAX(preamble_size, min_preamble_size);
+}
+
+/*
  * Determines the type of the given instruction.
  */
-InstType GetInstructionType(DataWord inst) {
+static InstType GetInstructionType(DataWord inst) {
   if ((inst & 0x3) == 0x1) {
     // Type 1 instructions encode 1 with their low two bits and consist
     // of ALU operations and load/store A.
@@ -157,7 +187,7 @@ InstType GetInstructionType(DataWord inst) {
  *
  * Assumes the given instruction is type 8.
  */
-size_t DisassembleType8(DataWord inst, char *inst_buf, size_t inst_buf_len) {
+size_t DisassembleType8(DataWord inst, char *buf, size_t buf_len) {
   const char* const kType8Mnemonics[16] = {
     kPushPMnemonic, kClearCMnemonic, kPullPMnemonic, kSetCMnemonic,
     kPushAMnemonic, kClearIMnemonic, kPullAMnemonic, kSetIMnemonic,
@@ -165,5 +195,5 @@ size_t DisassembleType8(DataWord inst, char *inst_buf, size_t inst_buf_len) {
     kIncYMnemonic,  kClearDMnemonic, kIncXMnemonic,  kSetDMnemonic
   };
   // TODO: Instruction offset must also be changed after disassembly.
-  return StrAppend(inst_buf, inst_buf_len, kType8Mnemonics[inst >> 4]);
+  return StrAppend(buf, buf_len, kType8Mnemonics[inst >> 4]);
 }

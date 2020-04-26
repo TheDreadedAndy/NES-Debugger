@@ -39,9 +39,7 @@
 [[gnu::pure]] float Inverse(float x) {
 #ifdef _NES_HOST_X86
   // If the host is X86, then we can use rcpss for a quick approximation.
-  asm("movd %1, %%xmm0\n"
-      "rcpss %%xmm0, %%xmm0\n"
-      "movd %%xmm0, %0" : "=r" (x) : "r" (x));
+  asm("rcpss %1, %0" : "=x" (x) : "x" (x));
   return x;
 #else
   /*

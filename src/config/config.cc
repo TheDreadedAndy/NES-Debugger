@@ -110,7 +110,7 @@ void Config::Load(const char *config_file) {
   // Keys and values can be no larger than BUF_LIMIT characters.
   char key[BUF_LIMIT];
   char val[BUF_LIMIT];
-  char next_byte;
+  int next_byte;
   while ((next_byte = fgetc(config)) != EOF) {
     // Undo the stream position increment from the loop guard.
     fseek(config, -1, SEEK_CUR);
@@ -140,7 +140,7 @@ bool Config::ScanKey(char *buf, size_t buf_size, FILE *config) {
   // Scan the line until either a failing condition is met or the
   // entire key has been read.
   size_t i = 0;
-  char next_byte;
+  int next_byte;
   while ((next_byte = fgetc(config)) != '=') {
     // Add the next character to the buffer if it was valid.
     if ((next_byte == '\n') || (next_byte == EOF)) { return false; }
@@ -172,7 +172,7 @@ bool Config::ScanVal(char *buf, size_t buf_size, FILE *config) {
   // Scan the line until either a stop character is encountered or
   // the buffer has been filled.
   size_t i = 0;
-  char next_byte = fgetc(config);
+  int next_byte = fgetc(config);
   while ((next_byte != '\n') && (next_byte != EOF)) {
     // Add the character to the buffer and read the next character.
     buf[i] = next_byte;

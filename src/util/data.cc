@@ -51,7 +51,8 @@
    * of the original, and our newton-method approximation was calculated
    * using f(y) = (1/y) - x = 0.
    */
-  union { float f; uint32_t i; } conv = { .f = x };
+  union { float f; uint32_t i; } conv;
+  conv.f = x;
   conv.i = 0x7EF4FB9D - conv.i;
   return conv.f * (2.0f - conv.f * x);
 #endif

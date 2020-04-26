@@ -658,10 +658,10 @@ float Apu::GetTndOutput(void) {
    * The output of the triangle/noise/dmc channels, which can be expressed as
    * f(t, n, d) = 159.79 / ((1 / ((t / 8227) + (n / 12241) + (d / 22638))) + 100)
    * is approximated with
-   * xtnd = (100 * (t / 8128)) + (n / 128) + (10 * (d / 2048)) + 1.0
-   * as f(xtnd) = (1.5979 * xtnd) / (1 + xtnd).
+   * xtnd = (108 * (t / 8128)) + (18 * (n / 2048)) + (10 * (d / 2048))
+   * as f(xtnd) = (1.5979 * xtnd) / (1.1 + xtnd).
    *
-   * This approximation introduces an error of up to 10%, but allows many of the
+   * This approximation introduces an error of up to 2.5%, but allows many of the
    * floating point operations to be replaced by shift operations (by manually
    * constructing the floating point representation of xtnd).
    */
@@ -669,10 +669,13 @@ float Apu::GetTndOutput(void) {
   uint32_t n = noise_->output;
   uint32_t d = dmc_->level;
   uint32_t xtnd_mantissa = ((n + t) << 16) + ((t + d) << 15)
-                         + (d << 13) + (t << 12);
+                         + ((n + t + d) << 13) + (t << 12);
   union { float f; uint32_t i; } xtnd;
-  xtnd.i = (xtnd_mantissa | 0x3F800000U);
-  return (1.5979f * (xtnd.f - 1.0f)) * Inverse(xtnd.f);
+  // Since the radixes are already alligned, we can just add the hex for
+  // 1.1f and it will become a valid float with the expected value, so long
+  // as t, n, and d were in range.
+  xtnd.i = (xtnd_mantissa + 0x3F8CCCCDU);
+  return (1.5979f * (xtnd.f - 1.1f)) * Inverse(xtnd.f);
 }
 
 /*

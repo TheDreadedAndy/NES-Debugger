@@ -655,27 +655,23 @@ float Apu::GetPulseOutput(void) {
  */
 float Apu::GetTndOutput(void) {
   /*
-   * The output of the triangle/noise/dmc channels, which can be expressed as
-   * f(t, n, d) = 159.79 / ((1 / ((t / 8227) + (n / 12241) + (d / 22638))) + 100)
-   * is approximated with
-   * xtnd = (108 * (t / 8128)) + (18 * (n / 2048)) + (10 * (d / 2048))
-   * as f(xtnd) = (1.5979 * xtnd) / (1.1 + xtnd).
+   * We use fixed point decimal multiplication to quickly obtain
+   * the floating point representation of xtnd + 1.0. We set the radix
+   * after bit 22, as this allows us to simple or our result with
+   * the hex value of the floating point representation of 1.0.
    *
-   * This approximation introduces an error of up to 2.5%, but allows many of the
-   * floating point operations to be replaced by shift operations (by manually
-   * constructing the floating point representation of xtnd).
+   * Since this avoids a floating point addtion and uses integer multiplication
+   * instead of floating point multiplication, it is faster on most systems.
+   *
+   * This approximation introduces an error of up to 0.5%.
    */
   uint32_t t = triangle_->output;
   uint32_t n = noise_->output;
   uint32_t d = dmc_->level;
-  uint32_t xtnd_mantissa = ((n + t) << 16) + ((t + d) << 15)
-                         + ((n + t + d) << 13) + (t << 12);
+  uint32_t xtnd_mantissa = (t * 0x18e4c) + (n * 0x10bb0) + (d * 0x90bf);
   union { float f; uint32_t i; } xtnd;
-  // Since the radixes are already alligned, we can just add the hex for
-  // 1.1f and it will become a valid float with the expected value, so long
-  // as t, n, and d were in range.
-  xtnd.i = (xtnd_mantissa + 0x3F8CCCCDU);
-  return (1.5979f * (xtnd.f - 1.1f)) * Inverse(xtnd.f);
+  xtnd.i = (xtnd_mantissa | 0x3F800000U);
+  return 1.5979f * (xtnd.f - 1.0f) * Inverse(xtnd.f);
 }
 
 /*
